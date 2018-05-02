@@ -1,0 +1,1 @@
+-define(MAX_TTL, 16#7FFFFFFF).

@@ -75,6 +75,7 @@
     include_depth=3  :: non_neg_integer(),
     included_from=[] :: [string()],
     punyencode=false :: boolean(),
+    allow_unknown_resources=false :: boolean(),
     directives=#{
         "origin"     => directive_origin,
         "ttl"        => directive_ttl,
@@ -324,6 +325,45 @@ punyencode(Domain, _) ->
     Domain.
 
 
+handle_unknown_resource_data([]) ->
+    {error, no_data};
+handle_unknown_resource_data([[$\\, $#], BytesList|HexValues]) ->
+    try list_to_integer(BytesList) of
+        Bytes when Bytes >= 0, Bytes < 16#FFFF ->
+            try transform_unknown_resource_data(lists:flatten(HexValues), Bytes, <<>>) of
+                {ok, _}=Tuple -> Tuple;
+                {error, _}=Tuple -> Tuple
+            catch
+                error:function_clause -> {error, invalid_resource_data}
+            end;
+        Bytes -> {error, {data_too_long, Bytes}}
+    catch
+        error:badarg -> {error, {bad_data_length, BytesList}}
+    end;
+handle_unknown_resource_data([Token|_]) ->
+    {error, {invalid_unknown_resource_start_token, Token}}.
+
+
+transform_unknown_resource_data([], 0, Acc) ->
+    {ok, Acc};
+transform_unknown_resource_data([], _, _) ->
+    {error, partial_resource_data};
+transform_unknown_resource_data([_], 1, _) ->
+    {error, missing_resource_data_nibble};
+transform_unknown_resource_data([C1, C2|Rest], Count, Acc) ->
+    Byte = (transform_unknown_resource_data_hex_to_integer(C1) bsl 4) bor transform_unknown_resource_data_hex_to_integer(C2),
+    transform_unknown_resource_data(Rest, Count-1, <<Acc/binary, Byte>>).
+
+
+transform_unknown_resource_data_hex_to_integer(C) when C >= $0, C =< $9 ->
+    C - $0;
+transform_unknown_resource_data_hex_to_integer(C) when C >= $a, C =< $f ->
+    C - ($a - 10);
+transform_unknown_resource_data_hex_to_integer(C) when C >= $A, C =< $F ->
+    C - ($A - 10).
+
+
+
 -spec compile_entry(proto_resource(), [line_part()], map()) -> {'ok', proto_resource()}.
 compile_entry(Entry, [], _) ->
     {ok, Entry};
@@ -358,6 +398,37 @@ try_ttl(Entry, Parts, State) ->
     try_type(Entry, Parts, State).
 
 
+try_type({Domain, undefined, Class, Ttl, undefined}=Tuple, [[$t,$y,$p,$e|TypeValue]|Rest], State = #state{startline=LineNumber,path=File,allow_unknown_resources=true}) ->
+    try list_to_integer(TypeValue) of
+        Type when Type >= 0, Type < 16#FFFF ->
+            case dnsrr:from_to(Type, value, module) of
+                Module when is_atom(Module) ->
+                    % If we know that resource, use Module:from_binary to produce internal resource representation
+                    % If the data contains domain compressions, produce error
+                    Atom = dnsrr:from_to(Module, module, atom),
+                    case Rest of
+                        [[$\\, $#]|_] ->
+                            case handle_unknown_resource_data(Rest) of
+                                {ok, Data} ->
+                                    case Module:from_binary(Data) of
+                                        {ok, Rdata} -> {ok, {Domain, Atom, Class, Ttl, Rdata}};
+                                        {error, Reason} -> {error, Reason};
+                                        {domains, _} -> {error, resource_contains_domain_compressions}
+                                    end;
+                                {error, Reason} -> error(syntax_error(File, LineNumber, {invalid_unknown_resource, Reason}))
+                            end;
+                        _ -> try_type(Tuple, [Module:masterfile_token()|Rest], State)
+                    end;
+                Type ->
+                    case handle_unknown_resource_data(Rest) of
+                        {ok, Data} -> {ok, {Domain, Type, Class, Ttl, Data}};
+                        {error, Reason} -> error(syntax_error(File, LineNumber, {invalid_unknown_resource, Reason}))
+                    end
+            end;
+        Type -> error(syntax_error(File, LineNumber, {type_value_out_of_range, Type}))
+    catch
+        error:badarg -> error(syntax_error(File, LineNumber, {invalid_type_value, TypeValue}))
+    end;
 try_type({Domain, undefined, Class, Ttl, undefined}, [Type0|Rest], State = #state{startline=LineNumber,path=File}) ->
     case dnsrr:from_to(Type0, masterfile_token, module) of
         Type0 -> error(resource_record_error(File, LineNumber, {invalid_token, Type0}));
@@ -421,7 +492,10 @@ check_blacklist(Entry = {_, Type, _, _, _} , State = #state{startline=LineNumber
     end.
 
 
-check_type_class_compatibility(Entry = {Domain, Type, Class, Ttl, _} , State0 = #state{records=Records,startline=LineNumber,path=File}) ->
+check_type_class_compatibility(Entry = {Domain, Type, Class, Ttl, _}, State0 = #state{records=Records}) when is_integer(Type) ->
+    State1 = State0#state{records=[Entry|Records], prevdomain=Domain, prevclass=Class, prevttl=Ttl},
+    {ok, State1};
+check_type_class_compatibility(Entry = {Domain, Type, Class, Ttl, _}, State0 = #state{records=Records,startline=LineNumber,path=File}) ->
     State1 = State0#state{records=[Entry|Records], prevdomain=Domain, prevclass=Class, prevttl=Ttl},
     Module = dnsrr:from_to(Type, atom, module),
     case
@@ -719,7 +793,9 @@ prepare_state(State = #state{}, [{origin, Domain}|Rest]) ->
 prepare_state(State = #state{}, [{ttl, Ttl}|Rest]) when is_integer(Ttl), Ttl >= 0, Ttl =< ?MAX_TTL ->
     prepare_state(State#state{prevttl=Ttl,defttl=Ttl}, Rest);
 prepare_state(State = #state{}, [{max_line_length, Len}|Rest]) ->
-    prepare_state(State#state{max_line_length=Len}, Rest).
+    prepare_state(State#state{max_line_length=Len}, Rest);
+prepare_state(State = #state{}, [{allow_unknown_resources, Value}|Rest]) when Value =:= true; Value =:= false ->
+    prepare_state(State#state{allow_unknown_resources=Value}, Rest).
 
 
 %%
@@ -793,9 +869,7 @@ write_resource([{Domain, Type, Class, Ttl, Data}|Rest], Fd, Map) ->
         $\t,
         integer_to_list(Ttl),
         $\t,
-        string:to_upper(dnsrr:from_to(Type, atom, masterfile_token)),
-        $\t,
-        resource_data_to_io(Type, Data, Map)
+        resource_specific(Type, Data, Map)
     ],
     case Rest of
         [] -> ok = file:write(Fd, Iodata);
@@ -804,8 +878,30 @@ write_resource([{Domain, Type, Class, Ttl, Data}|Rest], Fd, Map) ->
     write_resource(Rest, Fd, Map).
 
 
-resource_data_to_io(Type, Data, _) ->
-    Module = dnsrr:from_to(Type, atom, module),
+resource_specific(Type, Data, Map) ->
+    case dnsrr:from_to(Type, atom, module) of
+        Type when is_integer(Type), is_binary(Data) ->
+            [
+                string:to_upper(lists:append("type"), integer_to_list(Type)),
+                $\t,
+                resource_data_to_io(Type, Data, Map)
+            ];
+        Module ->
+            [
+                string:to_upper(dnsrr:from_to(Type, atom, masterfile_token)),
+                $\t,
+                resource_data_to_io(Module, Data, Map)
+            ]
+    end.
+
+
+resource_data_to_io(Type, Data, _) when is_integer(Type), is_binary(Data) ->
+    % Produce a representation of an unknown resource type according to
+    % RFC3597
+    Start = io_lib:format("\\# ~b ", [byte_size(Data)]),
+    % Produce hex representation of the data
+    [Start, resource_data_to_io_hex_unknown_data(Data, [])];
+resource_data_to_io(Module, Data, _) when is_atom(Module) ->
     List = Module:to_masterfile(Data),
     Fn = fun
         ({domain, Domain}, Acc) -> [$ , dnslib:domain_to_list(Domain)|Acc];
@@ -813,3 +909,16 @@ resource_data_to_io(Type, Data, _) ->
     end,
     [_|Ret] = lists:foldl(Fn, [], List),
     lists:reverse(Ret).
+
+resource_data_to_io_hex_unknown_data(<<>>, Acc) ->
+    lists:reverse(Acc);
+resource_data_to_io_hex_unknown_data(<<C1_0:4, C2_0:4, Tail/binary>>, Acc) ->
+    C1_1 = nibble_to_hex(C1_0),
+    C2_1 = nibble_to_hex(C2_0),
+    resource_data_to_io_hex_unknown_data(Tail, [C2_1, C1_1|Acc]).
+
+
+nibble_to_hex(C) when C >= 10, C < 16 ->
+    C + ($a - 10);
+nibble_to_hex(C) when C >= 0, C < 10 ->
+    C + $0.

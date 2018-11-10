@@ -597,9 +597,7 @@ list_to_ttl(Tail, Acc0) ->
                 "max" when Acc =:= [] -> list_to_ttl(?MAX_TTL, []);
                 _ -> {error, invalid_ttl}
             end
-    end;
-list_to_ttl(_, _) ->
-    {error, invalid_ttl}.
+    end.
 
 -ifdef(EUNIT).
 list_to_ttl_test() ->

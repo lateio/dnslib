@@ -539,11 +539,13 @@ to_bin_records([], Acc, State) ->
 to_bin_records([{Domain0, Type, Class, Ttl, Data}|Rest], Acc, State0) ->
     {Domain1, State1=#bin_state{offset=Offset0}} = compress_domain(Domain0, true, State0),
     case dnsrr:from_to(Type, atom, module) of
-        Type ->
-            % We cannot just pass through unrecognized types, as they could possibly
-            % contain compressed domains and would become invalid if passed through to
-            % a new message
-            error({unrecognized_type, Type});
+        Type when is_integer(Type), is_binary(Data) ->
+            % To be compliant with RFC3597, we'll pass along records we don't understand.
+            % We take it on faith that the resource does not contain domains compressions which
+            % we'll mangle.
+            BinLen = byte_size(Data),
+            Entry = [<<Domain1/binary, Type:16, (dnsclass:from_to(Class, atom, value)):16, Ttl:32, BinLen:16>>, Data],
+            to_bin_records(Rest, [Entry|Acc], State1#bin_state{offset=Offset0+10+BinLen});
         Module ->
             case
                 case Module:to_binary(Data) of

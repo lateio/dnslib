@@ -24,6 +24,7 @@ dnslib claims to be compliant with the following specifications:
 * URI DNS Records: [RFC7553](https://tools.ietf.org/html/rfc7553)
 * Extension Mechanism for DNS: [RFC6891](https://tools.ietf.org/rfc/rfc6891.txt)
 * The Role of Wilcards in the DNS: [RFC4592](https://tools.ietf.org/rfc/rfc4592.txt)
+* Handling of Unknown DNS Resource Record (RR) Types: [RFC3597](https://tools.ietf.org/rfc/rfc3597.txt)
 
 
 Roadmap

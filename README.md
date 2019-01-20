@@ -1,13 +1,42 @@
 dnslib
 =====
 
-dnslib provides tools for working with Domain Name System (DNS; RFCs 1034 and 1035) in Erlang. dnslib mainly facilitates working with DNS messages, master files and other related data types.
+dnslib will be a standards compliant, reliable and extensible library for working with Domain Name System (DNS) data. At the time of writing, however, it lacks the testing to verify it as any of the aforementioned.
 
-Note that since dnslib restricts itself to dealing with DNS wire format and master files, compliance with one RFC or another simply means that dnslib can take data described in a DNS master file, translate it to an internal representation, then translate it into the DNS wire format. Or in reverse, dnslib can translate DNS wire format to an internal representation and potentially even produce a master file representation based on the data.
+dnslib can be included in an application when it is necessary to work with DNS master files or DNS wire format.
+A variety of functionality for working with DNS messages and assorted data types is included.
 
-Thus dnslib claiming compliance a spec does not necessarily mean that merely using dnslib is enough for compliance. Obvious example is the CNAME resource type defined by RFCs 1034 and 1035. Although dnslib understands CNAME in various formats, it does not include any clues about how encountering a CNAME record is to affect a query for a resource. Thus full compliance with different specs might require implementing functionality not included in dnslib.
+The reader should note that dnslib **does not** implement any of the networking functionality of DNS. While it will get an application up to the binary representation of a DNS message, dnslib will not send that binary anywhere.
 
-Documentation for dnslib is currently (version 0.0.0) non-existent. Rectifying the lack of documentation is one of the main goals of 0.0.1.
+Quick start
+-----------
+
+```Erlang
+% Request
+Question = dnslib:question("arv.io", a, in),
+Request0 = dnsmsg:new(#{}, Question),
+{ok, ReqBinLen, ReqBin} = dnswire:to_binary(Request0),
+ReqBinLen = byte_size(ReqBin),
+{ok, Request0, <<>>} = dnswire:from_binary(ReqBin),
+
+% Response
+Answer = dnslib:resource("arv.io IN 60 A 127.0.0.1"),
+Request1 = dnsmsg:add_response_answer(Request0, Answer),
+Response = dnsmsg:response(Request1),
+{ok, ResBinLen, ResIolist} = dnswire:to_iolist(Response),
+ResBin = iolist_to_binary(ResIolist),
+ResBinLen = byte_size(ResBin),
+{ok, Response, <<"Trailing">>} = dnswire:from_binary(<<ResBin/binary, "Trailing">>),
+
+% Make sense of the response
+{ok, [{Question, ok, [Answer]}]} = dnsmsg:interpret_response(Response),
+
+% Keep the answer safe...
+ok = dnsfile:write_resources("/BleepBloop/treasures", [Answer]),
+
+% ...But but take a good look at it every now and then
+{ok, [Answer]} = dnsfile:consult("/BleepBloop/treasures").
+```
 
 
 Compliance
@@ -29,7 +58,8 @@ dnslib claims to be compliant with the following specifications:
 
 Roadmap
 ---
-For version 0.0.1
-* Documentation
-* Better eunit test coverage
-* Possibly `dnsfile:write_resources()`
+For version 0.0.2
+* Better eunit coverage
+* Custom classes similar to custom resource types
+* New opcodes/return codes as required by [Kurremkarmerruk](https://github.com/lateio/kurremkarmerruk)
+* Progress towards DNSSEC (?)

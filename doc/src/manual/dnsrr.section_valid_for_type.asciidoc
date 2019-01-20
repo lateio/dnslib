@@ -1,0 +1,54 @@
+= dnsrr:section_valid_for_type
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsrr:section_valid_for_type - Check if a type is allowed in certain section of a DNS message
+
+== Description
+
+[source,erlang]
+----
+section_valid_for_type(Section :: dnsmsg:message_section(), Type :: atom()) -> boolean().
+----
+
+Check if a type is allowed in certain section of a DNS message.
+
+== Arguments
+
+Section::
+
+Section to test
+
+Type::
+
+Type to test
+
+== Return value
+
+`'false'` is returned if the combination is *known* to be invalid.
+
+Otherwise `'true'` is returned.
+
+== Notes
+
+Most resource are allowed in any section. QTYPEs -- resource types which are only allowed in questions -- and `OPT` type are some exceptions to this.
+
+== Examples
+
+[source,erlang]
+----
+false = dnsrr:section_valid_for_type(question, opt),
+false = dnsrr:section_valid_for_type(answer, all).
+----
+
+== Changelog
+
+* *0.0.1* Function added
+
+== See also
+
+link:dnsrr.callback.message_section{ext-relative}[Module:message_section],
+link:dnsrr{ext-relative}[dnsrr]

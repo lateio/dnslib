@@ -1,0 +1,56 @@
+= Module:to_binary
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+Module:to_binary - Transforms data to wire format
+
+== Description
+
+[source,erlang]
+----
+to_binary(Data :: term())
+    -> {ok, iodata()}
+     | {domains, [term()]}.
+----
+
+Transforms data to wire format.
+
+== Arguments
+
+Data::
+
+Data to transform
+
+== Return value
+
+If the resource data *does not contain domains*, returns a tuple with `'ok'` and an `iodata()` term.
+
+If the resource data *does contain domains*, returns a tuple with `'domains'` and a list in which data other than domains has `iodata()` representation and domains are indicated with link:dnswire.to_binary_domain{ext-relative}[`dnswire:to_binary_domain`].
+
+== Examples
+
+.Example from dnsrr_a
+[source,erlang]
+----
+to_binary({B1, B2, B3, B4}) ->
+    {ok, <<B1, B2, B3, B4>>}.
+----
+
+.Example from dnsrr_mx
+[source,erlang]
+----
+to_binary({Priority, Domain}) ->
+    {domains, [<<Priority:16>>, dnswire:to_binary_domain(Domain)]}.
+----
+
+== Changelog
+
+* *0.0.0* Callback added
+
+== See also
+
+link:dnswire.to_binary_domain{ext-relative}[dnswire:to_binary_domain],
+link:dnsrr{ext-relative}[dnsrr]

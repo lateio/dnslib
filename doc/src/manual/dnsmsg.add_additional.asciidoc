@@ -1,0 +1,55 @@
+= dnsmsg:add_additional
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsmsg:add_additional - Add a resource to the additional section of a message
+
+== Description
+
+[source,erlang]
+----
+add_additional(
+  Msg :: dnsmsg:message(),
+  Resource :: dnslib:resource() | [dnslib:resource()])
+    -> dnsmsg:message().
+----
+
+Add a resource to the additional section of a message.
+
+== Arguments
+
+Msg::
+
+Message to which the resource will be added
+
+Resource::
+
+Resource(s) to add
+
+== Return value
+
+The message containing the added resource(s) is returned.
+
+Resources will appear in the message in the order they were included in.
+
+== Examples
+
+[source,erlang]
+----
+Msg = dnsmsg:add_additional(dnsmsg:new(), dnslib:resource([], ns, in, 60, "ns1")).
+----
+
+== Changelog
+
+* *0.0.0* Function added
+
+== See also
+
+link:dnsmsg.set_section{ext-relative}[dnsmsg:set_section],
+link:dnsmsg.add_question{ext-relative}[dnsmsg:add_question],
+link:dnsmsg.add_answer{ext-relative}[dnsmsg:add_answer],
+link:dnsmsg.add_authority{ext-relative}[dnsmsg:add_authority],
+link:dnsmsg{ext-relative}[dnsmsg]

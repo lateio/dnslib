@@ -1,0 +1,94 @@
+= dnsfile:parse_resource
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsfile:parse_resource - Parse string as a resource
+
+== Description
+
+[source,erlang]
+----
+parse_resource(Resource :: string())
+    -> {'ok', dnslib:resource()}
+     | {'error',
+           'empty'
+         | 'partial'
+         | term()
+       }.
+----
+
+Parse string as a resource. Intended for handier resource creation, not for handling DNS master files line by line.
+
+== Arguments
+
+Resource::
+
+String representing a resource in master file syntax. Should not contain line breaks.
+
+== Return value
+
+On success a tuple consisting of `'ok'` atom and the produced resource is returned.
+
+On error a tuple consisting of `'error'` atom and the error reason is returned.
+
+== Errors
+
+`'empty'`::
+
+`parse_entry` was passed an empty string or a string consisting only of whitespace.
+
+`'partial'`::
+
+String did not represent a complete resource entry. Unclosed parentheses or quotes are a likely culprit.
+
+== Notes
+
+For convenience's sake, `parse_resource` sets the origin to root domain, thus allowing domains to be written without the final dot.
+
+Like in `dnslib:consult`, `IN` is the assumed class of resources.
+
+All directives are disallowed.
+
+`@` as a shorthand for origin is disallowed.
+
+Line breaks should not be present in string used with `parse_entry` as they will likely produce unexpected results.
+
+== Encoding
+
+As the `Resource` string is likely an Erlang string, one should keep in mind the considerations related to non-ASCII in master files. See xref:dnsfile{ext-relative}#encoding[dnsfile - encoding] for further details.
+
+== Examples
+
+[source,erlang]
+----
+Resource = {[<<"arv">>,<<"io">>],a,in,60,{0,0,0,0}},
+
+{ok, Resource} = dnsfile:parse_resource("arv.io IN 60 A 0.0.0.0"),
+{ok, Resource} = dnsfile:parse_resource("arv.io\t60\tA\t0.0.0.0"),
+{ok, Resource} = dnsfile:parse_resource("arv.io. 60 A 0.0.0.0"),
+{ok, Resource} = dnsfile:parse_resource("arv.io. 1min A 0.0.0.0"),
+{ok, Resource} = dnsfile:parse_resource("arv.io CLASS1 60 TYPE1 \\# 4 00 00 00 00").
+----
+
+.Errors
+[source,erlang]
+----
+{error, empty} = dnsfile:parse_resource(""),
+{error, empty} = dnsfile:parse_resource("    \t\t\t\t      "),
+{error, partial} = dnsfile:parse_resource("arv.io IN 60 SOA (  "),
+{error, partial} = dnsfile:parse_resource("arv.io IN 60 SOA \"  "),
+{error, _} = dnsfile:parse_resource("@  60  A  0.0.0.0"),
+{error, _} = dnsfile:parse_resource("$INCLUDE \"other.zone\"").
+----
+
+== Changelog
+
+* *0.0.1* Function added
+
+== See also
+
+link:dnslib.resource{ext-relative}[dnslib:resource],
+link:dnsfile{ext-relative}[dnsfile]

@@ -1,0 +1,31 @@
+= dnszone
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Module
+
+dnszone
+
+== Description
+
+Functionality related to DNS zones.
+
+== Exports
+
+Zone validity:
+
+* link:dnszone.valid{ext-relative}[dnszone:valid] - Check if resource records form a valid zone
+
+Zone transfers:
+
+* link:dnszone.continue_transfer{ext-relative}[dnszone:continue_transfer] - Continue an ongoing zone transfer
+* link:dnszone.new_transfer{ext-relative}[dnszone:new_transfer] - Keep track of an ongoing zone transfer
+
+== Changelog
+
+* *0.0.0* Module added
+
+== See also
+
+link:index{ext-relative}[Index]

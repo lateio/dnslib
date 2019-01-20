@@ -1,0 +1,109 @@
+= Module:masterfile_format
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+Module:masterfile_format - Returns the number and type of master file data arguments
+
+== Description
+
+[source,erlang]
+----
+masterfile_format() -> [dnsrr:masterfile_format_type()].
+----
+
+Returns the number and type of master file data arguments.
+
+== Types
+
+=== masterfile_format_type()
+
+[source,erlang]
+----
+masterfile_format_type() =
+      'token'
+    | 'text'
+    | 'text_unlimited'
+    | 'qtext'
+    | 'qtext_unlimited'
+    | 'uint16'
+    | 'uint32'
+    | 'ttl'
+    | 'domain'
+    | '...'.
+----
+
+Each format type is passed to the module as a certain type. This is given in parentheses next to the format type.
+
+`'token'` (`string()`)::
+
+Any non-quoted string of characters. For example, `0.0.0.0`.
+
+`'text'` (`[byte()]`)::
+
+Any quoted or non-quoted string of characters. Can be at most 255 octets long. When handling this data -- or any of the following text data types -- the list can be safely transformed to binary without losing anything, as any non-ASCII characters have been encoded away.
+
+`'text_unlimited'` (`[byte()]`)::
+
+Like `'text'`, but has no length limit.
+
+`'qtext'` (`[byte()]`)::
+
+Like `'text'`, but only accepts quoted text.
+
+`'qtext_unlimited'` (`[byte()]`)::
+
+Like `'qtext'`, but has no length limit.
+
+`'uint16'` (`0..16#FFFF`)::
+
+Base10 integer in range `0..16#FFFF`.
+
+`'uint32'` (`0..16#FFFFFFFF`)::
+
+Base10 integer in range `0..16#FFFFFFFF`.
+
+`'ttl'` (`dnslib:ttl()`)::
+
+Base10 integer in range `0..16#7FFFFFFF`. Accepts time units described in link:dnslib.list_to_ttl{ext-relative}[`dnslib:list_to_ttl`].
+
+`'domain'` (`dnslib:non_wildcard_domain()`)::
+
+A non-wildcard domain.
+
+`'...'`::
+
+Repeat the previous type until all remaining arguments are exhausted.
+
+== Return value
+
+Returned list is used when verifying the number, types and values of master file arguments.
+
+== Optional callback
+
+This callback is optional.
+
+If this callback is not implemented, but link:dnsrr.callback.masterfile_token{ext-relative}[`Module:masterfile_token`] and link:dnsrr.callback.from_masterfile{ext-relative}[`Module:from_masterfile`] are implemented, default value `['token', '...']` is used.
+
+== Examples
+
+[source,erlang]
+----
+[token] = dnsrr_a:masterfile_format(),           % 127.0.0.1
+[text, '...'] = dnsrr_txt:masterfile_format(),   % "v=spf1 -all"
+[uint16, domain] = dnsrr_mx:masterfile_format(), % 0 smtp.domain.
+[domain] = dnsrr_ns:masterfile_format(),         % ns.domain.
+[domain, domain, uint32, ttl, ttl, ttl, ttl] = dnsrr_soa:masterfile_format().
+----
+
+== Changelog
+
+* *0.0.0* Callback added
+
+== See also
+
+link:dnsrr.callback.masterfile_token{ext-relative}[Module:masterfile_token],
+link:dnsrr.callback.from_masterfile{ext-relative}[Module:from_masterfile],
+link:dnsrr{ext-relative}[dnsrr]

@@ -1,0 +1,72 @@
+= dnsrr:from_to
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsrr:from_to - Transform an identifying term from one type to another
+
+== Description
+
+[source,erlang]
+----
+from_to(
+  Value :: atom() | 0..16#FFFF | string(),
+  From :: 'value' | 'module' | 'atom',
+  To   :: 'value' | 'module' | 'atom')
+    -> atom() | 0..16#FFFF | string().
+----
+
+Transform an identifying term from one type to another.
+
+Mnemonic: `from_to(ns, atom, value)` -- "Transform ns *from_* atom *to* value".
+
+== Arguments
+
+Value::
+
+Term to transform
+
+From::
+
+Transform from type
+
+To::
+
+Transform to type
+
+== Return value
+
+On success, the identifying term in type `To` is returned.
+
+If the translation was not possible, the original `Value` term is returned.
+
+Summarizing: On success a different value is returned, on error the original value is returned.
+
+== Examples
+
+[source,erlang]
+----
+1 = dnsrr:from_to(a, atom, value),
+"a" = dnsrr:from_to(a, atom, masterfile_token),
+dnsrr_a = dnsrr:from_to(a, atom, module),
+
+a = dnsrr:from_to(1, value, atom),
+dnsrr_a = dnsrr:from_to(1, value, module),
+"a" = dnsrr:from_to(1, value, masterfile_token),
+
+% An unknown value
+100 = dnsrr:from_to(100, value, atom).
+----
+
+== Changelog
+
+* *0.0.0* Function added
+
+== See also
+
+link:dnsrr.callback.atom{ext-relative}[Module:atom],
+link:dnsrr.callback.masterfile_token{ext-relative}[Module:masterfile_token],
+link:dnsrr.callback.value{ext-relative}[Module:value],
+link:dnsrr{ext-relative}[dnsrr]

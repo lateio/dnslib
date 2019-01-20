@@ -1,0 +1,81 @@
+= Module:from_masterfile
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+Module:from_masterfile - Transforms master file arguments to resource data
+
+== Description
+
+[source,erlang]
+----
+from_masterfile(Args :: [non_neg_integer() | string() | [byte()] | dnslib:non_wildcard_domain()])
+    -> {ok, Data :: term()}
+     | {error, term()}.
+----
+
+Transforms master file arguments to resource data.
+
+== Arguments
+
+Args::
+
+A list of arguments parsed and verified from a master file according to the link:dnsrr.callback.masterfile_format{ext-relative}[`Module:masterfile_format`] callback
+
+== Return value
+
+If all provided data was as expected, returns a tuple consisting of `'ok'` and the internal resource data.
+
+Otherwise, returns a tuple consisting of `'error'` and the error reason.
+
+== Optional callback
+
+This callback is optional. However, if the module implements link:dnsrr.callback.masterfile_token{ext-relative}[`Module:masterfile_token`], this callback is also required.
+
+== Notes
+
+This callback works with link:dnsrr.callback.masterfile_format{ext-relative}[`Module:masterfile_format`], freeing the module from calling `list_to_integer`, link:dnslib.list_to_ttl{ext-relative}[`dnslib:list_to_ttl`] or link:list_to_domain{ext-relative}[`dnslib:list_to_domain`] on all the arguments it is passed.
+
+For example, due to link:dnsrr.callback.masterfile_format{ext-relative}[`Module:masterfile_format`], the `Args` for an `MX` record would have the following contents:
+
+[source,erlang]
+[uint16, domain] = dnsrr_mx:masterfile_format(),
+[10, [<<"ns1">>,<<"domain">>]] = Args.
+
+== Examples
+
+[source,erlang]
+----
+Priority = 0,
+Domain = [<<"ns1">>,<<"domain">>],
+{ok, {Priority, Domain}} = dnsrr_mx:from_masterfile([Priority, Domain]).
+----
+
+.Example from dnsrr_a
+[source,erlang]
+----
+from_masterfile([Address0]) ->
+    case inet:parse_ipv4strict_address(Address0) of
+        {ok, Address} -> {ok, Address};
+        _ -> {error, {invalid_address, Address0}}
+    end.
+----
+
+.Example from dnsrr_mx
+[source,erlang]
+----
+from_masterfile([Priority, Domain]) ->
+    {ok, {Priority, Domain}}.
+----
+
+== Changelog
+
+* *0.0.0* Callback added
+
+== See also
+
+link:dnsrr.callback.masterfile_token{ext-relative}[`Module:masterfile_token`],
+link:dnsrr.callback.masterfile_format{ext-relative}[`Module:masterfile_format`],
+link:dnsrr{ext-relative}[dnsrr]

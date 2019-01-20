@@ -1,0 +1,69 @@
+= dnsclass:from_to
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Function
+
+dnsclass:from_to - Transform an identifying term from one type to another
+
+== Description
+
+[source,erlang]
+----
+from_to(
+  Value :: atom() | 0..16#FFFF | string(),
+  From :: 'value' | 'module' | 'atom',
+  To   :: 'value' | 'module' | 'atom')
+    -> atom() | 0..16#FFFF | string().
+----
+
+Transform an identifying term from one type to another.
+
+Mnemonic: `from_to(hs, atom, value)` -- "Transform hs *from_* atom *to* value".
+
+== Arguments
+
+Value::
+
+Term to transform
+
+From::
+
+Transform from type
+
+To::
+
+Transform to type
+
+== Return value
+
+On success, the identifying term in type `To` is returned.
+
+If the translation was not possible, the original `Value` is returned.
+
+Summarizing: On success a different value is returned, on error the original value is returned.
+
+== Examples
+
+[source,erlang]
+----
+1 = dnsclass:from_to(in, atom, value),
+"in" = dnsclass:from_to(in, atom, masterfile_token),
+dnsclass_in = dnsclass:from_to(in, atom, module),
+
+in = dnsclass:from_to(1, value, atom),
+dnsclass_in = dnsclass:from_to(1, value, module),
+"in" = dnsclass:from_to(1, value, masterfile_token),
+
+% An unknown value
+100 = dnsclass:from_to(100, value, atom).
+----
+
+== Changelog
+
+* *0.0.0* Function added
+
+== See also
+
+link:dnsclass{ext-relative}[dnsclass]

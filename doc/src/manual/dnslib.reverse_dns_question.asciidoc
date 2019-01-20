@@ -1,0 +1,48 @@
+= dnslib:reverse_dns_question
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:reverse_dns_question - Get the reverse dns question for an ip address
+
+== Description
+
+[source,erlang]
+----
+reverse_dns_question(Address :: inet:ip_address()) -> dnslib:question().
+----
+
+Get the reverse dns question for an ip address.
+
+== Arguments
+
+Address::
+
+An IPv4 or IPv6 address
+
+== Return value
+
+Returns the question term which is to be used in a reverse dns query for the provided address.
+
+== Examples
+
+[source,erlang]
+----
+{[<<"4">>,<<"3">>,<<"2">>,<<"1">>,<<"in-addr">>,<<"arpa">>], ptr, in} = dnslib:reverse_dns_question({1,2,3,4}),
+
+IPv6 = {16#0123, 16#4567, 16#89abc, 16#def0, 16#1234, 16#5678, 16#9abc, 16#def0},
+IPv6Domain = dnslib:reverse_dns_domain(IPv6),
+{IPv6Domain, ptr, in} = dnslib:reverse_dns_question(IPv6).
+----
+
+== Changelog
+
+* *0.0.1* Function renamed from `reverse_ip_query` to `reverse_dns_question`
+* *0.0.0* Function added
+
+== See also
+
+link:dnslib.reverse_dns_domain{ext-relative}[dnslib:reverse_dns_domain],
+link:dnslib{ext-relative}[dnslib]

@@ -1,0 +1,118 @@
+= dnslib:list_to_domain
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:list_to_domain - Transform a string into a domain
+
+== Description
+
+[source,erlang]
+----
+list_to_domain(Domain :: string())
+    -> {'ok', 'absolute' | 'relative', dnslib:domain()}
+     | {'error',
+         'domain_too_long' |
+         'label_too_long'  |
+         'empty_label'     |
+         'empty_string'    |
+         {'invalid_escape_integer', string()} |
+         {'escape_out_of_range', integer()}   |
+         {'non_ascii_codepoint', string()}
+       }.
+----
+
+Transform a string into a domain.
+
+== Arguments
+
+Domain::
+
+A string representation of a domain. Can be absolute or relative. Can contain character escapes. Character case is preserved. This string has to consist of characters in range `0..127` or an error will be returned.
+
+== Return value
+
+On success a tuple consisting of `'ok'` atom, the domain type -- `'absolute'` or `'relative'` -- and the domain is returned. The type of the domain is included because the distinction is not represented in domain data types, as the DNS protocol deals exclusively in absolute domains. Difference between `'absolute'` and `'relative'` domains is a convenience for writing master files, not much more.
+
+On error a tuple consisting of `'error'` atom and the error reason is returned.
+
+== Errors
+
+`'domain_too_long'`::
+
+Domains can be at most 255 octets long. Due to the way domains are represented in wire format, this does not mean that domains can actually contain 255 characters.
+
+`'label_too_long'`::
+
+Domain labels -- `arv` and `io` in `arv.io` -- can be at most 63 octets long.
+
+`'empty_label'`::
+
+Domains cannot contain empty labels -- for example `arv..io` is illegal.
+
+`'empty_string'`::
+
+`list_to_domain` will not process empty strings.
+
+`{'invalid_escape_integer', string()}`::
+
+Escape form `\000` has to be made up of a backslash (`\`) and three digits.
+
+`{'escape_out_of_range', integer()}`::
+
+Escape form `\000` is limited to values in range `0..255`
+
+`{'non_ascii_codepoint', string()}`::
+
+Erlang strings are lists of arbitrarily large integers. Thus it is possible to try to parse a string containing codepoints outside of ASCII as a domain. While a number of extended ASCII encodings can be represented using single octets, dnslib takes the stance that any domains containing non-ASCII codepoints have to be explicitly handled and okayed by the programmer, so as to prevent encodings -- and related ambiguity -- from accidentally bleeding into domains. Thus `list_to_domain` will produce an error if the string contains non-ASCII codepoints.
+
+[NOTE]
+If your use case potentially involves non-ASCII codepoints, use link:dnslib.list_to_codepoint_domain{ext-relative}[dnslib:list_to_codepoint_domain] instead, as it allows you to deal with previously mentioned codepoints before they are transformed to binaries.
+
+== Examples
+
+[source,erlang]
+----
+{ok, absolute, []} = dnslib:list_to_domain("."),
+{ok, absolute, [<<"ARV">>,<<"io">>]} = dnslib:list_to_domain("ARV.io."),
+{ok, relative, [<<"ARV">>,<<"io">>]} = dnslib:list_to_domain("ARV.io"),
+{ok, absolute, ['_',<<"ARV">>,<<"io">>]} = dnslib:list_to_domain("*.ARV.io."),
+{ok, relative, ['_',<<"ARV">>,<<"*">>,<<"io">>]} = dnslib:list_to_domain("*.ARV.*.io"),
+{ok, relative, [<<"*">>,<<"ARV">>,<<"*">>,<<"io">>]} = dnslib:list_to_domain("\\*.ARV.*.io"),
+{ok, relative, [<<"ARV">>,<<"*">>,<<"io">>]} = dnslib:list_to_domain("ARV.*.io"),
+{ok, relative, [<<"arv.io>>"]} = dnslib:list_to_domain("arv\\.io"),
+{ok, relative, [<<"arv io>>"]} = dnslib:list_to_domain("arv\\032io").
+----
+
+.Various errors
+[source,erlang]
+----
+{'error', 'empty_string'} = dnslib:list_to_domain(""),
+{'error', 'empty_label'} = dnslib:list_to_domain("ARV..io"),
+{'error', 'label_too_long'} = dnslib:list_to_domain(lists:seq(1,64)),
+
+Label = lists:reverse([$.|[$a || _ <- lists:seq(1,63)]]),
+TooLongDomain = lists:append([Label || _ <- lists:seq(1,4)]),
+{'error', 'domain_too_long'} = dnslib:list_to_domain(TooLongDomain),
+
+{'error', {'invalid_escape_integer', "0a0"}} = dnslib:list_to_domain("\\0a0"),
+{'error', {'escape_out_of_range', 256}} = dnslib:list_to_domain("\\256"),
+
+{'error', {'non_ascii_codepoint', [255]}} = dnslib:list_to_domain("\\255"),
+{'error', {'non_ascii_codepoint', "ä"}} = dnslib:list_to_domain("ä").
+----
+
+== Changelog
+
+* *0.0.1*
+** Wildcard boolean was removed from success return tuple, `'ok'` was added.
+** `{'non_ascii_codepoint', string()}` error was added
+* *0.0.0* Function added
+
+== See also
+
+link:dnslib.list_to_codepoint_domain{ext-relative}[dnslib:list_to_codepoint_domain],
+link:dnslib.domain_to_binary{ext-relative}[dnslib:domain_to_binary],
+link:dnslib{ext-relative}[dnslib]

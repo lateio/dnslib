@@ -1,0 +1,46 @@
+= dnsclass
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Module
+
+dnsclass
+
+== Description
+
+Behavior for class modules and related functions.
+
+Modules implementing specific DNS classes have to adhere to `dnsclass` behavior.
+
+== Exports
+
+* link:dnsclass.from_to{ext-relative}[dnsclass:from_to] - Transform an identifying term from one type to another
+
+== Callback functions
+
+=== Exports
+
+* link:dnsclass.callback.atom{ext-relative}[Module:atom] - Returns an atom representing the class
+* link:dnsclass.callback.value{ext-relative}[Module:value] - Returns an integer representing the class
+* link:dnsclass.callback.masterfile_token{ext-relative}[Module:masterfile_token] (optional) - Returns a string representing the class
+
+== Types
+
+=== class()
+
+[source,erlang]
+----
+class() = atom() | 0..16#FFFF.
+----
+
+Atoms represent known classes in data structures. Integer values are used to allow passthrough of unknown classes.
+
+== Changelog
+
+* *0.0.1* Behavior and callbacks added
+* *0.0.0* Module added
+
+== See also
+
+link:index{ext-relative}[Index]

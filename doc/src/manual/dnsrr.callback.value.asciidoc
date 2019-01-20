@@ -1,0 +1,37 @@
+= Module:value
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+Module:value - Returns an integer representing the resource record type
+
+== Description
+
+[source,erlang]
+----
+value() -> 0..16#FFFF.
+----
+
+Returns an integer representing the resource record type.
+
+== Return value
+
+Returned integer is used to represent the resource type in wire format. It must thus be distinct from other resource type integers and conform to relevant standards.
+
+== Examples
+
+[source,erlang]
+----
+1 = dnsrr_a:value(),
+28 = dnsrr_aaaa:value().
+----
+
+== Changelog
+
+* *0.0.0* Callback added
+
+== See also
+
+link:dnsrr{ext-relative}[dnsrr]

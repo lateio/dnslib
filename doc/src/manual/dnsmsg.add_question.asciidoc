@@ -1,0 +1,55 @@
+= dnsmsg:add_question
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsmsg:add_question - Add a question to a message
+
+== Description
+
+[source,erlang]
+----
+add_question(
+  Msg :: dnsmsg:message(),
+  Question :: dnslib:question() | [dnslib:question()])
+    -> dnsmsg:message().
+----
+
+Add a question to a message.
+
+== Arguments
+
+Msg::
+
+Message to which question will be added
+
+Question::
+
+Question(s) to add
+
+== Return value
+
+The message containing the added question(s) is returned.
+
+Questions will appear in the message in the order they were included in.
+
+== Examples
+
+[source,erlang]
+----
+Msg = dnsmsg:add_question(dnsmsg:new(), dnslib:question([], ns, in)).
+----
+
+== Changelog
+
+* *0.0.0* Function added
+
+== See also
+
+link:dnsmsg.set_section{ext-relative}[dnsmsg:set_section],
+link:dnsmsg.add_answer{ext-relative}[dnsmsg:add_answer],
+link:dnsmsg.add_authority{ext-relative}[dnsmsg:add_authority],
+link:dnsmsg.add_additional{ext-relative}[dnsmsg:add_additional],
+link:dnsmsg{ext-relative}[dnsmsg]

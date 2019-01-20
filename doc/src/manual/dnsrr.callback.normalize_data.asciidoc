@@ -1,0 +1,48 @@
+= Module:normalize_data
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+Module:normalize_data - Returns normalized resource data
+
+== Description
+
+[source,erlang]
+----
+normalize_data(Data :: term()) -> term().
+----
+
+Returns normalized resource data.
+
+== Arguments
+
+Data::
+
+Data to normalize
+
+== Return value
+
+Normalized resource data is returned.
+
+== Optional callback
+
+This callback is optional. If it is not implemented, resource data is assumed to only have one representation and thus no normalization is possible.
+
+== Examples
+
+.Example from dnsrr_ns
+[source,erlang]
+----
+normalize_data(Domain) ->
+    dnslib:normalize_domain(Domain).
+----
+
+== Changelog
+
+* *0.0.1* Callback added
+
+== See also
+
+link:dnsrr{ext-relative}[dnsrr]

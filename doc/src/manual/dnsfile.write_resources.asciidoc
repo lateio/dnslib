@@ -1,0 +1,74 @@
+= dnsfile:write_resources
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsfile:write_resources - Write resource records to a file
+
+== Description
+
+[source,erlang]
+----
+write_resources(Path :: string(), Resources :: [dnslib:resource()])
+    -> write_resources(Path, Resources, []).
+
+write_resources(Path :: string(), Resources :: [dnslib:resource()], Opts :: [write_resources_opt()])
+    -> 'ok'.
+----
+
+Write resource records to a file. Inverse of link:dnsfile.consult{ext-relative}[`dnsfile:consult`].
+
+== Types
+
+=== write_resources_opt()
+
+[source,erlang]
+write_resources_opt() =
+    {'generic', boolean()}.
+
+The default value for each option -- when one exists -- is given in parentheses next to the option.
+
+`{'generic', boolean()}` (`'false'`)::
+
+link:https://tools.ietf.org/rfc/rfc3597.txt[RFC3597] specifies a generic syntax for representing unknown resource types and classes in DNS master files. Setting this option to `'true'` causes all resources -- known and unknown alike -- to be written in the aforementioned generic form.
+
+== Arguments
+
+Path::
+
+Path of the file to which resources will be written. Created if it does not exist, overwritten if it does exist.
+
+Resources::
+
+Resources which are to be written to the file
+
+Opts::
+
+Options to alter the behavior of `write_resources`
+
+== Return value
+
+On success `'ok'` atom is returned.
+
+== Notes
+
+Although `write_resources` can store the passed resources in master file syntax, the resulting file will *not* be pretty or user-friendly.
+
+== Examples
+
+[source,erlang]
+----
+Resource = {[<<"arv">>,<<"io">>], a, in, 60, {0,0,0,0}},
+ok = dnsfile:write_resources("/tmp/test.zone", [Resource]).
+----
+
+== Changelog
+
+* *0.0.1* Function added
+
+== See also
+
+link:dnsfile.consult{ext-relative}[dnsfile:consult],
+link:dnsfile{ext-relative}[dnsfile]

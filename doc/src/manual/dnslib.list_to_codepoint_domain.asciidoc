@@ -1,0 +1,119 @@
+= dnslib:list_to_codepoint_domain
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:list_to_codepoint_domain - Transform a string into a codepoint domain
+
+== Description
+
+[source,erlang]
+----
+list_to_codepoint_domain(Domain :: string())
+    -> {'ok', 'absolute' | 'relative', ASCIIOnly :: boolean(), Domain :: dnslib:codepoint_domain()}
+     | {'error',
+         'domain_too_long' |
+         'label_too_long'  |
+         'empty_label'     |
+         'empty_string'    |
+         {'invalid_escape_integer', string()} |
+         {'escape_out_of_range', integer()}
+       }.
+----
+
+Transform a string into a codepoint domain.
+
+== Arguments
+
+Domain::
+
+A string representation of a domain. Can be absolute or relative. Can contain character escapes.
+Unlike when using `dnslib:list_to_domain`, here the string can contain non-ASCII characters.
+
+== Return value
+
+On success a tuple consisting of `'ok'` atom, the domain type -- `'absolute'` or `'relative'` -- , a boolean indicating whether the domain contains only ASCII characters and the domain is returned. The type of the domain is included because the distinction is not represented in domain data types, as the DNS protocol deals exclusively in absolute domains. Difference between `'absolute'` and `'relative'` domains is a convenience for writing master files, not much more.
+
+On error a tuple consisting of `'error'` atom and the error reason is returned.
+
+== Errors
+
+`'domain_too_long'`::
+
+Domains can be at most 255 octets long. Due to the way domains are represented in wire format, this does not mean that domains can actually contain 255 characters.
+
+`'label_too_long'`::
+
+Domain labels -- `arv` and `io` in `arv.io` -- can be at most 63 octets long.
+
+`'empty_label'`::
+
+Domains cannot contain empty labels -- for example `arv..io` is illegal.
+
+`'empty_string'`::
+
+`list_to_domain` will not process empty strings.
+
+`{'invalid_escape_integer', string()}`::
+
+Escape form `\000` has to be made up of a backslash (`\`) and three digits.
+
+`{'escape_out_of_range', integer()}`::
+
+Escape form `\000` is limited to values in range `0..255` (an octet). Even though `list_to_codepoint_domain` otherwise tolerates non-ASCII characters, this range of escapes is enforced per link:https://tools.ietf.org/html/rfc1035[RFC1035, Section 5.1].
+
+== Examples
+
+[source,erlang]
+----
+{ok, absolute, true, []} = dnslib:list_to_codepoint_domain("."),
+{ok, absolute, true, ["ARV","io"]} = dnslib:list_to_codepoint_domain("ARV.io."),
+{ok, relative, true, ["ARV","io"]} = dnslib:list_to_codepoint_domain("ARV.io"),
+{ok, absolute, true, ['_',"ARV","io"]} = dnslib:list_to_codepoint_domain("*.ARV.io."),
+{ok, relative, true, ['_',"ARV","*","io"]} = dnslib:list_to_codepoint_domain("*.ARV.*.io"),
+{ok, relative, true, ["*","ARV","*","io"]} = dnslib:list_to_codepoint_domain("\\*.ARV.*.io"),
+{ok, relative, true, ["ARV","*","io"]} = dnslib:list_to_codepoint_domain("ARV.*.io"),
+{ok, relative, true, ["arv.io"]} = dnslib:list_to_codepoint_domain("arv\\.io"),
+{ok, relative, true, ["arv io"]} = dnslib:list_to_codepoint_domain("arv\\032io"),
+
+{ok, absolute, false, ["väinämöinen"]} = dnslib:list_to_codepoint_domain("väinämöinen."),
+{ok, relative, false, ["väinämöinen"]} = dnslib:list_to_codepoint_domain("väinämöinen"),
+
+% Although these following examples would produce too long labels as UTF-8 octets,
+% as strings list_to_codepoint_domain will parse them without complaints.
+Domain1 = lists:reverse([$.|[$ä || _ <- lists:seq(1,63)]]),
+{ok, absolute, false, _} = dnslib:list_to_codepoint_domain(Domain1),
+
+Domain2 = lists:reverse([$.|[$あ || _ <- lists:seq(1,63)]]),
+{ok, absolute, false, _} = dnslib:list_to_codepoint_domain(Domain2).
+----
+
+.Various invalid domains
+[source,erlang]
+----
+{'error', 'empty_string'} = dnslib:list_to_codepoint_domain(""),
+{'error', 'empty_label'} = dnslib:list_to_codepoint_domain("ARV..io"),
+{'error', 'label_too_long'} = dnslib:list_to_codepoint_domain(lists:seq(1,64)),
+
+Label = lists:reverse([$.|[$a || _ <- lists:seq(1,63)]]),
+TooLongDomain = lists:append([Label || _ <- lists:seq(1,4)]),
+{'error', 'domain_too_long'} = dnslib:list_to_codepoint_domain(TooLongDomain).
+----
+
+== Notes
+
+`dnslib:list_to_codepoint_domain` function and `dnslib:codepoint_domain()` type should be considered necessary evils for bridging the gap between Erlang strings and domains. This is due to the fact that while Erlang strings have made the decision to only deal in codepoint values, when dealing with domains we have to be mindful that domains will ultimately have to be represented as binaries of octets. Thus we need a data type which is structurally analogous to the `dnslib:domain()` type, yet is capable of containing arbitrarily large codepoints.
+
+`dnslib:codepoint_domain()` fulfills this intermediary role and after necessary processing, can be transformed into a `dnslib:domain()` with `dnslib:codepoint_domain_to_domain`.
+
+== Changelog
+
+* *0.0.1* Function added
+
+== See also
+
+link:dnslib.codepoint_domain_to_domain{ext-relative}[dnslib:codepoint_domain_to_domain],
+link:dnslib.list_to_domain{ext-relative}[dnslib:list_to_domain],
+link:dnslib{ext-relative}[dnslib]

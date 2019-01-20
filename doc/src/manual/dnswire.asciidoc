@@ -1,0 +1,36 @@
+= dnswire
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Module
+
+dnswire
+
+== Description
+
+Transform messages from and to binary wire format.
+
+== Exports
+
+To wire format:
+
+* link:dnswire.to_binary{ext-relative}[dnswire:to_binary] - Transform DNS message to wire format
+* link:dnswire.to_iolist{ext-relative}[dnswire:to_iolist] - Transform DNS message to wire format
+
+From wire format:
+
+* link:dnswire.from_binary{ext-relative}[dnswire:from_binary] - Parse wire format to message
+
+Support functions:
+
+* link:dnswire.from_binary_domain{ext-relative}[dnswire:from_binary_domain] - Indicate domain in link:dnsrr.callback.from_binary{ext-relative}[`Resource:from_binary`] callback
+* link:dnswire.to_binary_domain{ext-relative}[dnswire:to_binary_domain] - Indicate domain in link:dnsrr.callback.to_binary{ext-relative}[`Resource:to_binary`] callback
+
+== Changelog
+
+* *0.0.0* Module added
+
+== See also
+
+link:index{ext-relative}[Index]

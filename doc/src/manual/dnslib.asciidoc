@@ -1,0 +1,193 @@
+= dnslib
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Module
+
+dnslib
+
+== Description
+
+General DNS functionality.
+
+== Exports
+
+Domains:
+
+* link:dnslib.append_domain{ext-relative}[dnslib:append_domain] - Concatenate two or more domains
+* link:dnslib.binary_to_domain{ext-relative}[dnslib:binary_to_domain] - Transform a wire format binary into a domain
+* link:dnslib.codepoint_domain_to_domain{ext-relative}[dnslib:codepoint_domain_to_domain] - Transform a codepoint domain into a domain
+* link:dnslib.domain_binary_length{ext-relative}[dnslib:domain_binary_length] - Get the `byte_size()` for wire encoding of a domain
+* link:dnslib.domain_in_zone{ext-relative}[dnslib:domain_in_zone] - Test if one domain is in the zone specified by another domain
+* link:dnslib.domain_to_binary{ext-relative}[dnslib:domain_to_binary] - Transform a domain into a wire format binary
+* link:dnslib.domain_to_codepoint_domain{ext-relative}[dnslib:domain_to_codepoint_domain] - Transform a domain into a codepoint domain
+* link:dnslib.domain_to_list{ext-relative}[dnslib:domain_to_list] - Transform a domain into a string
+* link:dnslib.is_subdomain{ext-relative}[dnslib:is_subdomain] - Test if one domain is a subdomain of another
+* link:dnslib.is_valid_domain{ext-relative}[dnslib:is_valid_domain] - Check if a domain breaks any length limits
+* link:dnslib.list_to_domain{ext-relative}[dnslib:list_to_domain] - Transform a string into a domain
+* link:dnslib.list_to_codepoint_domain{ext-relative}[dnslib:list_to_codepoint_domain] - Transform a string into a codepoint domain
+* link:dnslib.normalize_domain{ext-relative}[dnslib:normalize_domain] - Normalize domain for comparison
+* link:dnslib.reverse_dns_domain{ext-relative}[dnslib:reverse_dns_domain] - Get the reverse dns domain for an ip address
+
+Questions:
+
+* link:dnslib.normalize_question{ext-relative}[dnslib:normalize_question] - Normalize a question term
+* link:dnslib.question{ext-relative}[dnslib:question] - Create a question term
+* link:dnslib.reverse_dns_question{ext-relative}[dnslib:reverse_dns_question] - Get the reverse dns question for an ip address
+
+Resources:
+
+* link:dnslib.normalize_resource{ext-relative}[dnslib:normalize_resource] - Normalize a resource term
+* link:dnslib.resource{ext-relative}[dnslib:resource] - Create a resource term
+
+Misc:
+
+* link:dnslib.deduplicate{ext-relative}[dnslib:deduplicate] - Deduplicate a list of questions or resources
+* link:dnslib.list_to_ttl{ext-relative}[dnslib:list_to_ttl] - Parse a string as a time-to-live (TTL) field
+
+== Types
+
+=== domain_label()
+
+[source,erlang]
+domain_label() = <<_:8, _:_*8>>.
+
+A domain label is a `1..63` octets long binary.
+
+63 octets is the upper limit due to how domain labels are encoded in wire format and because of the reservations made by the original DNS spec.
+
+=== non_wildcard_domain()
+
+[source,erlang]
+non_wildcard_domain() = [domain_label()].
+
+A domain is represented as a list of domain labels. The root domain is represented by an empty list.
+
+DNS specification restricts the maximum length of a domain to 255 octets in wire format. A byte is used to represent the end of the domain, thus 254 bytes remain for the labels.
+Each label in represented by a byte encoding the length of the label, followed by the actual bytes of the label.
+
+A domain can thus in theory contain up to 127 one octet labels. The longer the labels used in a domain are, the fewer labels can fit in a domain.
+
+=== wildcard_domain()
+
+[source,erlang]
+wildcard_domain() = ['_'|domain_label()].
+
+A wildcard domain is a special domain where the first label is the `'_'` atom.
+
+Wilcard domains are most commonly used in DNS master files and look something like this: `*.arv.io`.
+Wilcard labels can only occur as the first label of a domain.
+
+=== domain()
+
+[source,erlang]
+domain() = non_wildcard_domain() | wildcard_domain().
+
+`domain()` type allows both wildcard and non-wildcard domains. Most functions use or allow this type.
+
+=== compressed_domain()
+
+[source,erlang]
+compressed_domain() =
+    {
+        'compressed',
+        Ref    :: non_neg_integer(),
+        Domain :: dnslib:domain()
+    }.
+
+`dnslib:binary_to_domain` might return a compressed domain. Such a domain has to be further resolved for it to be complete.
+
+`Ref` is the offset for the rest of the domain from the start of the current message. `Domain` contains the domains labels so far, in reverse order -- first label is the last member of the list.
+
+=== non_wildcard_codepoint_domain()
+
+[source,erlang]
+non_wildcard_codepoint_domain() = [string()].
+
+`non_wildcard_codepoint_domain()` is an intermediary domain form. It is mainly useful for bridging the gap between Erlang strings and `dnslib:domain()` type.
+
+Unlike in `non_wildcard_domain()` terms where each label is a `binary()` made up of octets, labels in `non_wildcard_codepoint_domain()` terms are Erlang strings and can thus represent, for example, arbitrary unicode characters.
+
+=== wildcard_codepoint_domain()
+
+[source,erlang]
+wildcard_codepoint_domain() = ['_'|string()].
+
+`wildcard_codepoint_domain()` is to `non_wildcard_codepoint_domain()` what `wildcard_domain()` is to `non_wildcard_domain()`.
+
+=== codepoint_domain()
+
+[source,erlang]
+codepoint_domain() =
+    non_wildcard_codepoint_domain() |
+    wildcard_codepoint_domain().
+
+=== ttl()
+
+[source,erlang]
+ttl() = 0..16#7FFFFFFF.
+
+TTL -- time-to-live -- represents the time in seconds that a resource can be cached and re-distributed for.
+
+=== question()
+
+[source,erlang]
+question() = {
+    Domain :: dnslib:non_wildcard_domain(),
+    Type   :: dnsrr:type(),
+    Class  :: dnsclass:class()
+}.
+
+Question terms represent queries which a DNS client send to a DNS server.
+
+=== resource()
+
+[source,erlang]
+question() = {
+    Domain :: dnslib:domain(),
+    Type   :: dnsrr:type(),
+    Class  :: dnsclass:class(),
+    Ttl    :: dnslib:ttl(),
+    Data   :: term()
+}.
+
+Resource terms represent resources which a DNS server returns to a DNS client.
+
+=== opcode()
+
+[source,erlang]
+opcode() =
+      'query'
+    | 'i_query'
+    | 'status'
+    | 0..16#F.
+
+`opcode()` specifies the operation in a DNS message.
+
+=== return_code()
+
+[source,erlang]
+return_code() =
+      'ok'
+    | 'format_error'
+    | 'server_error'
+    | 'name_error'
+    | 'not_implemented'
+    | 'refused'
+    | 0..16#FFF.
+
+The `return_code()` in a DNS message signifies whether the operation succeeded or encountered an error.
+
+== Notes
+
+`dnslib` module implements `application` behavior to initialize custom resource records and classes.
+
+== Changelog
+
+* *0.0.1* `codepoint_domain()` type and other associated types added
+* *0.0.0* Module added
+
+== See also
+
+link:index{ext-relative}[Index]

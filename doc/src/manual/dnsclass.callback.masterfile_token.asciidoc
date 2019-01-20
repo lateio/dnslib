@@ -1,0 +1,41 @@
+= Module:masterfile_token
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+Module:masterfile_token - Returns a string representing the class
+
+== Description
+
+[source,erlang]
+----
+masterfile_token() -> string().
+----
+
+Returns a string representing the class.
+
+== Return value
+
+Returned string is used to represent the class in master files. It must thus be distinct from other class strings and conform to relevant standards for the class.
+
+== Optional callback
+
+This callback is optional.
+
+== Examples
+
+[source,erlang]
+----
+"in" = dnsclass_in:masterfile_token(),
+"cs" = dnsclass_cs:masterfile_token().
+----
+
+== Changelog
+
+* *0.0.1* Callback added
+
+== See also
+
+link:dnsclass{ext-relative}[dnsclass]

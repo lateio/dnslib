@@ -1,0 +1,65 @@
+= dnslib:domain_in_zone
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:domain_in_zone - Test if one domain is in the zone specified by another domain
+
+== Description
+
+[source,erlang]
+----
+domain_in_zone(Domain :: dnslib:domain(), Zone :: dnslib:domain())
+    -> boolean().
+----
+
+Test if one domain is in the zone specified by another domain.
+
+== Arguments
+
+Domain::
+
+Domain to test
+
+Zone::
+
+Domain/Zone to test against
+
+== Return value
+
+The function returns `'true'` if `Domain` is a subdomain of `Zone` or equal to `Zone`. Returns `'false'` otherwise.
+
+== Details
+
+Neither domain is normalized in any way, thus labels which differ in character case will not be considered identical.
+
+[source,erlang]
+false = domain_in_zone([<<"def">>, <<"abc">>], [<<"ABC">>]).
+
+== Examples
+
+[source,erlang]
+----
+false = dnslib:domain_in_zone([<<"def">>, <<"abc">>], [<<"ABC">>]),
+true  = dnslib:domain_in_zone([<<"def">>, <<"abc">>], [<<"abc">>]),
+false = dnslib:domain_in_zone([<<"def">>, <<"abc">>], [<<"def">>]),
+true  = dnslib:domain_in_zone([<<"def">>, <<"abc">>], [<<"def">>, <<"abc">>]),
+true  = dnslib:domain_in_zone(['_', <<"def">>, <<"abc">>], [<<"def">>, <<"abc">>]),
+true  = dnslib:domain_in_zone([<<"def">>, <<"abc">>], ['_']),
+true  = dnslib:domain_in_zone([<<"def">>, <<"abc">>], ['_', <<"abc">>]),
+true  = dnslib:domain_in_zone(['_', <<"abc">>], ['_', <<"abc">>]).
+----
+
+== Changelog
+
+* *0.0.1*
+** Renamed from `in_zone` to `domain_in_zone`
+** Handle wildcards correctly
+* *0.0.0* Function added
+
+== See also
+
+link:dnslib.is_subdomain{ext-relative}[dnslib:is_subdomain],
+link:dnslib{ext-relative}[dnslib]

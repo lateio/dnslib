@@ -1,0 +1,98 @@
+= dnslib:append_domain
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:append_domain - Concatenate two or more domains
+
+== Description
+
+[source,erlang]
+----
+append_domain(DomainList :: [dnslib:domain()]) ->
+    -> {'ok', New :: dnslib:domain()}
+     | {'error',
+         'domain_too_long' |
+         'label_too_long'  |
+         'empty_label'
+       }.
+
+append_domain(Domain1 :: dnslib:domain(), Domain2 :: dnslib:domain())
+    -> {'ok', New :: dnslib:domain()}
+     | {'error',
+         'domain_too_long' |
+         'label_too_long'  |
+         'empty_label'
+       }.
+----
+
+Concatenate two or more domains.
+
+== Arguments
+
+DomainList::
+
+List of domains to be concatenated. Domains will appears in the same order as they do in the list.
+
+Domain1::
+
+Beginning part of the new domain
+
+Domain2::
+
+Tail part of the new domain
+
+== Return value
+
+On success, a tuple consisting of `'ok'` and the produced domain is returned.
+
+On error, a tuple consisting of `'error'` atom and the error reason is returned.
+
+== Errors
+
+`'domain_too_long'`::
+
+The new domain would be too long.
+
+`'label_too_long'`::
+
+A label in one of the domains is too long.
+
+`'empty_label'`::
+
+A label in one of the domains is empty.
+
+== Notes
+
+If any of the latter domains is a wildcard_domain, the wildcard label is replaced by a `<<"*">>` label.
+
+== Examples
+
+[source,erlang]
+----
+{ok, [<<"def">>, <<"abc">>]} = dnslib:append_domain([<<"def">>], [<<"abc">>]),
+{ok, [<<"def">>, <<"abc">>]} = dnslib:append_domain([[<<"def">>], [<<"abc">>]]),
+{ok, ['_', <<"def">>, <<"*">>]} = dnslib:append_domain([['_', <<"def">>], ['_']]).
+----
+
+.Errors
+[source,erlang]
+----
+{error, label_too_long} = dnslib:append_domain([<< <<$a>> || _ <- lists:seq(1,64)>>], []),
+Label = << <<$a>> || _ <- lists:seq(1,63)>>,
+{error, domain_too_long} = dnslib:append_domain([Label, Label], [Label, Label]),
+{error, empty_label} = dnslib:append_domain([<<>>], []).
+----
+
+== Changelog
+
+* *0.0.1*
+** Function renamed from `concat` to `append_domain`
+** Added `append_domain/1` function
+* *0.0.0* Function added
+
+== See also
+
+link:dnslib{ext-relative}[dnslib]

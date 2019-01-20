@@ -1,0 +1,45 @@
+= dnslib:domain_to_codepoint_domain
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:domain_to_codepoint_domain - Transform a domain into a codepoint domain
+
+== Description
+
+[source,erlang]
+----
+domain_to_codepoint_domain(Domain :: dnslib:domain())
+    -> dnslib:codepoint_domain().
+----
+
+Transform a domain into a codepoint domain.
+
+== Arguments
+
+Domain::
+
+Domain to transform
+
+== Return value
+
+The produced codepoint domain is returned.
+
+== Examples
+
+[source,erlang]
+----
+["ARV","io"] = dnslib:domain_to_codepoint_domain([<<"ARV">>,<<"io">>]).
+----
+
+== Changelog
+
+* *0.0.1* Function added
+
+== See also
+
+link:dnslib.codepoint_domain_to_domain{ext-relative}[dnslib:codepoint_domain_to_domain],
+link:dnslib.list_to_codepoint_domain{ext-relative}[dnslib:list_to_codepoint_domain],
+link:dnslib{ext-relative}[dnslib]

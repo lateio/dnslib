@@ -1,0 +1,48 @@
+= dnslib:domain_binary_length
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:domain_binary_length - Get the `byte_size()` for wire encoding of a domain
+
+== Description
+
+[source,erlang]
+----
+domain_binary_length(
+  Domain :: dnslib:non_wildcard_domain() | dnslib:compressed_domain())
+    -> pos_integer().
+----
+
+Get the `byte_size()` for wire encoding of a domain.
+
+== Arguments
+
+Domain::
+
+Domain to get the length for. Can also be a compressed domain.
+
+== Return value
+
+The `byte_size()` of the wire encoding of the domain is returned.
+
+== Examples
+
+[source,erlang]
+----
+1 = dnslib:domain_binary_length([]),
+8 = dnslib:domain_binary_length([<<"arv">>,<<"io">>]),
+9 = dnslib:domain_binary_length({compressed, 12, [<<"io">>,<<"arv">>]}).
+----
+
+== Changelog
+
+* *0.0.1* Function also accepts compressed domains
+* *0.0.0* Function added
+
+== See also
+
+link:dnslib.domain_to_binary{ext-relative}[dnslib:domain_to_binary],
+link:dnslib{ext-relative}[dnslib]

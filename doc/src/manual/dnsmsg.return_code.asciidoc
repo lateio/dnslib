@@ -1,0 +1,40 @@
+= dnsmsg:return_code
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsmsg:return_code - Get the message return code
+
+== Description
+
+[source,erlang]
+----
+return_code(Message :: dnsmsg:message()) -> dnslib:return_code() | 0..16#FFF.
+----
+
+Get the message return code.
+
+It is also possible to get the return code from a message with pattern matching.
+
+[source,erlang]
+#{'Return_code' := ReturnCode} = dnsmsg:new().
+
+== Arguments
+
+Message::
+
+Message whose return code we want to know
+
+== Return value
+
+Message return code is returned.
+
+== Changelog
+
+* *0.0.0* Function added
+
+== See also
+
+link:dnsmsg{ext-relative}[dnsmsg]

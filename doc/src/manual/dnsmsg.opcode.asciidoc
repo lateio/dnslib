@@ -1,0 +1,40 @@
+= dnsmsg:opcode
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsmsg:opcode - Get the message opcode
+
+== Description
+
+[source,erlang]
+----
+opcode(Message :: dnsmsg:message()) -> dnslib:opcode() | 0..16#F.
+----
+
+Get the message opcode.
+
+It is also possible to get the opcode from a message with pattern matching.
+
+[source,erlang]
+#{'Opcode' := Opcode} = dnsmsg:new().
+
+== Arguments
+
+Message::
+
+Message whose opcode we want to know
+
+== Return value
+
+Message opcode is returned.
+
+== Changelog
+
+* *0.0.0* Function added
+
+== See also
+
+link:dnsmsg{ext-relative}[dnsmsg]

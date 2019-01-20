@@ -1,0 +1,35 @@
+= Module:cacheable
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+Module:cacheable - Returns whether the resource is cacheable
+
+== Description
+
+[source,erlang]
+----
+cacheable() -> boolean().
+----
+
+Returns whether the resource is cacheable.
+
+== Return value
+
+If the function returns `'true'`, the resource type is cacheable.
+
+If the function returns `'false'`, the resource type is not cacheable.
+
+== Optional callback
+
+This callback is optional. If it is not implemented, resource is assumed to be cacheable.
+
+== Changelog
+
+* *0.0.0* Callback added
+
+== See also
+
+link:dnsrr{ext-relative}[dnsrr]

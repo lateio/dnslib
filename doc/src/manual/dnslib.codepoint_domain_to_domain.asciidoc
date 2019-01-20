@@ -1,0 +1,66 @@
+= dnslib:codepoint_domain_to_domain
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:codepoint_domain_to_domain - Transform a codepoint domain into a domain
+
+== Description
+
+[source,erlang]
+----
+codepoint_domain_to_domain(Domain :: dnslib:codepoint_domain())
+    -> {'ok', dnslib:domain()}
+     | {'error', {'codepoint_too_large', Label :: string()}}.
+----
+
+Transform a codepoint domain into a domain.
+
+== Arguments
+
+Domain::
+
+Codepoint domain to transform
+
+== Return value
+
+On success a tuple consisting of `'ok'` atom and the produced `dnslib:domain()` is returned.
+
+On error a tuple consisting of `error` atom and the reason is returned.
+
+== Errors
+
+`{'codepoint_too_large', string()}`::
+
+If the codepoint_domain contains a character not in range `0..255` -- and thus not representable by an octet -- this error is returned. The programmer should somehow eliminate these characters from the domain.
+
+== Examples
+
+[source,erlang]
+----
+{ok, [<<"ARV">>,<<"io">>]} = dnslib:codepoint_domain_to_domain(["ARV","io"]),
+{ok, ['_', <<"ARV">>,<<"io">>]} = dnslib:codepoint_domain_to_domain(['_', "ARV","io"]),
+
+% Although this doesn't produce an error (as the character fits high-ASCII),
+% it demonstrates how some codepoint_domains containing non-ASCII characters
+% can make it into domains
+{ok, [<<228>>]} = dnslib:codepoint_domain_to_domain(["ä"]).
+----
+
+.Errors
+[source,erlang]
+----
+{error, {codepoint_too_large, "あ"}} = dnslib:codepoint_domain_to_domain(["あ"]).
+----
+
+== Changelog
+
+* *0.0.1* Function added
+
+== See also
+
+link:dnslib.domain_to_codepoint_domain{ext-relative}[dnslib:domain_to_codepoint_domain],
+link:dnslib.list_to_codepoint_domain{ext-relative}[dnslib:list_to_codepoint_domain],
+link:dnslib{ext-relative}[dnslib]

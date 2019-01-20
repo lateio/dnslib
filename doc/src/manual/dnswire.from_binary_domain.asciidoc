@@ -1,0 +1,43 @@
+= dnswire:from_indicate_domain
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnswire:from_indicate_domain - Indicate domain in link:dnsrr.callback.from_binary{ext-relative}[`Resource:from_binary`] callback
+
+== Description
+
+[source,erlang]
+----
+from_indicate_domain(
+  Domain :: dnslib:compressed_domain() | dnslib:domain(),
+  Offset :: non_neg_integer())
+    -> opaque().
+----
+
+Indicate domain in link:dnsrr.callback.from_binary{ext-relative}[`Resource:from_binary`] callback.
+
+== Arguments
+
+Domain::
+
+Domain to indicate. Both normal and compressed domains are accepted. Compressed domains will be resolved.
+
+Offset::
+
+Offset -- in bytes -- from the start of the data section of the resource. This is necessary as dnslib does not otherwise have any visibility into the construction of resource data, and having the info will help when resolving further domains.
+
+== Return value
+
+Return value should be passed in the `DataList` of the `{'domains', DataList}` return tuple from link:dnsrr.callback.from_binary{ext-relative}[`Resource:from_binary`] callback.
+
+== Changelog
+
+* *0.0.1* Function added
+
+== See also
+
+link:dnsrr.callback.from_binary{ext-relative}[Resource:from_binary],
+link:dnswire{ext-relative}[dnswire]

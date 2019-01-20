@@ -1,0 +1,41 @@
+= dnswire:to_binary_domain
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnswire:to_binary_domain - Indicate domain in link:dnsrr.callback.to_binary{ext-relative}[`Resource:to_binary`] callback
+
+== Description
+
+[source,erlang]
+----
+to_binary_domain(Domain :: dnslib:domain(), AllowCompression :: boolean())
+    -> opaque().
+----
+
+Indicate domain in link:dnsrr.callback.to_binary{ext-relative}[`Resource:to_binary`] callback.
+
+== Arguments
+
+Domain::
+
+Domain to indicate
+
+AllowCompression::
+
+Specifies if dnslib is allowed to compress the domain
+
+== Return value
+
+Return value should be passed in the `DataList` of the `{'domains', DataList}` return tuple from link:dnsrr.callback.to_binary{ext-relative}[`Resource:to_binary`] callback.
+
+== Changelog
+
+* *0.0.1* Function added
+
+== See also
+
+link:dnsrr.callback.to_binary{ext-relative}[`Resource:to_binary`],
+link:dnswire{ext-relative}[dnswire]

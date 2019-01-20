@@ -1,0 +1,51 @@
+= dnsmsg:answers
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsmsg:answers - Get answers from a message
+
+== Description
+
+[source,erlang]
+----
+answers(Message :: dnsmsg:message()) -> [dnslib:resource()].
+----
+
+Get answers from a message.
+
+== Arguments
+
+Message::
+
+Message whose answers we want to know
+
+== Return value
+
+Answers from the message will be returned. Answers will be in the order they were added in.
+
+In case you are trying to make sense of the answers in a response, link:dnsmsg.interpret_response{ext-relative}[`dnsmsg:interpret_response`] might work better.
+
+== Example
+
+[source,erlang]
+----
+Resource1 = dnslib:resource([], a, in, 60, {0,0,0,0}),
+Resource1 = dnslib:resource([], a, in, 60, {127,0,0,1}),
+Msg = dnsmsg:new(#{}, [], [Resource1, Resource2]),
+[Resource1, Resource2] = dnsmsg:answers(Msg).
+----
+
+== Changelog
+
+* *0.0.1* Function added
+
+== See also
+
+link:dnsmsg.interpret_response{ext-relative}[dnsmsg:interpret_response],
+link:dnsmsg.questions{ext-relative}[dnsmsg:questions],
+link:dnsmsg.authority{ext-relative}[dnsmsg:authority],
+link:dnsmsg.additional{ext-relative}[dnsmsg:additional],
+link:dnsmsg{ext-relative}[dnsmsg]

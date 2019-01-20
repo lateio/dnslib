@@ -1,0 +1,48 @@
+= dnsmsg:questions
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsmsg:questions - Get questions from a message
+
+== Description
+
+[source,erlang]
+----
+questions(Message :: dnsmsg:message()) -> [dnslib:question()].
+----
+
+Get questions from a message.
+
+== Arguments
+
+Message::
+
+Message whose questions we want to know
+
+== Return value
+
+Questions from the message will be returned. Questions will be in the order they were added in.
+
+== Example
+
+[source,erlang]
+----
+Question1 = dnslib:question([], a, in),
+Question2 = dnslib:question([], ns, in),
+Msg = dnsmsg:new(#{}, [Question1, Question2]),
+[Question1, Question2] = dnsmsg:questions(Msg).
+----
+
+== Changelog
+
+* *0.0.1* Function added
+
+== See also
+
+link:dnsmsg.answers{ext-relative}[dnsmsg:answers],
+link:dnsmsg.authority{ext-relative}[dnsmsg:authority],
+link:dnsmsg.additional{ext-relative}[dnsmsg:additional],
+link:dnsmsg{ext-relative}[dnsmsg]

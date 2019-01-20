@@ -1,0 +1,45 @@
+= Module:masterfile_token
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+Module:masterfile_token - Returns a string representing the resource record type
+
+== Description
+
+[source,erlang]
+----
+masterfile_token() -> string().
+----
+
+Returns a string representing the resource record type.
+
+== Return value
+
+Returned string is used to represent the resource type in master files. It must thus be distinct from other resource type strings and conform to relevant standards.
+
+== Optional callback
+
+This callback is optional.
+
+If this callback is not implemented, link:dnsrr.callback.from_masterfile{ext-relative}[`Module:from_masterfile`] and link:dnsrr.callback.masterfile_format{ext-relative}[`Module:masterfile_format`] should also be left unimplemented.
+
+== Examples
+
+[source,erlang]
+----
+"a" = dnsrr_a:masterfile_token(),
+"aaaa" = dnsrr_aaaa:masterfile_token().
+----
+
+== Changelog
+
+* *0.0.0* Callback added
+
+== See also
+
+link:dnsrr.callback.masterfile_format{ext-relative}[Module:masterfile_format],
+link:dnsrr.callback.from_masterfile{ext-relative}[Module:from_masterfile],
+link:dnsrr{ext-relative}[dnsrr]

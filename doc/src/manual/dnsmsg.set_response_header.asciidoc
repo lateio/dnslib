@@ -1,0 +1,105 @@
+= dnsmsg:set_response_header
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsmsg:set_response_header - Modify fields of a future response
+
+== Description
+
+[source,erlang]
+----
+set_response_header(Msg :: dnsmsg:message(), [{Key :: message_field(), Value :: term()}])
+    -> dnsmsg:message().
+
+set_header(
+  Msg :: dnsmsg:message(),
+  Field :: response_field(),
+  Value :: term())
+    -> dnsmsg:message().
+----
+
+Modify fields of a future response.
+
+== Types
+
+=== message_field()
+
+[source,erlang]
+----
+response_field() =
+      'return_code'
+    | 'authoritative'
+    | 'truncated'
+    | 'recursion_available'
+    | 'authenticated_data'
+    | 'checking_disabled'.
+----
+
+Each key requires a value of a certain type, which is given in parentheses next to the key.
+
+`'return_code'` (`dnslib:return_code() | 0..16#FFF`)::
+
+Set the return code of a message.
+
+`'authoritative'` (`boolean()`)::
+
+Indicates whether the resources in a message are from an authoritative source (eg. not cached).
+
+`'truncated'` (`boolean()`)::
+
+`'true'` indicates that not all available resources could fit in the response and the client should try again with TCP transport.
+
+`'recursion_available'` (`boolean()`)::
+
+When `'true'` in a response, indicates that the server is willing to perform recursive queries.
+
+`'authenticated_data'` (`boolean()`)::
+
+TBD. DNSSEC related.
+
+`'checking_disabled'` (`boolean()`)::
+
+TBD. DNSSEC related.
+
+== Arguments
+
+Msg::
+
+A request message. When the response to this message is created, modified field(s) will be present in it.
+
+Field::
+
+Field to modify
+
+Value::
+
+Value to which the field will be set to
+
+== Return value
+
+A request message containing the added resource(s) is returned.
+
+When `dnmsg:response` is executed on the returned request message, the modified fields will be present in the created response.
+
+Supplying the wrong type of value for a field will crash the application.
+
+== Examples
+
+[source,erlang]
+----
+Req = dnsmsg:new(),
+Req1 = dnsmsg:set_response_header(Req, return_code, format_error),
+#{'Return_code' := format_error} = Res = dnsmsg:response(Req1).
+----
+
+== Changelog
+
+* *0.0.0* Function added
+
+== See also
+
+link:dnsmsg.response{ext-relative}[dnsmsg:response],
+link:dnsmsg{ext-relative}[dnsmsg]

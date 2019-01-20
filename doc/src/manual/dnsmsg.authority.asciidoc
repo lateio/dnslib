@@ -1,0 +1,48 @@
+= dnsmsg:authority
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsmsg:authority - Get the authority section from a message
+
+== Description
+
+[source,erlang]
+----
+authority(Message :: dnsmsg:message()) -> [dnslib:resource()].
+----
+
+Get the authority section from a message.
+
+== Arguments
+
+Message::
+
+Message whose authority section we want to know
+
+== Return value
+
+Authority section from the message will be returned. Resources will be in the order they were added in.
+
+== Example
+
+[source,erlang]
+----
+Resource1 = dnslib:resource([], a, in, 60, {0,0,0,0}),
+Resource1 = dnslib:resource([], a, in, 60, {127,0,0,1}),
+Msg = dnsmsg:new(#{}, [], [], [Resource1, Resource2]),
+[Resource1, Resource2] = dnsmsg:authority(Msg).
+----
+
+== Changelog
+
+* *0.0.1* Function added
+
+== See also
+
+link:dnsmsg.questions{ext-relative}[dnsmsg:questions],
+link:dnsmsg.answers{ext-relative}[dnsmsg:answers],
+link:dnsmsg.additional{ext-relative}[dnsmsg:additional],
+link:dnsmsg{ext-relative}[dnsmsg]

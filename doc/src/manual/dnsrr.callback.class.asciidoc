@@ -1,0 +1,41 @@
+= Module:class
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+Module:class - Returns valid class(es) for the resource record type
+
+== Description
+
+[source,erlang]
+----
+class() -> [dnsclass:class()].
+----
+
+Returns valid class(es) for the resource record type.
+
+== Return value
+
+Returns a list of valid classes for the resource record type.
+
+== Optional callback
+
+This callback is optional. If the callback is not implemented, the resource record type assumed to have no class restrictions.
+
+== Examples
+
+.Example from dnsrr_a
+[source,erlang]
+----
+class() -> [in].
+----
+
+== Changelog
+
+* *0.0.0* Callback added
+
+== See also
+
+link:dnsrr{ext-relative}[dnsrr]

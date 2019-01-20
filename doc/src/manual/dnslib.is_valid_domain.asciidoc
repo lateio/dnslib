@@ -1,0 +1,65 @@
+= dnslib:is_valid_domain
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:is_valid_domain - Check if a domain breaks any length limits
+
+== Description
+
+[source,erlang]
+----
+is_valid_domain(Domain :: dnslib:domain()) ->
+    -> 'true'
+     | {'false',
+         'not_a_list'       |
+         'domain_too_long'  |
+         'label_too_long'   |
+         'non_binary_label' |
+         'empty_label'
+       }.
+----
+
+Check if a domain breaks any length limits.
+
+== Arguments
+
+Domain::
+
+Domain to check
+
+== Return value
+
+If the domain is a list of binaries -- except for the first label, which can be `'_'` -- and would be 255 or less octets long in wire format and all its labels are 63 octets long or shorter, the function will return `'true'`.
+
+Otherwise a tuple consisting of `'false'` and the error reason will be returned.
+
+== Examples
+
+[source,erlang]
+----
+true = dnslib:is_valid_domain([<<"arv">>,<<"io">>]).
+----
+
+.Errors
+[source,erlang]
+----
+LongLabel = << <<$a>> || _ <- lists:seq(1,64)>>,
+{false, label_too_long} = dnslib:is_valid_domain([LongLabel]),
+Label = << <<$a>> || _ <- lists:seq(1,63)>>,
+{false, domain_too_long} = dnslib:is_valid_domain([Label, Label, Label, Label]),
+{false, empty_label} = dnslib:is_valid_domain([<<>>]),
+{false, non_binary_label} = dnslib:is_valid_domain([1]),
+{false, not_a_list} = dnslib:is_valid_domain(atom).
+----
+
+== Changelog
+
+* *0.0.1* IsWildcard boolean() and the wrapping tuple removed from `'true'` return
+* *0.0.0* Function added
+
+== See also
+
+link:dnslib{ext-relative}[dnslib]

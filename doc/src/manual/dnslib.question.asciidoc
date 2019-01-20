@@ -1,0 +1,80 @@
+= dnslib:question
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:question - Create a question term
+
+== Description
+
+[source,erlang]
+----
+question(Domain :: dnslib:domain() | string(), Type :: dnsrr:type())
+    -> question(Domain, Type, in).
+
+question(Domain :: dnslib:domain() | string(), Type :: dnsrr:type(), Class :: dnsclass:class())
+    -> dnslib:question().
+----
+
+Create a question term.
+
+== Arguments
+
+Domain::
+
+Domain to be used in the question. Can be given as a string.
+
+Type::
+
+Type to be used. Can be an atom or a an integer.
+
+Class::
+
+Class to be used. Can be an atom or an integer.
+
+== Return value
+
+On success the produced question is returned.
+
+This function can throw `error:badarg` in the following cases:
+
+* `dnslib:list_to_domain` error when `Domain` is a string
+* `dnslib:is_valid_domain` error when `Domain` is not a string
+* An unknown atom is passed as `Type` or `Class`
+* An integer outside the range `0..16#FFFF` is passed as `Type` or `Class`
+
+== Examples
+
+[source,erlang]
+----
+{[], ns, in} = dnslib:question("", ns, in),
+Question1 = {[<<"arv">>,<<"io">>], a, in} = dnslib:question("arv.io", a, in),
+Question1 = dnslib:question("arv.io.", a, in),
+Question1 = dnslib:question("arv.io", 1, 1), % Value of A type and IN class are both 1
+
+% wildcard_domains() are not allowed
+{[<<"*">>], a, in} = dnslib:question("*", a, in).
+----
+
+.Errors
+[source,erlang]
+----
+{'EXIT', {badarg, _}} = (catch dnslib:question([], -1, 1)), % out of range type
+{'EXIT', {badarg, _}} = (catch dnslib:question([], 16#FFFF+1, 1)), % out of range type
+{'EXIT', {badarg, _}} = (catch dnslib:question([], 1, -1)), % out of range class
+{'EXIT', {badarg, _}} = (catch dnslib:question([], 1, 16#FFFF+1)), % out of range class
+{'EXIT', {badarg, _}} = (catch dnslib:question("väinämöinen", 1, 1)), % non-ASCII error
+{'EXIT', {badarg, _}} = (catch dnslib:question([], not_a_type, 1)), % unknown type atom
+{'EXIT', {badarg, _}} = (catch dnslib:question([], 1, not_a_class)). % unknown class atom
+----
+
+== Changelog
+
+* *0.0.1* Function added
+
+== See also
+
+link:dnslib.resource{ext-relative}[dnslib:resource],
+link:dnslib{ext-relative}[dnslib]

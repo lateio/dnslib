@@ -1,0 +1,53 @@
+= dnslib:normalize_question
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:normalize_question - Normalize a question term
+
+== Description
+
+[source,erlang]
+----
+normalize_question(Question :: dnslib:question())
+    -> dnslib:question().
+----
+
+Normalize a question term.
+
+== Arguments
+
+Question::
+
+Question to normalize
+
+== Return value
+
+Returns a question in which:
+
+* Domain has been normalized. See link:dnslib.normalize_domain{ext-relative}[`dnslib:normalize_domain`].
+* Known integer values for `Question` type and class have been replaced with their respective atoms
+
+This function throws `error:badarg` if `Question` type or class are unknown atoms.
+
+== Examples
+
+[source,erlang]
+----
+{[], a, in} = dnslib:normalize_question({[], 1, 1}),
+{[<<"arv">>,<<"io">>], a, in} = dnslib:normalize_question({[<<"ARV">>,<<"IO">>], 1, 1}).
+----
+
+== Changelog
+
+* *0.0.1* Function now also normalizes `Type` and `Class` members of the question
+* *0.0.0* Function added
+
+== See also
+
+link:dnslib.question{ext-relative}[dnslib:question],
+link:dnslib.normalize_domain{ext-relative}[dnslib:normalize_domain],
+link:dnslib.normalize_resource{ext-relative}[dnslib:normalize_resource],
+link:dnslib{ext-relative}[dnslib]

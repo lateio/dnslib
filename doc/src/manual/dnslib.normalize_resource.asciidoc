@@ -1,0 +1,67 @@
+= dnslib:normalize_resource
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:normalize_resource - Normalize a resource term
+
+== Description
+
+[source,erlang]
+----
+normalize_resource(Resource :: dnslib:resource()) ->
+    -> dnslib:resource().
+----
+
+Normalize a resource term.
+
+== Arguments
+
+Resource::
+
+Resource to normalize
+
+== Return value
+
+Returns a resource in which:
+
+* Domain has been normalized. See link:dnslib.normalize_domain{ext-relative}[`dnslib:normalize_domain`].
+* Known integer values for `Resource` type and class have been replaced with their respective atoms
+* If the data member of a known resource type is a `binary()` term, it will be transformed to the appropriate data structure.
+* Resource data is normalized
+
+This function can throw `error:badarg` in the following cases:
+
+* Resource type or class is an unknown atom
+* Resource type or class is an integer outside range `0..16#FFFF`
+* Resource ttl is an integer outside range `0..16#7FFFFFFF`
+* Resource data is invalid
+* `binary()` resource data contains compressed domains
+
+== Examples
+
+[source,erlang]
+----
+{[], a, in, 0, {0,0,0,0}} = dnslib:normalize_resource({[], 1, 1, 0, <<0:32>>}),
+Result = {[<<"arv">>,<<"io">>], a, in, 0, {0,0,0,0}},
+Result = dnslib:normalize_resource({[<<"ARV">>,<<"IO">>], 1, 1, 0, <<0:32>>}),
+Result2 = {[<<"arv">>,<<"io">>], ns, in, 0, [<<"arv">>,<<"io">>]}
+Result2 = dnslib:normalize_resource({[<<"ARV">>,<<"IO">>], ns, 1, 0, [<<"ARV">>,<<"IO">>]}).
+----
+
+== Changelog
+
+* *0.0.1*
+** Function now also normalizes type and class members of the resource
+** Function now also applies `Module:from_binary/1` to `binary()` data terms of known resource types
+** Function now also normalizes `Resource` data
+* *0.0.0* Function added
+
+== See also
+
+link:dnslib.resource{ext-relative}[dnslib:resource],
+link:dnslib.normalize_domain{ext-relative}[dnslib:normalize_domain],
+link:dnslib.normalize_question{ext-relative}[dnslib:normalize_question],
+link:dnslib{ext-relative}[dnslib]

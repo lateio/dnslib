@@ -1,0 +1,73 @@
+= Module:from_binary
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+Module:from_binary - Parses data from wire format
+
+== Description
+
+[source,erlang]
+----
+from_binary(Bin :: binary())
+    -> {ok, Data :: term()}
+     | {domains, [term()]}
+     | {error, term()}.
+----
+
+Parses data from wire format.
+
+== Arguments
+
+Bin::
+
+Binary which should contain the resource record data
+
+== Return value
+
+If the binary was a valid representation of resource data and the data *did not contain domains*, returns a tuple consisting of `'ok'` and the internal resource data.
+
+If the binary was a valid representation of resource data and *did contain domains*, returns a tuple consisting of `'domains'` and a list of terms, in which domains have been marked with link:dnswire:from_binary{ext-relative}[`dnswire:from_binary_domain`]. The module might also have to implement link:dnsrr.callback.from_binary_finalize[`Module:from_binary_finalize`].
+
+If the binary was invalid, returns a tuple consisting of `'error'` and the error reason.
+
+Note, that dnslib treats `error:function_clause` the same as `{'error', 'invalid_data'}`. Thus it is possible to only implement a function clause with the valid bit match, leaving other data to throw.
+
+== Examples
+
+[source,erlang]
+----
+{ok, {0,0,0,0}} = dnsrr_a:from_binary(<<0,0,0,0>>).
+----
+
+.Example from dnsrr_a
+[source,erlang]
+----
+from_binary(<<B1, B2, B3, B4>>) ->
+    {ok, {B1, B2, B3, B4}}.
+----
+
+.Example from dnsrr_mx
+[source,erlang]
+----
+from_binary(<<Priority:16, Bin/binary>>) ->
+    case dnslib:binary_to_domain(Bin) of
+        {ok, Domain, <<>>} -> {domains, [Priority, dnswire:from_binary_domain(Domain, 2)]};
+        {{compressed, _, _} = Tuple, <<>>} ->
+            {domains, [Priority, dnswire:from_binary_domain(Tuple, 2)]};
+        {error, Reason} -> {error, Reason}
+    end.
+----
+
+== Changelog
+
+* *0.0.1* `error:function_clause` is considered to indicate invalid data
+* *0.0.0* Callback added
+
+== See also
+
+link:dnsrr.callback.from_binary_finalize{ext-relative}[Module:from_binary_finalize],
+link:dnswire.from_binary_domain{ext-relative}[dnswire:from_binary_domain],
+link:dnsrr{ext-relative}[dnsrr]

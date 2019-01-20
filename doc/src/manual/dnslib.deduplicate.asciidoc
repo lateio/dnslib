@@ -1,0 +1,65 @@
+= dnslib:deduplicate
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:deduplicate - Deduplicate a list of questions or resources
+
+== Description
+
+[source,erlang]
+----
+deduplicate(List :: [dnslib:question()] | [dnslib:resource()])
+    -> [dnslib:question()] | [dnslib:resource()].
+----
+
+Deduplicate a list of questions or resources.
+
+== Arguments
+
+List::
+
+List to deduplicate
+
+== Return value
+
+The function returns a list consisting of entries in the original list -- returned terms are not changed -- but with duplicate entries pruned out.
+
+== Details
+
+Duplicate questions are terms where type and class match exactly and normalized domains match exactly.
+
+Duplicate resources are terms where type, class, ttl, normalized domains and normalized resource data match exactly. Thus otherwise identical resources which only differ in ttl value would not be considered equal.
+
+== Examples
+
+[source,erlang]
+----
+Resource1 = dnslib:resource("ARV.IO", a, in, 60, "0.0.0.0"),
+Resource2 = dnslib:resource("arv.io", a, in, 60, "0.0.0.0"),
+[Resource1] = dnslib:deduplicate([Resource1, Resource2]).
+----
+
+[source,erlang]
+----
+Resource1 = dnslib:resource("ARV.IO", ns, in, 60, "NS1.arv.IO"),
+Resource2 = dnslib:resource("arv.IO", ns, in, 60, "ns1.arv.io"),
+[Resource1] = dnslib:deduplicate([Resource1, Resource2]).
+----
+
+[source,erlang]
+----
+Resource1 = dnslib:resource("ARV.IO", a, in, 60, "0.0.0.0"),
+Resource2 = dnslib:resource("arv.io", a, in, 30, "0.0.0.0"),
+[Resource1, Resource2] = dnslib:deduplicate([Resource1, Resource2]).
+----
+
+== Changelog
+
+* *0.0.1* Function added
+
+== See also
+
+link:dnslib{ext-relative}[dnslib]

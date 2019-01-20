@@ -1,0 +1,47 @@
+= dnslib:normalize_domain
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:normalize_domain - Normalize domain for comparison
+
+== Description
+
+[source,erlang]
+----
+is_valid_domain(Domain :: dnslib:domain()) ->
+    -> dnslib:domain().
+----
+
+Normalize domain for comparison.
+
+== Arguments
+
+Domain::
+
+Domain to normalize
+
+== Return value
+
+A version of `Domain` where ASCII characters have been lowercased is returned.
+
+== Examples
+
+[source,erlang]
+----
+[<<"arv">>, <<"io">>] = dnslib:normalize_domain([<<"ARV">>, <<"io">>]),
+[<<"Ä">>, <<"arv">>, <<"io">>] = dnslib:normalize_domain([<<"Ä">>,<<"ARV">>, <<"io">>]).
+----
+
+== Changelog
+
+* *0.0.1* Function renamed from `normalize` to `normalize_domain`
+* *0.0.0* Function added
+
+== See also
+
+link:dnslib.normalize_question{ext-relative}[dnslib:normalize_question],
+link:dnslib.normalize_resource{ext-relative}[dnslib:normalize_resource],
+link:dnslib{ext-relative}[dnslib]

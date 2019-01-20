@@ -1,0 +1,199 @@
+= dnsmsg:interpret_response
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsmsg:interpret_response - Match response resources to questions
+
+== Description
+
+[source,erlang]
+----
+interpret_response(Response :: dnsmsg:message()) -> {'ok', [interpret_result()]}.
+----
+
+Match response resources to questions.
+
+DNS responses vary in how the result of a query is presented in them. The simplest case is when a query was successful, and the answers section of a response contains resources which neatly match the questions. A slightly more complicated one is when the original question was actually a `CNAME` and the cname and the proper answer are both included in the answers section.
+
+From there on it gets more complicated and thus it is important to collect the logic of extracting results from DNS responses in a single place. If you need to make sense of DNS responses, use this function.
+
+== Types
+
+=== terminal_interpret_result()
+
+[source,erlang]
+----
+terminal_interpret_result() =
+      {dnslib:question(), 'ok',         [dnslib:resource()]}
+    | {dnslib:question(), 'nodata',     {Soa :: dnslib:resource(), CnameTrail :: [dnslib:resource()]}}
+    | {dnslib:question(), 'name_error', {Soa :: dnslib:resource(), CnameTrail :: [dnslib:resource()]}}.
+----
+
+`{Question, 'ok', Resources}`::
+
+Represents a normal, successful query. `Resources` is a list of resources related to the question `Question`. The list of resources might also contain `CNAME` resources if those were encountered.
+
+`{Question, 'nodata', {Soa, CnameTrail}}`::
+
+Represents a query for which no data could be found. For example: if a domain name has an `AAAA` record, but no `TXT` record, query for `TXT` of that record would produce a `'nodata'` result.
+
+`{Question, 'name_error', {Soa, CnameTrail}}`::
+
+Represents a query for a domain which does not exist.
+
+=== referral_interpret_result()
+
+[source,erlang]
+----
+referral_interpret_result() =
+      {dnslib:question(), 'addressless_referral', [dnslib:resource()]}
+    | {dnslib:question(), 'missing_glue_referral', [dnslib:resource()]}
+    | {dnslib:question(), 'referral', [{dnslib:resource(), [dnslib:resource()]}]}.
+----
+
+`{Question, 'addressless_referral', NsResources}`::
+
+Represents a query which returned a referral to other name servers, addresses of which might have to be queried elsewhere.
+
+`{Question, 'missing_glue_referral', NsResources}`::
+
+Represents a query which returned a referral to name servers for which we have no addresses. Can be treated as an error condition, as missing glue is ofter a configuration error on the side of the authoritative server.
+
+`{Question, 'referral', [{NsResource, [AddressResource]}]}`::
+
+Represents a query which returned a referral with glue (address; `A` and `AAAA`) records.
+
+=== cname_interpret_result()
+
+[source,erlang]
+----
+cname_interpret_result() =
+      {dnslib:question(), 'cname_loop', Cnames :: [dnslib:resource()]}
+    | {dnslib:question(), 'cname', {Cname :: dnslib:resource(cname), PreceedingCnames :: [dnslib:resource()]}}
+    | {dnslib:question(), 'cname_referral', {Cname :: dnslib:resource(), Referral :: referral_interpret_result(), PreceedingCnames :: [dnslib:resource()]}}.
+----
+
+`{Question, 'cname_loop', Cnames}`::
+
+Encountered a `CNAME` loop.
+
+`{Question, 'cname', {Cname, PreceedingCnames}}`::
+
+Represents a query which returned a `CNAME` record which has to be further resolved elsewhere.
+
+`{Question, 'cname_referral', {Cname, Referral, PreceedingCnames}}`::
+
+Represents a query which returned a `CNAME` record which has to be further resolved from other name servers -- thus it has `Referral`.
+
+=== incremental_transfer_change_set()
+
+[source,erlang]
+----
+incremental_transfer_change_set() =
+    {
+        Deletions :: {OldSoa :: dnslib:resource(), [dnslib:resources()]},
+        Additions :: {NewSoa :: dnslib:resource(), [dnslib:resources()]}
+    }.
+----
+
+=== transfer_interpret_result()
+
+[source,erlang]
+----
+transfer_interpret_result() =
+    {
+        dnslib:question(),
+        'zone_transfer' | 'incremental_zone_transfer',
+        {
+            Soa       :: dnslib:resource() | 'nil',
+            Type      :: 'complete' | 'first' | 'middle' | 'last',
+            Resources :: [dnslib:resource()] | [incremental_transfer_change_set()]
+        }
+    }.
+----
+
+Transfers are represented by one or more messages, thus the `Type` member.
+
+`Soa` is `'nil'` in results when `Type =:= 'middle'`, since the message does not contain that information.
+
+=== error_interpret_result()
+
+[source,erlang]
+----
+error_interpret_result() = {dnslib:question(), Reason :: term()}.
+----
+
+`{Question, Reason $$::$$ term()}`::
+
+Question encountered an error of some kind.
+
+=== interpret_result()
+
+[source,erlang]
+----
+interpret_result() =
+      terminal_interpret_result()
+    | referral_interpret_result()
+    | cname_interpret_result()
+    | error_interpret_result().
+----
+
+== Arguments
+
+Response::
+
+Response message to interpret
+
+== Return value
+
+A tuple consisting of `'ok'` atom and a list of `interpret_result()` terms -- one per question in the response -- is returned.
+
+== Examples
+
+[source,erlang]
+----
+Question = dnslib:question("arv.io", a, in),
+Resource = dnslib:resource("arv.io", a, in, 60, {0,0,0,0}),
+Res = dnsmsg:new(#{is_response => true}, Question, Resource),
+{ok, [{Question, ok, [Resource]}]} = dnsmsg:interpret_response(Res).
+----
+
+.Zone transfer
+[source,erlang]
+----
+Question = dnslib:question("arv.io", axfr, in),
+Soa = dnslib:resource("arv.io IN 60 SOA ns1.arv.io hostmaster.arv.io 0 1min 1min 1min 1min"),
+Resource = dnslib:resource("arv.io", a, in, 60, {0,0,0,0}),
+Res = dnsmsg:new(#{is_response => true}, Question, [Soa, Resource, Soa]),
+{ok, [{Question, zone_transfer, {Soa, complete, [Resource]}}]} = dnsmsg:interpret_response(Res).
+----
+
+.Cname
+[source,erlang]
+----
+Question = dnslib:question("alias.arv.io", a, in),
+Cname = dnslib:resource("alias.arv.io", cname, in, 60, "arv.io"),
+Resource = dnslib:resource("arv.io", a, in, 60, {0,0,0,0}),
+Res = dnsmsg:new(#{is_response => true}, Question, [Cname, Resource]),
+{ok, [{Question, ok, [Resource, Cname]}]} = dnsmsg:interpret_response(Res).
+----
+
+.No answers
+[source,erlang]
+----
+Question = dnslib:question("alias.arv.io", a, in),
+Res = dnsmsg:new(#{is_response => true}, Question),
+{ok, [{Question, undefined}]} = dnsmsg:interpret_response(Res).
+----
+
+== Changelog
+
+* *0.0.1* Zone transfer results added
+* *0.0.0* Function added
+
+== See also
+
+link:dnsmsg{ext-relative}[dnsmsg]

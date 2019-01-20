@@ -1,0 +1,128 @@
+= dnsmsg
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Module
+
+dnsmsg
+
+== Description
+
+Create and work with DNS messages.
+
+== Exports
+
+Create messages:
+
+* link:dnsmsg.new{ext-relative}[dnsmsg:new] - Create a new DNS message
+* link:dnsmsg.response{ext-relative}[dnsmsg:response] - Create response to a DNS request
+
+Access messages:
+
+* link:dnsmsg.additional{ext-relative}[dnsmsg:additional] - Get the additional section from a message
+* link:dnsmsg.answers{ext-relative}[dnsmsg:answers] - Get answers from a message
+* link:dnsmsg.authority{ext-relative}[dnsmsg:authority] - Get the authority section from a message
+* link:dnsmsg.id{ext-relative}[dnsmsg:id] - Get the message id
+* link:dnsmsg.is_response{ext-relative}[dnsmsg:is_response] - Check if a message is a response
+* link:dnsmsg.opcode{ext-relative}[dnsmsg:opcode] - Get the message opcode
+* link:dnsmsg.questions{ext-relative}[dnsmsg:questions] - Get questions from a message
+* link:dnsmsg.return_code{ext-relative}[dnsmsg:return_code] - Get the message return code
+
+Modify messages:
+
+* link:dnsmsg.add_additional{ext-relative}[dnsmsg:add_additional] - Add a resource to the additional section of a message
+* link:dnsmsg.add_answer{ext-relative}[dnsmsg:add_answer] - Add an answer to a message
+* link:dnsmsg.add_authority{ext-relative}[dnsmsg:add_authority] - Add a resource to the authority section of a message
+* link:dnsmsg.add_question{ext-relative}[dnsmsg:add_question] - Add a question to a message
+* link:dnsmsg.add_to_section{ext-relative}[dnsmsg:add_to_section] - Add a question or a resource to a section of a message
+* link:dnsmsg.reset_id{ext-relative}[dnsmsg:reset_id] - Reset the message id
+* link:dnsmsg.set_header{ext-relative}[dnsmsg:set_header] - Modify message fields
+* link:dnsmsg.set_section{ext-relative}[dnsmsg:set_section] - Set a section of a message to some list of questions or resources
+
+Preparing responses:
+
+* link:dnsmsg.add_response_additional{ext-relative}[dnsmsg:add_response_additional] - Add a resource to the additional section of a future response
+* link:dnsmsg.add_response_answer{ext-relative}[dnsmsg:add_response_answer] - Add an answer to a future response
+* link:dnsmsg.add_response_authority{ext-relative}[dnsmsg:add_response_authority] - Add a resource to the authority section of a future response
+* link:dnsmsg.add_to_response_section{ext-relative}[dnsmsg:add_to_response_section] - Add a resource to a section of a future response
+* link:dnsmsg.set_response_header{ext-relative}[dnsmsg:set_response_header] - Modify fields of a future response
+* link:dnsmsg.set_response_section{ext-relative}[dnsmsg:set_response_section] - Set a section of a future response to some list of resources
+
+Interpreting responses:
+
+* link:dnsmsg.interpret_response{ext-relative}[dnsmsg:interpret_response] - Match response resources to questions
+
+== Types
+
+=== message()
+
+[source,erlang]
+message() = map().
+
+All keys that dnslib relies on in `message()` use unconventional `'Capitalized_atoms'`, thus allowing `message()` to be extended when necessary with minimal chance -- at least with normal use of atoms -- of kneecapping dnslib in the process.
+
+It is perfectly fine to use pattern matching or the `maps` module to access members of the message. However, message should only be modified by using the functions provided by dnslib.
+
+.Message fields
+[source,erlang]
+----
+Message = #{
+    'ID'                    => 0..16#FFFF,
+    'Is_response'           => boolean(),
+    'Opcode'                => dnslib:opcode() | 0..16#F,
+    'Authoritative'         => boolean(),
+    'Truncated'             => boolean(),
+    'Recursion_desired'     => boolean(),
+    'Recursion_available'   => boolean(),
+    'Reserved'              => 0,
+    'Authenticated_data'    => boolean(), % DNSSEC
+    'Checking_disabled'     => boolean(), % DNSSEC
+    'Return_code'           => dnslib:return_code() | 0..16#FFF,
+
+    'EDNS_version'          => 0,
+    'EDNS_udp_payload_size' => 512..16#FFFF,
+    'EDNS_dnssec_ok'        => boolean(), % DNSSEC
+    'EDNS' => map(),
+
+    'Questions'             => [dnslib:question()],
+    'Answers'               => [dnslib:resource()],
+    'Nameservers'           => [dnslib:resource()],
+    'Additional'            => [dnslib:resource()],
+
+    'Response'              => map()
+}.
+----
+
+[[question-resource-order]]
+==== Question and Resource order
+
+Questions and resources are stored in reverse order in the message. Ie. if questions for `NS` and `A` are added into a message (in that order), they'll be stored in `'Questions'` list in the following order: `A`, `NS`. This is done because of how Erlang lists work.
+
+When a message is transformed into wire format, questions and resources will be present in the order they were added in.
+
+[[request-response]]
+==== Requests and Responses
+
+DNS header has a bit flag which signifies whether a message is a request (`0`) or a response (`1`).
+
+You should always work with requests, even if your goal is to construct a response. `dnsmsg` module offers functions like `dnsmsg:set_response_header`, `dnsmsg:add_response_answer` and others to allow you to prepare a response by working with the original request. These functions restrict you from changing fields which should remain same from the request to the response. Finally you can run `dnsmsg:response` to produce the response object you have been preparing and send that along.
+
+=== message_section()
+
+[source,erlang]
+----
+message_section() =
+      'question'
+    | 'answer'
+    | 'nameserver'
+    | 'additional'.
+----
+
+== Changelog
+
+* *0.0.0* Module added
+
+== See also
+
+link:index{ext-relative}[Index]

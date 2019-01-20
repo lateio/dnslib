@@ -1,0 +1,107 @@
+= dnswire:to_binary
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnswire:to_binary - Transform DNS message to wire format
+
+== Description
+
+[source,erlang]
+----
+to_binary(Msg :: dnsmsg:message()) -> to_binary(Msg, []).
+
+to_binary(Msg :: dnsmsg:message(), Opts :: [to_iolist_opt()])
+    -> {'ok', Len :: pos_integer(), Bin :: binary()}
+     | {
+          'partial',
+          Len :: pos_integer(),
+          Bin :: binary(),
+          {
+            RemainingQuestions   :: [dnslib:question()],
+            RemainingAnswers     :: [dnslib:resource()],
+            RemainingNameservers :: [dnslib:resource()],
+            RemainingAdditional  :: [dnslib:resource()]
+          }
+       }.
+----
+
+Transform DNS message to wire format.
+
+== Types
+
+=== to_iolist_opt()
+
+[source,erlang]
+----
+to_iolist_opt() =
+      {max_length, 12..16#FFFF}
+    | {edns, boolean()}
+    | {truncate, boolean()}
+    | {domain_compression, boolean()}
+    | {data_domain_compression, boolean()}.
+----
+
+Default for each option is given in parentheses next to the option.
+
+`{'max_length', 12..16#FFFF}` (`16#FFFF`)::
+
+This option lets the length of the produced message to be capped at certain value.
+
+`{'edns', boolean()}` (`'true'`)::
+
+Controls whether edns is included in the produced message.
+
+`{'truncate', boolean()}` (`'true'`)::
+
+Controls whether the truncated flag is automatically set in output for messages where `'max_length'` is reached. If `'true'` the flag is automatically set.
+
+`{'domain_compression', boolean()}` (`boolean()`)::
+
+Controls whether domain compression is allowed at all. If `'true'` domain compression is allowed.
+
+`{'data_domain_compression', boolean()}` (`'true'`)::
+
+Controls whether domain compression is allowed in resource data -- think the value of an `NS` record. If `'true'` data domain compression is allowed. Note that some resource types might still disallow their data domains to be compressed.
+
+== Arguments
+
+Msg::
+
+Message to transform
+
+Opts::
+
+Options to control the transformation
+
+== Return value
+
+If everything in the message fit in a binary smaller or at most `'max_length'` long, a tuple consisting of `'ok'`, the total length of the produced binary and the binary is returned.
+
+If the message was longer than allowed, a tuple consisting of `'partial'`, the total length of the produced binary, the produced binary and a tuple containing -- in this order -- the questions, answers, authority and additional which did not fit the message is returned.
+
+== Examples
+
+[source,erlang]
+----
+Msg = dnsmsg:new(#{id => 0}),
+{ok, 12, <<0:96>>} = dnswire:to_binary(Msg, [{edns, false}]).
+----
+
+== Changelog
+
+* *0.0.1*
+** Options
+*** Added `'max_length'`
+*** Added `'edns'`
+*** `'disable_compress'` renamed to `'domain_compression'`
+*** Added `'data_domain_compression'`
+* *0.0.0* Function added
+
+== See also
+
+link:dnswire.to_iolist{ext-relative}[dnswire:to_iolist],
+link:dnswire.from_binary{ext-relative}[dnswire:from_binary],
+link:dnswire{ext-relative}[dnswire]

@@ -1,0 +1,55 @@
+= dnsmsg:add_answer
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsmsg:add_answer - Add an answer to a message
+
+== Description
+
+[source,erlang]
+----
+add_answer(
+  Msg :: dnsmsg:message(),
+  Resource :: dnslib:resource() | [dnslib:resource()])
+    -> dnsmsg:message().
+----
+
+Add an answer to a message.
+
+== Arguments
+
+Msg::
+
+Message to which the answer will be added
+
+Resource::
+
+Answer(s) to add
+
+== Return value
+
+The message containing the added answer(s) is returned.
+
+Answers will appear in the message in the order they were included in.
+
+== Examples
+
+[source,erlang]
+----
+Msg = dnsmsg:add_answer(dnsmsg:new(), dnslib:resource([], ns, in, 60, "ns1")).
+----
+
+== Changelog
+
+* *0.0.0* Function added
+
+== See also
+
+link:dnsmsg.set_section{ext-relative}[dnsmsg:set_section],
+link:dnsmsg.add_question{ext-relative}[dnsmsg:add_question],
+link:dnsmsg.add_authority{ext-relative}[dnsmsg:add_authority],
+link:dnsmsg.add_additional{ext-relative}[dnsmsg:add_additional],
+link:dnsmsg{ext-relative}[dnsmsg]

@@ -1,0 +1,58 @@
+= Module:valid_data
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+Module:valid_data - Checks if a term is valid resource data
+
+== Description
+
+[source,erlang]
+----
+valid_data(Data :: term()) -> boolean().
+----
+
+Checks if a term is valid resource data.
+
+== Arguments
+
+Data::
+
+Data to test
+
+== Return value
+
+Returns `'true'` if the `Data` is valid. Otherwise returns `'false'`.
+
+If call to this function throws `error:function_clause`, that is also considered as `false`. Thus it is possible to only implement function matching the valid data term.
+
+== Examples
+
+.Example from dnsrr_a
+[source,erlang]
+----
+valid_data(Address) when tuple_size(Address) =:= 4 ->
+    Fn = fun (FunMember) ->
+        is_integer(FunMember) andalso FunMember >= 0 andalso FunMember =< 16#FF
+    end,
+    lists:all(Fn, tuple_to_list(Address)).
+----
+
+.Example from dnsrr_mx
+[source,erlang]
+----
+valid_data({Priority, Domain})
+when is_integer(Priority), Priority >= 0, Priority =< 16#FFFF ->
+    true =:= dnslib:is_valid_domain(Domain).
+----
+
+== Changelog
+
+* *0.0.1* `error:function_clause` also considered `'false'`
+* *0.0.0* Callback added
+
+== See also
+
+link:dnsrr{ext-relative}[dnsrr]

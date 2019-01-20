@@ -1,0 +1,46 @@
+= dnsmsg:reset_id
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsmsg:reset_id - Reset the message id
+
+== Description
+
+[source,erlang]
+----
+reset_id(Message :: dnsmsg:message()) -> dnsmsg:message().
+----
+
+Reset the message id.
+
+== Arguments
+
+Message::
+
+Message which deserves to have its id reset
+
+== Return value
+
+The returned message has its id set to a random new value.
+
+Trying to reset the id of a response will crash the application.
+
+== Examples
+
+[source,erlang]
+----
+Msg1 = dnsmsg:new(),
+Msg2 = dnsmsg:reset_id(Msg1),
+true = Msg1 =/= Msg2.
+----
+
+== Changelog
+
+* *0.0.0* Function added
+
+== See also
+
+link:dnsmsg{ext-relative}[dnsmsg]

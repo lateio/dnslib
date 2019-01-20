@@ -1,0 +1,40 @@
+= dnsmsg:id
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsmsg:id - Get the message id
+
+== Description
+
+[source,erlang]
+----
+id(Message :: dnsmsg:message()) -> 0..16#FFFF.
+----
+
+Get the message id.
+
+It is also possible to get the id from a message with pattern matching.
+
+[source,erlang]
+#{'ID' := ID} = dnsmsg:new().
+
+== Arguments
+
+Message::
+
+Message whose id we want to know
+
+== Return value
+
+Message id is returned.
+
+== Changelog
+
+* *0.0.0* Function added
+
+== See also
+
+link:dnsmsg{ext-relative}[dnsmsg]

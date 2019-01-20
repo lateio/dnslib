@@ -1,0 +1,37 @@
+= Module:value
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+Module:value - Returns an integer representing the class
+
+== Description
+
+[source,erlang]
+----
+value() -> 0..16#FFFF.
+----
+
+Returns an integer representing the class.
+
+== Return value
+
+Returned atom is used to represent the class in wire format. It must thus be distinct from other class integers and conform to relevant standards for the class.
+
+== Examples
+
+[source,erlang]
+----
+1 = dnsclass_in:value(),
+2 = dnsclass_cs:value().
+----
+
+== Changelog
+
+* *0.0.1* Callback added
+
+== See also
+
+link:dnsclass{ext-relative}[dnsclass]

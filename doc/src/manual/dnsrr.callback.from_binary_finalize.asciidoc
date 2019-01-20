@@ -1,0 +1,55 @@
+= Module:from_binary_finalize
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+Module:from_binary_finalize - Finalizes parsing from wire format
+
+== Description
+
+[source,erlang]
+----
+from_binary_finalize(Terms :: [term()]) -> {ok, Data :: term()}.
+----
+
+Finalizes parsing from wire format.
+
+== Arguments
+
+Terms::
+
+The list returned by `Module:from_binary`, in which compressed domains have been resolved
+
+== Return value
+
+Returns a tuple consisting of `'ok'` and the internal resource data.
+
+== Optional callback
+
+If the module can return `{'domains', List}` from link:dnsrr.callback.from_binary{ext-relative}[`Module:from_binary`], and the resource data is structured in *some other way than*:
+
+* If the list has only one member, the first member is used as the resource data
+* If there are multiple members in the list, `list_to_tuple` is run on the list and the tuple is used as resource data
+
+then the module must implement this callback. Otherwise it is optional.
+
+== Examples
+
+.Example from dnsrr_soa
+[source,erlang]
+----
+from_binary_finalize([Ns, Contact, Id, Refresh, Retry, Expire, Minimum]) ->
+    {ok, {Ns, Contact, Id, ?FIX_TTL(Refresh), ?FIX_TTL(Retry), ?FIX_TTL(Expire), ?FIX_TTL(Minimum)}}.
+----
+
+== Changelog
+
+* *0.0.1* Added default behavior, making callback necessary only in unusual cases
+* *0.0.0* Callback added
+
+== See also
+
+link:dnsrr.callback.from_binary{ext-relative}[Module:from_binary],
+link:dnsrr{ext-relative}[dnsrr]

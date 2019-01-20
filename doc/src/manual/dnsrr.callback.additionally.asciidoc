@@ -1,0 +1,61 @@
+= Module:additionally
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+Module:additionally - Returns additional resource suggestions
+
+== Description
+
+[source,erlang]
+----
+additionally(Record :: dnslib:resource()) ->
+      dnslib:question()
+    | dnslib:resource()
+    | [dnslib:question() | dnslib:resource()].
+----
+
+Returns additional resource suggestions.
+
+== Return value
+
+Callback returns question(s) and/or resource(s) to suggest additional records to add to the message. It is up to the caller whether or not these suggestions are fulfilled.
+
+== Optional callback
+
+This callback is optional. If it is not implemented, no additional resources are considered for the resource type.
+
+== Example
+
+.Example from dnsrr_ns
+[source,erlang]
+----
+additionally({_, _, in, _, Domain}) ->
+    [
+        {Domain, a, in},
+        {Domain, aaaa, in}
+    ];
+additionally(_) ->
+    [].
+----
+
+.Example from dnsrr_mx
+----
+additionally({_, _, in, _, {_, Domain}}) ->
+    [
+        {Domain, a, in},
+        {Domain, aaaa, in}
+    ];
+additionally(_) ->
+    [].
+----
+
+== Changelog
+
+* *0.0.0* Callback added
+
+== See also
+
+link:dnsrr{ext-relative}[dnsrr]

@@ -1,0 +1,60 @@
+= dnsmsg:add_response_authority
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsmsg:add_response_authority - Add a resource to the authority section of a future response
+
+== Description
+
+[source,erlang]
+----
+add_response_authority(
+  Msg :: dnsmsg:message(),
+  Resource :: dnslib:resource() | [dnslib:resource()])
+    -> dnsmsg:message().
+----
+
+Add a resource to the authority section of a future response.
+
+== Arguments
+
+Msg::
+
+A request message. When the response to this message is created, added resource(s) will be present in it.
+
+Resource::
+
+Resource(s) to add
+
+== Return value
+
+A request message containing the added resource(s) is returned.
+
+When `dnmsg:response` is executed on the returned request message, the added resources will be present in the created response.
+
+Resources will appear in the response in the order they were included in.
+
+== Examples
+
+[source,erlang]
+----
+Resource = dnslib:resource([], ns, in, 60, "ns1"),
+Req = dnsmsg:new(#{}),
+Req1 = dnsmsg:add_response_authority(Req, Resource),
+#{'Nameservers' := [Resource]} = Res = dnsmsg:response(Req1).
+----
+
+== Changelog
+
+* *0.0.0* Function added
+
+== See also
+
+link:dnsmsg.set_response_section{ext-relative}[dnsmsg:set_response_section],
+link:dnsmsg.add_response_additional{ext-relative}[dnsmsg:add_response_additional],
+link:dnsmsg.add_response_answer{ext-relative}[dnsmsg:add_response_answer],
+link:dnsmsg.response{ext-relative}[dnsmsg:response],
+link:dnsmsg{ext-relative}[dnsmsg]

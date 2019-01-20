@@ -1,0 +1,37 @@
+= Module:atom
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+Module:atom - Returns an atom representing the resource record type
+
+== Description
+
+[source,erlang]
+----
+atom() -> atom().
+----
+
+Returns an atom representing the resource record type.
+
+== Return value
+
+Returned atom is used to represent the resource type in questions and resources. It must thus be distinct from other resource type atoms.
+
+== Examples
+
+[source,erlang]
+----
+a = dnsrr_a:atom(),
+aaaa = dnsrr_aaaa:atom().
+----
+
+== Changelog
+
+* *0.0.0* Callback added
+
+== See also
+
+link:dnsrr{ext-relative}[dnsrr]

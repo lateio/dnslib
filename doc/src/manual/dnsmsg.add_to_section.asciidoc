@@ -1,0 +1,65 @@
+= dnsmsg:add_to_section
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsmsg:add_to_section - Add a question or a resource to a section of a message
+
+== Description
+
+[source,erlang]
+----
+add_to_section(
+  Msg :: dnsmsg:message(),
+  Section :: dnsmsg:message_section(),
+  Term :: dnslib:question() | [dnslib:question()] | dnslib:resource() | [dnslib:resource()])
+    -> dnsmsg:message().
+----
+
+Add a question or a resource to a section of a message.
+
+== Arguments
+
+Msg::
+
+Message to which the term(s) will be added
+
+Section::
+
+Section to which the term(s) will be added
+
+Term::
+
+Term(s) to add
+
+== Return value
+
+The message containing the added terms is returned.
+
+Terms will appear in the message in the order they were added in -- first in the list will appear first in the message and so on.
+
+Adding questions to other sections, or resources to `'question'` section will crash the application.
+
+== Examples
+
+[source,erlang]
+----
+Msg0 = dnsmsg:new(),
+Msg1 = dnsmsg:add_question(Msg0, dnslib:question([], ns, in)),
+Msg1 = dnsmsg:add_to_section(Msg0, question, dnslib:question([], ns, in)).
+----
+
+== Changelog
+
+* *0.0.0* Function added
+
+== See also
+
+link:dnsmsg.set_section{ext-relative}[dnsmsg:set_section],
+link:dnsmsg.add_question{ext-relative}[dnsmsg:add_question],
+link:dnsmsg.add_answer{ext-relative}[dnsmsg:add_answer],
+link:dnsmsg.add_authority{ext-relative}[dnsmsg:add_authority],
+link:dnsmsg.add_additional{ext-relative}[dnsmsg:add_additional],
+link:dnsmsg{ext-relative}[dnsmsg]

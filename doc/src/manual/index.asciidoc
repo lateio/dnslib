@@ -1,0 +1,94 @@
+= dnslib 0.0.1 Manual
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Introduction
+
+dnslib will be a standards compliant, reliable and extensible library for working with Domain Name System (DNS) data. At the time of writing, however, it lacks the testing to verify it as any of the aforementioned.
+
+dnslib can be included in an application when it is necessary to work with DNS master files or DNS wire format.
+A variety of functionality for working with DNS messages and assorted data types is included.
+
+The reader should note that dnslib *does not* implement any of the networking functionality of DNS. While it will get an application up to the binary representation of a DNS message, dnslib will not send that binary anywhere.
+
+=== Supported platforms
+
+dnslib is developed and tested for Erlang/OTP 20+, on macOS and Linux.
+
+However, as dnslib does not rely on anything particularly exotic in Erlang, it may well work on older versions of Erlang and on other platforms. Extending support to older versions and other platforms is not out of the question, if the need arises.
+
+Given the fact that dnslib relies heavily on maps, Erlang/OTP 17 is likely the earliest version of Erlang for which the idea of compatibility should be entertained.
+
+=== Versioning
+
+dnslib is a new project and limited stability should be expected for versions before 1.0.0 -- although nobody likes breaking changes and we try to avoid them. Additionally, for the foreseeable future dnslib will go the way that the requirements of the link:https://github.com/lateio/kurremkarmerruk[Kurremkarmerruk DNS server] dictate.
+
+After 1.0.0, dnslib will adopt the standard semantic versioning.
+
+== Quick start
+
+[source,erlang]
+----
+% Request
+Question = dnslib:question("arv.io", a, in),
+Request0 = dnsmsg:new(#{}, Question),
+{ok, ReqBinLen, ReqBin} = dnswire:to_binary(Request0),
+ReqBinLen = byte_size(ReqBin),
+{ok, Request0, <<>>} = dnswire:from_binary(ReqBin),
+
+% Response
+Answer = dnslib:resource("arv.io IN 60 A 127.0.0.1"),
+Request1 = dnsmsg:add_response_answer(Request0, Answer),
+Response = dnsmsg:response(Request1),
+{ok, ResBinLen, ResIolist} = dnswire:to_iolist(Response),
+ResBin = iolist_to_binary(ResIolist),
+ResBinLen = byte_size(ResBin),
+{ok, Response, <<"Trailing">>} = dnswire:from_binary(<<ResBin/binary, "Trailing">>),
+
+% Make sense of the response
+{ok, [{Question, ok, [Answer]}]} = dnsmsg:interpret_response(Response),
+
+% Keep the answer safe...
+ok = dnsfile:write_resources("/BleepBloop/treasures", [Answer]),
+
+% ...But but take a good look at it every now and then
+{ok, [Answer]} = dnsfile:consult("/BleepBloop/treasures").
+----
+
+== Modules
+
+* link:dnsclass{ext-relative}[dnsclass] - Behavior for class modules and related functions
+* link:dnsfile{ext-relative}[dnsfile] - Handle DNS master files
+* link:dnslib{ext-relative}[dnslib] - General DNS functionality
+* link:dnsmsg{ext-relative}[dnsmsg] - Create and work with DNS messages
+* link:dnsrr{ext-relative}[dnsrr] - Behavior for resource record modules and related functions
+* link:dnswire{ext-relative}[dnswire] - Transform messages from and to binary wire format
+* link:dnszone{ext-relative}[dnszone] - Functionality related to DNS zones
+
+== Supported resource types
+
+* A
+* AAAA
+* ALL/$$*$$ (QTYPE)
+* AXFR (QTYPE)
+* CNAME
+* HINFO
+* IXFR (QTYPE)
+* MAILA (QTYPE)
+* MAILB (QTYPE)
+* MB, MD, MF, MG, MR
+* MINFO
+* MX
+* NAPTR
+* NS
+* NULL
+* OPT
+* PTR
+* SOA
+* SRV
+* TXT
+* URI
+* WKS
+
+dnslib can also passthrough unrecognized resource types and their data, if need be.

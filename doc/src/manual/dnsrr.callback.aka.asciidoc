@@ -1,0 +1,49 @@
+= Module:aka
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+Module:aka - Returns a list of resource record types the QTYPE represents
+
+== Description
+
+[source,erlang]
+----
+aka() -> [dnsrr:type()].
+----
+
+Returns a list of resource record types the QTYPE represents.
+
+== Return value
+
+Returns a list of *other* resource record types for which this type is substituted for in questions.
+
+== Optional callback
+
+This callback is optional. If it is not implemented, the resource record type represents only itself.
+
+This callback is mainly useful for QTYPEs, ie. resource record types which can only appear in questions.
+
+== Examples
+
+.Example from dnsrr_all
+[source,erlang]
+----
+aka() -> ['_']. % All
+----
+
+.Example from dnsrr_maila
+[source,erlang]
+----
+aka() -> [md, mf].
+----
+
+== Changelog
+
+* *0.0.0* Callback added
+
+== See also
+
+link:dnsrr{ext-relative}[dnsrr]

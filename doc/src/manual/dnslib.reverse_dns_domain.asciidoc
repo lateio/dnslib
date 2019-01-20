@@ -1,0 +1,49 @@
+= dnslib:reverse_dns_domain
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:reverse_dns_domain - Get the reverse dns domain for an ip address
+
+== Description
+
+[source,erlang]
+----
+reverse_dns_domain(Address :: inet:ip_address()) -> domain().
+----
+
+Get the reverse dns domain for an ip address.
+
+== Arguments
+
+Address::
+
+An IPv4 or IPv6 address
+
+== Return value
+
+Returns the domain which is to be used in a reverse dns question for the provided address.
+
+== Examples
+
+[source,erlang]
+----
+[<<"4">>,<<"3">>,<<"2">>,<<"1">>,<<"in-addr">>,<<"arpa">>] = dnslib:reverse_dns_domain({1,2,3,4}),
+
+IPv6 = {16#0123, 16#4567, 16#89abc, 16#def0, 16#1234, 16#5678, 16#9abc, 16#def0},
+[<<"0">>,<<"f">>,<<"e">>,<<"d">>,<<"c">>,<<"b">>,<<"a">>,<<"9">>,<<"8">>,
+ <<"7">>,<<"6">>,<<"5">>,<<"4">>,<<"3">>,<<"2">>,<<"1">>,<<"0">>,<<"f">>,
+ <<"e">>,<<"d">>,<<"c">>,<<"b">>,<<"a">>,<<"9">>,<<"7">>,<<"6">>,<<"5">>,
+ <<"4">>,<<"3">>,<<"2">>,<<"1">>,<<"0">>,<<"ip6">>,<<"arpa">>] = dnslib:reverse_dns_domain(IPv6).
+----
+
+== Changelog
+
+* *0.0.1* Function added
+
+== See also
+
+link:dnslib.reverse_dns_question{ext-relative}[dnslib:reverse_dns_question],
+link:dnslib{ext-relative}[dnslib]

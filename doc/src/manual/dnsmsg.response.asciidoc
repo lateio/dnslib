@@ -1,0 +1,119 @@
+= dnsmsg:response
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsmsg:response - Create a response to a request
+
+== Description
+
+[source,erlang]
+----
+response(Request :: dnsmsg:message()) -> response(Request, #{}).
+
+response(Request ::  dnsmsg:message(), Opts :: response_opts())
+    -> dnsmsg:message().
+----
+
+Create a response to a request.
+
+== Types
+
+=== response_opts()
+
+[source,erlang]
+----
+response_opts() = #{
+    'authoritative'         => boolean(),
+    'truncated'             => boolean(),
+    'recursion_available'   => boolean(),
+    'authenticated_data'    => boolean(),
+    'checking_disabled'     => boolean(),
+    'return_code'           => dnslib:return_code() | 0..16#FFF,
+
+    'edns_version'          => 0..16#FF,
+    'edns_udp_payload_size' => 512..16#FFFF,
+    'edns_dnssec_ok'        => boolean()
+}.
+----
+
+Default value for each option -- when one is available -- is given in parentheses.
+
+`'authoritative'` (`'true'`)::
+
+Indicates whether the resources in a message are from an authoritative source (eg. not cached).
+
+`'truncated'` (`'false'`)::
+
+`'true'` indicates that not all available resources could fit in the response and the client should try again with TCP transport.
+
+`'recursion_available'` (`'false'`)::
+
+When `'true'` in a response, indicates that the server is willing to perform recursive queries.
+
+`'authenticated_data'` (`'false'`)::
+
+TBD. DNSSEC related.
+
+`'checking_disabled'` (`'false'`)::
+
+TBD. DNSSEC related.
+
+`'return_code'` (`'ok'`)::
+
+Set the return code for the new message.
+
+`'edns_version'` (`0`)::
+
+Sets the advertised EDNS version. Currently `0` is the only valid version.
+
+`'edns_udp_payload_size'`::
+
+Sets the advertised maximum UDP payload size.
+
+`'edns_dnssec_ok'` (`'false'`)::
+
+TBD. DNSSEC related.
+
+== Arguments
+
+Request::
+
+A request `dnsmsg:message()` for which a response is to be created
+
+Opts::
+
+Default values used for the response can be customized with this map
+
+== Return value
+
+The created response is returned.
+
+`'Is_response'` field is set to `'true'` in the response and the response also inherits the following fields from the request:
+
+* `'ID'`
+* `'Opcode'`
+* `'Recursion_desired'`
+* `'Questions'`
+
+== Creating responses
+
+Although one might be tempted to use `dnsmsg:response` to create a response and then use `dnsmsg:add_answer` and other related functions to add resources to it, there is a better way. It is possible to only work with the original request, store response resources in it with `dnsmsg:add_response_answer` and other functions and then only lastly run `dnsmsg:response` to produce the response.
+
+== Examples
+
+[source,erlang]
+----
+Response = dnsmsg:response(dnsmsg:new()).
+----
+
+== Changelog
+
+* *0.0.0* Function added
+
+== See also
+
+link:dnsmsg.new{ext-relative}[dnsmsg:new],
+link:dnsmsg{ext-relative}[dnsmsg]

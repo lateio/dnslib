@@ -1,0 +1,75 @@
+= dnsrr
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Module
+
+dnsrr
+
+== Description
+
+Behavior for resource record modules and related functions.
+
+== Exports
+
+* link:dnsrr.from_to{ext-relative}[dnsrr:from_to] - Transform an identifying term from one type to another
+* link:dnsrr.class_valid_for_type{ext-relative}[dnsrr:class_valid_for_type] - Check if certain combination of type and class is allowed
+* link:dnsrr.section_valid_for_type{ext-relative}[dnsrr:section_valid_for_type] - Check if a type is allowed in certain section of a DNS message
+* link:dnsrr.validate_data{ext-relative}[dnsrr:validate_data] - Validate resource data
+
+== Callback functions
+
+=== Exports
+
+==== Basic
+
+* link:dnsrr.callback.atom{ext-relative}[Module:atom] - Returns an atom representing the resource record type
+* link:dnsrr.callback.value{ext-relative}[Module:value] - Returns an integer representing the resource record type
+
+==== Binary
+
+* link:dnsrr.callback.from_binary{ext-relative}[Module:from_binary] - Parses data from wire format
+* link:dnsrr.callback.from_binary_finalize{ext-relative}[Module:from_binary_finalize] *(optional)* - Finalizes parsing from wire format
+* link:dnsrr.callback.to_binary{ext-relative}[Module:to_binary] - Transforms data to wire format
+
+==== Data
+
+* link:dnsrr.callback.normalize_data{ext-relative}[Module:normalize_data] *(optional)* - Returns normalized resource data
+* link:dnsrr.callback.valid_data{ext-relative}[Module:valid_data] - Checks if a term is valid resource data
+
+==== Master file (optional)
+
+* link:dnsrr.callback.from_masterfile{ext-relative}[Module:from_masterfile] *(optional)* - Transforms master file arguments to resource data
+* link:dnsrr.callback.masterfile_format{ext-relative}[Module:masterfile_format] *(optional)* - Returns the number and type of master file data arguments
+* link:dnsrr.callback.masterfile_token{ext-relative}[Module:masterfile_token] *(optional)* - Returns a string representing the resource record type
+
+==== Misc (optional)
+
+* link:dnsrr.callback.additionally{ext-relative}[Module:additionally] *(optional)* - Returns additional resource suggestions
+* link:dnsrr.callback.aka{ext-relative}[Module:aka] *(optional)* - Returns a list of resource record types the QTYPE represents
+
+==== Restrictions (optional)
+
+* link:dnsrr.callback.cacheable{ext-relative}[Module:cacheable] *(optional)* - Returns whether the resource type is cacheable
+* link:dnsrr.callback.class{ext-relative}[Module:class] *(optional)* - Returns valid class(es) for the resource record type
+* link:dnsrr.callback.message_section{ext-relative}[Module:message_section] *(optional)* - Returns a list of message sections where the resource record type can appear
+
+== Types
+
+=== type()
+
+[source,erlang]
+----
+type() = atom() | 0..16#FFFF.
+----
+
+Atoms represent known types in data structures. Integer values are used to allow passthrough of unknown types.
+
+== Changelog
+
+* *0.0.0* Module added
+
+== See also
+
+link:index{ext-relative}[Index]

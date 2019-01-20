@@ -1,0 +1,164 @@
+= dnsmsg:new
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsmsg:new - Create a new DNS message
+
+== Description
+
+[source,erlang]
+----
+new() -> new(#{}).
+
+new(Opts :: new_opts()) -> dnsmsg:message().
+
+new(Opts :: new_opts(), Questions :: dnslib:question() | [dnslib:question()])
+    -> dnsmsg:message().
+
+new(
+  Opts      :: new_opts(),
+  Questions :: dnslib:question() | [dnslib:question()],
+  Answers   :: dnslib:resource() | [dnslib:resource()])
+    -> dnsmsg:message().
+
+new(
+  Opts        :: new_opts(),
+  Questions   :: dnslib:question() | [dnslib:question()],
+  Answers     :: dnslib:resource() | [dnslib:resource()],
+  Nameservers :: dnslib:resource() | [dnslib:resource()])
+    -> dnsmsg:message().
+
+new(
+  Opts        :: new_opts(),
+  Questions   :: dnslib:question() | [dnslib:question()],
+  Answers     :: dnslib:resource() | [dnslib:resource()],
+  Nameservers :: dnslib:resource() | [dnslib:resource()],
+  Additional  :: dnslib:resource() | [dnslib:resource()])
+    -> dnsmsg:message().
+----
+
+Create a new DNS message.
+
+== Types
+
+=== new_opts()
+
+[source,erlang]
+----
+new_opts() = #{
+    'id'                    => 0..16#FFFF,
+    'is_response'           => boolean(),
+    'opcode'                => dnslib:opcode() | 0..16#F,
+    'authoritative'         => boolean(),
+    'truncated'             => boolean(),
+    'recursion_desired'     => boolean(),
+    'recursion_available'   => boolean(),
+    'authenticated_data'    => boolean(),
+    'checking_disabled'     => boolean(),
+    'return_code'           => dnslib:return_code() | 0..16#FFF,
+
+    'edns_version'          => 0..16#FF,
+    'edns_udp_payload_size' => 512..16#FFFF,
+    'edns_dnssec_ok'        => boolean()
+}.
+----
+
+Default value for each option -- when one is available -- is given in parentheses.
+
+`'id'` (random)::
+
+Set the id for the new message.
+
+`'is_response'` (`'false'`)::
+
+Set whether the message is considered a request (`'false'`) or response (`'true'`). When creating responses to requests, one should normally stick to using link:dnsmsg.response{ext-relative}[`dnsmsg:response`].
+
+`'opcode'` (`'query'`)::
+
+Set the opcode for the new message.
+
+`'authoritative'` (`'true'`)::
+
+Indicates whether the resources in a message are from an authoritative source (eg. not cached).
+
+`'truncated'` (`'false'`)::
+
+`'true'` indicates that not all available resources could fit in the response and the client should try again with TCP transport.
+
+`'recursion_desired'` (`'false'`)::
+
+When `'true'` in a request, indicates that the receiving server -- if willing -- should perform a recursive query to resolve questions present in the message.
+
+`'recursion_available'` (`'false'`)::
+
+When `'true'` in a response, indicates that the server is willing to perform recursive queries.
+
+`'authenticated_data'` (`'false'`)::
+
+TBD. DNSSEC related.
+
+`'checking_disabled'` (`'false'`)::
+
+TBD. DNSSEC related.
+
+`'return_code'` (`'ok'`)::
+
+Set the return code for the new message.
+
+`'edns_version'` (`0`)::
+
+Sets the advertised EDNS version. Currently `0` is the only valid version.
+
+`'edns_udp_payload_size'`::
+
+Sets the advertised maximum UDP payload size.
+
+`'edns_dnssec_ok'` (`'false'`)::
+
+TBD. DNSSEC related.
+
+== Arguments
+
+Opts::
+
+Default values used for a new message can be customized with this map
+
+Questions::
+
+Question(s) to include in the new message
+
+Answers::
+
+Resource(s) to include in the `answers` section of the new message
+
+Nameservers::
+
+Resource(s) to include in the `nameservers` section of the new message
+
+Additional::
+
+Resource(s) to include in the `additional` section of the new message
+
+== Return value
+
+The new message is returned.
+
+== Examples
+
+[source,erlang]
+----
+Msg = dnsmsg:new(),
+Msg1 = dnsmsg:new(#{}, dnslib:question("arv.io", a, in)).
+----
+
+== Changelog
+
+* *0.0.0* Function added
+
+== See also
+
+link:dnsmsg.response{ext-relative}[dnsmsg:response],
+link:dnsmsg{ext-relative}[dnsmsg]

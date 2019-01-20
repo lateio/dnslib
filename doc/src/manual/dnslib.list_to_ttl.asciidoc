@@ -1,0 +1,113 @@
+= dnslib:list_to_ttl
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:list_to_ttl - Parse a string as a time-to-live (TTL) field
+
+== Description
+
+[source,erlang]
+----
+list_to_ttl(Ttl :: string())
+    -> {'ok', 0..16#7FFFFFFF}
+     | {'error',
+         'invalid_ttl'  |
+         'empty_string' |
+         {'out_of_range', integer()}
+       }.
+----
+
+Parse a string as a time to live (TTL) field.
+
+== Arguments
+
+Ttl::
+
+String to parse. Can be only digits or optionally include a trailing time unit. If a time unit is included, it can -- but does not have to be -- be separated from the preceding number by a space. Time unit is case-insensitive.
+
+== Return value
+
+On success a tuple consisting of `'ok'` and the ttl integer is returned.
+
+On error a tuple consisting of `'error'` and the error reason is returned.
+
+== Errors
+
+`'invalid_ttl'`::
+
+String fails to parse as an integer or the time unit was not recognized.
+
+`'empty_string'`::
+
+`list_to_ttl` will not process an empty string.
+
+`{'out_of_range', integer()}`::
+
+`list_to_ttl` enforces value range `0..16#7FFFFFFF` for ttl values.
+
+== Time units
+* *Minute*
+** `"m"`
+** `"min"`
+** `"mins"`
+** `"minute"`
+** `"minutes"`
+* *Hour*
+** `"h"`
+** `"hour"`
+** `"hours"`
+* *Day*
+** `"d"`
+** `"day"`
+** `"days"`
+* *Week*
+** `"w"`
+** `"week"`
+** `"weeks"`
+* *Month* (30 days)
+** `"mon"`
+** `"month"`
+** `"months"`
+* *Year* (365 days)
+** `"y"`
+** `"year"`
+** `"years"`
+
+[NOTE]
+Most of these time units are implemented in jest, as ttl values upwards of a day rarely make sense in DNS. They do, however, illustrate that if required, DNS can represent resources with ttl values upwards of 6 decades.
+
+== Examples
+
+[source,erlang]
+----
+{ok, 2049840000} = dnslib:list_to_ttl("65 YEARS"),
+{ok, 168480000} = dnslib:list_to_ttl("65 month"),
+{ok, 39312000} = dnslib:list_to_ttl("65w"),
+{ok, 5616000} = dnslib:list_to_ttl("65 DAYS"),
+{ok, 234000} = dnslib:list_to_ttl("65hour"),
+{ok, 3900} = dnslib:list_to_ttl("65 mins"),
+{ok, 65} = dnslib:list_to_ttl("65"),
+
+{ok, 16#7FFFFFFF} = dnslib:list_to_ttl("MAX").
+----
+
+.Errors
+[source,erlang]
+----
+{error, empty_string} = dnslib:list_to_ttl(""),
+{error, {out_of_range, -60}} = dnslib:list_to_ttl("-60"),
+{error, {out_of_range, _}} = dnslib:list_to_ttl(integer_to_list(16#80000000)),
+{error, invalid_ttl} = dnslib:list_to_ttl("foobar"),
+{error, invalid_ttl} = dnslib:list_to_ttl("28 viikkoa").
+----
+
+== Changelog
+
+* *0.0.0* Function added
+
+== See also
+
+link:dnslib{ext-relative}[dnslib]

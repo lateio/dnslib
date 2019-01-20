@@ -1,0 +1,105 @@
+= dnslib:binary_to_domain
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:binary_to_domain - Transform a wire format binary into a domain
+
+== Description
+
+[source,erlang]
+----
+binary_to_domain(Bin :: binary())
+    -> {'ok', dnslib:non_wildcard_domain(), Tail :: binary()}
+     | {'compressed', dnslib:compressed_domain(), Tail :: binary()}
+     | {'error',
+         'truncated_domain' |
+         'empty_binary'     |
+         'domain_too_long'  |
+         {'invalid_length', Bit1 :: 0..1, Bit2 :: 0..1}
+       }.
+----
+
+Transform a wire format binary into a domain.
+
+== Arguments
+
+Bin::
+
+Binary representing a domain in wire format.
+
+== Return value
+
+On success a tuple consisting of `'ok'` or `'compressed'` atom, the produced domain and whatever trailing bytes the binary contained is returned.
+
+Note that a compressed domain will require further processing to be completely decoded.
+
+On error a tuple consisting of `'error'` atom and the error reason is returned.
+
+== Errors
+
+`'truncated_domain'`::
+
+All octets in the binary were exhausted before a valid domain termination was encountered.
+
+`'empty_binary'`::
+
+`binary_to_domain` will not process empty binaries.
+
+`'domain_too_long'`::
+
+The domain was more than 255 bytes long before a valid end was encountered.
+
+`{'invalid_length', 0..1, 0..1}`::
+
+The two most significant bits of a label length octet have an unknown combination of values. The bits are included in the tuple in their order of significance.
+
+== Domain wire format
+
+In wire format domains are encoded as a series of labels. Each label consist of an octet -- the two most significant bits of which are set to 0 -- encoding the length of the label, followed by the number of octets indicated by the first octet. Label with a length of 0 terminates the domain
+
+[source,erlang]
+BinDomain = <<3, "arv", 2, "io", 0>>,
+{ok, [<<"arv">>,<<"io">>], <<>>} = dnslib:binary_to_domain(BinDomain).
+
+Setting the two most significant bits of an octet encoding the length of a label to 1 indicates domain compression. The 14 bits following the two bits set to 1 form the offset from the start of a DNS message where the rest of the domain can be located.
+
+[source,erlang]
+BinDomainCompressed = <<3, "arv", 2, "io", 1:1, 1:1, 20:14>>,
+{compressed, {compressed, 20, [<<"io">>, <<"arv">>]}, <<>>} = dnslib:binary_to_domain(BinDomainCompressed).
+
+== Examples
+
+[source,erlang]
+----
+Bin1 = <<3, "ARV", 2, "io", 0, "trailing">>,
+{ok, [<<"ARV">>,<<"io">>], <<"trailing">>} = dnslib:binary_to_domain(Bin1),
+Bin2 = <<3, "ARV", 2, "io", 3:2, 20:14, "trailing">>,
+{compressed, {compressed, 20, [<<"io">>,<<"ARV">>]}, <<"trailing">>} = dnslib:binary_to_domain(Bin2).
+----
+
+.Various errors
+[source,erlang]
+----
+{error, truncated_domain} = dnslib:binary_to_domain(<<0:2>>),
+{error, truncated_domain} = dnslib:binary_to_domain(<<3, "arv", 2, "io">>),
+{error, empty_binary} = dnslib:binary_to_domain(<<>>),
+BinLabel = << <<$a>> || _ <- lists:seq(1,63)>>,
+LongBinary = <<63, BinLabel/binary, 63, BinLabel/binary, 63, BinLabel/binary, 63, BinLabel/binary, 0>>,
+{error, domain_too_long} = dnslib:binary_to_domain(LongBinary),
+{error, {invalid_length, 0, 1}} = dnslib:binary_to_domain(<<0:1, 1:1, 0:6>>).
+----
+
+== Changelog
+
+* *0.0.1*
+** Added `domain_too_long` error
+** Return tuple for compressed domains changed from `{Domain, Tail}` to `{'compressed', Domain, Tail}`
+* *0.0.0* Function added
+
+== See also
+
+link:dnslib.domain_to_binary{ext-relative}[dnslib:domain_to_binary],
+link:dnslib{ext-relative}[dnslib]

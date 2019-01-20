@@ -1,0 +1,71 @@
+= dnszone:continue_transfer
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnszone:continue_transfer - Continue an ongoing zone transfer
+
+== Description
+
+[source,erlang]
+----
+continue_transfer(Result :: dnsmsg:transfer_interpret_result(), State :: opaque())
+    -> {'more', State :: opaque()};
+     | {'ok',
+           {'zone', NewSoa :: dnslib:resource(), [dnslib:resource()]}
+         | {'change_sets', NewSoa :: dnslib:resource(), [dnsmsg:incremental_transfer_change_set()]}
+       }
+     | {'error',
+           'unexpected_transfer_type'
+         | 'unexpected_answer_type'
+       }.
+----
+
+Continue an ongoing zone transfer.
+
+== Arguments
+
+Result::
+
+Zone transfer result from `dnsmsg:interpret_response`
+
+State::
+
+State returned by previous `dnszone:new_transfer` or `dnszone:continue_transfer` call
+
+== Return value
+
+If `Result` completed the zone transfer, a tuple consisting of `'ok'` and a tuple containing the results of the zone transfer is returned.
+
+If zone transfer is still not complete, a tuple consisting of `'more'` and an opaque state is returned. This state is to be used in further `dnszone:continue_transfer` calls.
+
+If an error occurred, a tuple consisting of `'error'` and the error reason is returned.
+
+== Errors
+
+`'unexpected_transfer_type'`::
+
+Zone transfer type -- normal or incremental -- changed in the middle of the transfer.
+
+`'unexpected_answer_type'`::
+
+`Result` was not a part of an incomplete zone transfer
+
+== Completed transfers
+
+Depending on the first member of the result tuple returned when a transfer is complete, contained terms might require further processing.
+
+If the first member of the result tuple is `'zone'`, it is possible to just add `NewSoa` to the list of resources and the resulting list represents the transferred zone.
+
+If the first member of the result tuple is `'change_sets'`, results are groups of removed and added resource records. These results should then be used to modify some existing zone.
+
+== Changelog
+
+* *0.0.1* Function added
+
+== See also
+
+link:dnszone.new_transfer{ext-relative}[dnszone:new_transfer],
+link:dnszone{ext-relative}[dnszone]

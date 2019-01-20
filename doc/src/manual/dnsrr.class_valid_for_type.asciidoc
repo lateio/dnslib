@@ -1,0 +1,53 @@
+= dnsrr:class_valid_for_type
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsrr:class_valid_for_type - Check if certain combination of type and class is allowed
+
+== Description
+
+[source,erlang]
+----
+class_valid_for_type(Class :: atom(), Type :: atom()) -> boolean().
+----
+
+Check if certain combination of type and class is allowed.
+
+== Arguments
+
+Class::
+
+Class to test
+
+Type::
+
+Type to test
+
+== Return value
+
+`'false'` is returned if the combination is *known* to be invalid.
+
+Otherwise `'true'` is returned.
+
+== Notes
+
+Most resource types are allowed with any class. `A` and `AAAA` are one of the rare exceptions, they are only allowed with `IN` class.
+
+== Examples
+
+[source,erlang]
+----
+false = dnsrr:class_valid_for_type(hs, a).
+----
+
+== Changelog
+
+* *0.0.0* Function added
+
+== See also
+
+link:dnsrr.callback.class{ext-relative}[Module:class],
+link:dnsrr{ext-relative}[dnsrr]

@@ -1,0 +1,50 @@
+= dnsrr:validate_data
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsrr:validate_data - Check if resource data is valid
+
+== Description
+
+[source,erlang]
+----
+class_valid_for_type(Type :: atom(), Data :: term()) -> boolean().
+----
+
+Check if resource data is valid.
+
+== Arguments
+
+Type::
+
+Type for which `Data` should be valid
+
+Data::
+
+Data to test
+
+== Return value
+
+'true'` is returned if `Data` was valid for `Type`.
+
+Otherwise `'false'` is returned.
+
+== Examples
+
+[source,erlang]
+----
+true = dnsrr:validate_data(a, {0,0,0,0}),
+false = dnsrr:validate_data(a, {}).
+----
+
+== Changelog
+
+* *0.0.1* Function added
+
+== See also
+
+link:dnsrr.callback.valid_data{ext-relative}[Module:valid_data],
+link:dnsrr{ext-relative}[dnsrr]

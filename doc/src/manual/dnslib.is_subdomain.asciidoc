@@ -1,0 +1,64 @@
+= dnslib:is_subdomain
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:is_subdomain - Test if one domain is a subdomain of another
+
+== Description
+
+[source,erlang]
+----
+is_subdomain(Domain :: dnslib:domain(), OfThis :: dnslib:domain())
+    -> boolean().
+----
+
+Test if one domain is a subdomain of another.
+
+== Arguments
+
+Domain::
+
+Domain to test
+
+OfThis::
+
+Domain to test against
+
+== Return value
+
+The function returns `'true'` if `Domain` is a subdomain of `OfThis`. Returns `'false'` otherwise.
+
+== Notes
+
+Neither domain is normalized in any way, thus labels which differ in character case will not be considered identical.
+
+[source,erlang]
+false = is_subdomain([<<"def">>, <<"abc">>], [<<"ABC">>]).
+
+Domains are not considered to be subdomains of themselves. Have a look at link:dnslib.domain_in_zone{ext-relative}[`dnslib:domain_in_zone`] for this
+
+[source,erlang]
+false = is_subdomain([<<"abc">>], [<<"abc">>]).
+
+== Examples
+
+[source,erlang]
+----
+false = dnslib:is_subdomain([<<"def">>, <<"abc">>], [<<"ABC">>]),
+true  = dnslib:is_subdomain([<<"def">>, <<"abc">>], [<<"abc">>]),
+true  = dnslib:is_subdomain([<<"def">>, <<"abc">>], ['_']),
+false = dnslib:is_subdomain([<<"def">>, <<"abc">>], ['_', <<"abc">>]).
+----
+
+== Changelog
+
+* *0.0.1* Handle wildcards correctly
+* *0.0.0* Function added
+
+== See also
+
+link:dnslib.domain_in_zone{ext-relative}[dnslib:domain_in_zone],
+link:dnslib{ext-relative}[dnslib]

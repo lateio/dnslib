@@ -1,0 +1,40 @@
+= dnsmsg:is_response
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsmsg:is_response - Check if a message is a response
+
+== Description
+
+[source,erlang]
+----
+is_response(Message :: dnsmsg:message()) -> boolean().
+----
+
+Check if a message is a response.
+
+It is also possible to get this information from a message with pattern matching.
+
+[source,erlang]
+#{'Is_response' := IsResponse} = dnsmsg:new().
+
+== Arguments
+
+Message::
+
+Message which we want to test
+
+== Return value
+
+`'true'` is returned if message is a response.
+
+== Changelog
+
+* *0.0.0* Function added
+
+== See also
+
+link:dnsmsg{ext-relative}[dnsmsg]

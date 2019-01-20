@@ -1,0 +1,48 @@
+= Module:message_section
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+Module:message_section - Returns a list of message sections where the resource record type can appear
+
+== Description
+
+[source,erlang]
+----
+message_section() -> [dnsmsg:message_section()].
+----
+
+Returns a list of message section where the resource record type can appear.
+
+== Return value
+
+Returns a list of message section where the resource record type can appear.
+
+== Optional callback
+
+This callback is optional. If it is not implemented, the resource record type can appear in any section.
+
+== Examples
+
+.Example from dnsrr_all
+[source,erlang]
+----
+message_section() -> [question].
+----
+
+.Example from dnsrr_opt
+[source,erlang]
+----
+message_section() -> [additional].
+----
+
+== Changelog
+
+* *0.0.1* Renamed from `can_appear_in` to `message_section`
+* *0.0.0* Callback added
+
+== See also
+
+link:dnsrr{ext-relative}[dnsrr]

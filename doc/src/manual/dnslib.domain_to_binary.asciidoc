@@ -1,0 +1,78 @@
+= dnslib:domain_to_binary
+Lauri Moisio <l@arv.io>
+Version 0.0.1, 2019.01.18
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:domain_to_binary - Transform a domain into a wire format binary
+
+== Description
+
+[source,erlang]
+----
+domain_to_binary(Domain :: dnslib:non_wildcard_domain() | dnslib:compressed_domain())
+    -> {'ok', binary()}
+     | {'error',
+         'domain_too_long' |
+         'label_too_long'  |
+         'empty_label'     |
+         'ref_out_of_range'
+       }.
+----
+
+Transform a domain into a wire format binary.
+
+== Arguments
+
+Domain::
+
+Domain to transform. Can also be a compressed domain.
+
+== Return value
+
+On success a tuple consisting of `'ok'` atom and the produced binary is returned.
+
+On error a tuple consisting of `'error'` atom and the error reason is returned.
+
+== Errors
+
+`'domain_too_long'`::
+
+The domain would have been longer than 255 octets in wire format. The domain itself is invalid.
+
+`'label_too_long'`::
+
+A label in the domain was longer than 63 octets. The domain itself is invalid.
+
+`'empty_label'`::
+
+A label in the domain was empty. The domain itself is invalid.
+
+`'ref_out_of_range'`::
+
+When trying to handle a compressed domain, the offset the domain refers to look for the rest of the domain is verified to fall into range `0..16#3FFF`. Value outside of this range produces an error.
+
+== Examples
+
+[source,erlang]
+----
+{ok, <<3, "ARV", 2, "io", 0>>} = dnslib:domain_to_binary([<<"ARV">>,<<"io">>]),
+{ok, <<3, "ARV", 2, "io", 3:2, 12:14>>} = dnslib:domain_to_binary({compressed, 12, [<<"io">>, <<"ARV">>]}).
+----
+
+== Changelog
+
+* *0.0.1*
+** Added `domain_too_long` error
+** Added `label_too_long` error
+** Added `empty_label` error
+** Added `ref_out_of_range` error
+** Added support for `compressed_domain()` type
+** Successful return wrapped in a tuple
+* *0.0.0* Function added
+
+== See also
+
+link:dnslib.binary_to_domain{ext-relative}[dnslib:binary_to_domain],
+link:dnslib{ext-relative}[dnslib]

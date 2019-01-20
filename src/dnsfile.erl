@@ -30,13 +30,15 @@
 -export([
     consult/1,
     consult/2,
+    parse_resource/1,
     write_resources/2,
     write_resources/3,
     directive_origin/2,
     directive_include/2,
     directive_punyencode/2,
+    directive_reverse_dns_pointer/2,
     directive_ttl/2,
-    escape_text/1,
+    to_masterfile_escape_text/1,
     indicate_domain/1
 ]).
 
@@ -58,39 +60,38 @@
 -type line_part() :: string() | {string(), 'quoted'}.
 
 -record(state, {
+    encoding=unicode :: unicode:encoding(),
+    text_encoding=unicode :: unicode:encoding(),
     max_line_length=1024 :: pos_integer(),
     line=1 :: pos_integer(),
     startline=1 :: pos_integer(),
-    fn=fun line_start/2 :: function(),
-    parentheses=false :: boolean(),
-    entry_parts=[[]] :: [line_part()],
-    path             :: string() | 'undefined',
-    origin           :: dnslib:domain() | 'undefined',
-    origin_str       :: string() | 'undefined',
-    prevdomain       :: dnslib:domain() | 'undefined',
-    prevclass        :: dnsclass:class() | 'undefined',
-    prevttl          :: dnslib:ttl() | 'undefined',
-    defttl           :: dnslib:ttl() | 'undefined',
-    records=[]       :: [dnslib:resource()],
-    include_depth=3  :: non_neg_integer(),
-    included_from=[] :: [string()],
-    punyencode=false :: boolean(),
+    fn=fun line_start/2    :: function(),
+    parentheses=false      :: boolean(),
+    entry_parts=[[]]       :: [line_part()],
+    path                   :: string()         | 'undefined',
+    origin                 :: dnslib:domain()  | 'undefined',
+    origin_str             :: string()         | 'undefined',
+    prevdomain             :: dnslib:domain()  | 'undefined',
+    prevclass={assume, in} :: dnsclass:class() | {'assume', 'in'} | 'undefined',
+    prevttl                :: dnslib:ttl()     | 'undefined',
+    defttl                 :: dnslib:ttl()     | 'undefined',
+    records=[]             :: [dnslib:resource()],
+    include_depth=3        :: non_neg_integer(),
+    included_from=[]       :: [string()],
+    punyencode=false       :: boolean(),
     allow_unknown_resources=false :: boolean(),
+    allow_unknown_classes=false   :: boolean(),
+    reverse_dns_pointer=false :: boolean() | 'inet' | 'inet6',
+    'allow_@'=true :: boolean(),
     directives=#{
-        "origin"     => directive_origin,
-        "ttl"        => directive_ttl,
-        "include"    => directive_include,
-        "punyencode" => directive_punyencode
+        "origin"              => directive_origin,
+        "ttl"                 => directive_ttl,
+        "include"             => directive_include,
+        "punyencode"          => directive_punyencode,
+        "reverse-dns-pointer" => directive_reverse_dns_pointer
     } :: #{string() => atom()},
-    type_blacklist = [
-        mb,
-        md,
-        mf,
-        mg,
-        minfo,
-        mr
-    ] :: [dnsrr:type()],
-    line_break=$\n :: [char()] | char()
+    type_blacklist = [] :: [dnsrr:type()],
+    line_break="\n" :: string()
 }).
 
 
@@ -99,6 +100,8 @@ resolve(Str) when is_list(Str) ->
 
 resolve([], Acc) ->
 	lists:reverse(Acc);
+resolve([$\\, {integer, C1}|Tail], Acc) ->
+    resolve(Tail, [C1|Acc]);
 resolve([$\\, C1|Tail], Acc) ->
     resolve(Tail, [C1|Acc]);
 resolve([Cur|Tail], Acc) ->
@@ -120,12 +123,13 @@ resource_record_error(File, LineNumber, Details) ->
     'too_many_arguments' |
     'too_long_text_data' |
     'no_origin'          |
+    'configuration_disallows_@'                                        |
     {'unexpected_quoted', string()}                                    |
     {'out_of_range', 'uint16' | 'uint32' | 'ttl', string(), integer()} |
     {'invalid_domain', dnslib:list_to_domain_error(), string()}        |
     {'invalid_integer', string()}                                      |
     {'invalid_ttl', string()}.
--spec prepare_data([line_part()], [dnsrr:masterfile_format_type() | non_neg_integer()], map()) ->
+-spec prepare_data([line_part()], [dnsrr:masterfile_format_type() | non_neg_integer()], #state{}) ->
     {'ok', [string() | dnslib:domain() | integer()]} |
     {'error', prepare_data_error()}.
 prepare_data(Data, Format, Ctx) ->
@@ -141,6 +145,8 @@ prepare_data([], _, _, _) ->
     {error, too_few_arguments};
 prepare_data(_, [], _, _) ->
     {error, too_many_arguments};
+prepare_data(["@"|_], _, #state{'allow_@'=false}, _) ->
+    {error, 'configuration_disallows_@'};
 prepare_data([{Value, quoted}|_], [token|_], _, _) ->
     {error, {unexpected_quoted, Value}};
 prepare_data(["@"|_], [token|_], #state{origin = undefined}, _) ->
@@ -157,22 +163,29 @@ prepare_data([{Txt, quoted}|_], [qtext|_], _, _) when length(Txt) > 255 ->
     {error, too_long_text_data};
 prepare_data([{Txt, quoted}|RestData], Types = [TxtType|_], State, Acc)
 when TxtType =:= text; TxtType =:= text_unlimited; TxtType =:= qtext; TxtType =:= qtext_unlimited ->
-    Result = resolve(Txt),
-    prepare_data(RestData, prepare_data_next_type(Types), State, [Result|Acc]);
+    case prepare_data_text_to_bytelist(Txt, State) of
+        {error, _}=Tuple -> Tuple;
+        Result -> prepare_data(RestData, prepare_data_next_type(Types), State, [Result|Acc])
+    end;
 prepare_data([_|_], [qtext|_], _, _) ->
     {error, unquoted_text};
 prepare_data([Txt|_], [text|_], _, _) when length(Txt) > 255 ->
     {error, too_long_text_data};
-prepare_data(["@"|_], [Txt|_], #{origin := undefined}, _)
+prepare_data(["@"|_], [Txt|_], #state{origin = undefined}, _)
 when Txt =:= text; Txt =:= text_unlimited ->
     {error, at_no_origin};
 prepare_data(["@"|RestData], Types = [Txt|_], State = #state{origin_str = Origin}, Acc)
 when Txt =:= text; Txt =:= text_unlimited ->
-    prepare_data(RestData, prepare_data_next_type(Types), State, [Origin|Acc]);
+    case prepare_data_text_to_bytelist(Origin, State) of
+        {error, _}=Tuple -> Tuple;
+        Result -> prepare_data(RestData, prepare_data_next_type(Types), State, [Result|Acc])
+    end;
 prepare_data([Txt|RestData], Types = [TxtType|_], State, Acc)
 when TxtType =:= text; TxtType =:= text_unlimited ->
-    Result = resolve(Txt),
-    prepare_data(RestData, prepare_data_next_type(Types), State, [Result|Acc]);
+    case prepare_data_text_to_bytelist(Txt, State) of
+        {error, _}=Tuple -> Tuple;
+        Result -> prepare_data(RestData, prepare_data_next_type(Types), State, [Result|Acc])
+    end;
 
 prepare_data([Cur|RestData], Types = [IntType|_], State, Acc) when IntType =:= uint16; IntType =:= uint32 ->
     try list_to_integer(resolve(Cur)) of
@@ -192,23 +205,52 @@ prepare_data([Cur|RestData], Types = [ttl|_], State, Acc) ->
         {error, {out_of_range, Value}} -> {error, {out_of_range, ttl, Cur, Value}};
         {error, invalid_ttl} -> {error, {invalid_ttl, Cur}}
     end;
-prepare_data(["@"|_], [domain|_], #{origin := undefined}, _) ->
+prepare_data(["@"|_], [domain|_], #state{origin=undefined}, _) ->
     {error, at_no_origin};
 prepare_data(["@"|RestData], Types = [domain|_], State = #state{origin = Origin}, Acc) ->
     prepare_data(RestData, prepare_data_next_type(Types), State, [Origin|Acc]);
 prepare_data([Cur|RestData], Types = [domain|_], State = #state{origin = Origin}, Acc) ->
-    case dnslib:list_to_domain(Cur) of
-        {_, true, _} -> {error, {wildcard_domain, Cur}};
-        {absolute, _, Domain} -> prepare_data(RestData, prepare_data_next_type(Types), State, [Domain|Acc]);
-        {relative, _, _} when Origin =:= undefined -> {error, relative_no_origin};
-        {relative, _, Domain} ->
-            case dnslib:concat(punyencode(Domain, State), Origin) of
-                {ok, true, Fqdn} -> {error, {wildcard_domain, dnslib:domain_to_list(Fqdn)}};
-                {ok, false, Fqdn} -> prepare_data(RestData, prepare_data_next_type(Types), State, [Fqdn|Acc]);
+    case dnslib:list_to_codepoint_domain(Cur) of
+        {ok, _, _, ['_'|_]} -> {error, {wildcard_domain, Cur}};
+        % Return an error on non-ASCII characters unless there is a pipeline for handling them...
+        {ok, absolute, _, Domain0} ->
+            {ok, Domain1} = dnslib:codepoint_domain_to_domain(punyencode(Domain0, State)),
+            prepare_data(RestData, prepare_data_next_type(Types), State, [Domain1|Acc]);
+        {ok, relative, _, _} when Origin =:= undefined -> {error, relative_no_origin};
+        {ok, relative, _, Domain0} ->
+            {ok, Domain1} = dnslib:codepoint_domain_to_domain(punyencode(Domain0, State)),
+            case dnslib:append_domain(Domain1, Origin) of
+                {ok, ['_'|_]=Fqdn} -> {error, {wildcard_domain, dnslib:domain_to_list(Fqdn)}};
+                {ok, Fqdn} -> prepare_data(RestData, prepare_data_next_type(Types), State, [Fqdn|Acc]);
                 {error, Reason} -> {error, {invalid_domain, Reason, Cur}}
             end;
         {error, DomainError} ->
             {error, {invalid_domain, DomainError, Cur}}
+    end.
+
+
+text_to_bytelist_splitwith_encode_fun(Char) -> Char =/= $\\.
+
+text_to_bytelist_splitwith_encode([], Acc, _, _) ->
+    Acc;
+text_to_bytelist_splitwith_encode(Text, Acc, Encoding, TextEncoding) ->
+    {Head, Tail0} = lists:splitwith(fun text_to_bytelist_splitwith_encode_fun/1, Text),
+    HeadBin = unicode:characters_to_binary(Head, Encoding, TextEncoding),
+    case Tail0 of
+        [$\\, {integer, Char}|Tail1] ->
+            text_to_bytelist_splitwith_encode(Tail1, <<Acc/binary, HeadBin/binary, Char>>, Encoding, TextEncoding);
+        [$\\, Char|Tail1] ->
+            text_to_bytelist_splitwith_encode([Char|Tail1], <<Acc/binary, HeadBin/binary>>, Encoding, TextEncoding);
+        [] -> text_to_bytelist_splitwith_encode(Tail0, <<Acc/binary, HeadBin/binary>>, Encoding, TextEncoding)
+    end.
+
+
+-spec prepare_data_text_to_bytelist(list(), #state{}) -> {error, text_too_long} | list().
+prepare_data_text_to_bytelist(Txt, #state{text_encoding=TextEncoding,encoding=Encoding}) ->
+    Bin = text_to_bytelist_splitwith_encode(Txt, <<>>, Encoding, TextEncoding),
+    if
+        byte_size(Bin) > 255 -> {error, text_too_long};
+        true -> binary_to_list(Bin)
     end.
 
 
@@ -220,17 +262,20 @@ prepare_data_next_type([_|Type]) ->
     Type.
 
 
+-spec directive_origin([string()], #state{}) -> {'ok', #state{}} | no_return().
 directive_origin([Origin0], State) ->
-    case dnslib:list_to_domain(Origin0) of
-        {error, Reason} -> error({invalid_domain, Reason, Origin0});
-        {relative, _, _} -> error(relative_origin);
-        {absolute, _, Origin1} ->
-            {ok, State#state{origin=punyencode(Origin1, State), origin_str=Origin0}}
+    case dnslib:list_to_codepoint_domain(Origin0) of
+        {ok, relative, _, _} -> error(relative_origin);
+        {ok, absolute, _, Origin1} ->
+            {ok, Origin2} = dnslib:codepoint_domain_to_domain(punyencode(Origin1, State)),
+            {ok, State#state{origin=Origin2, origin_str=Origin0}};
+        {error, Reason} -> error({invalid_domain, Reason, Origin0})
     end;
 directive_origin([], _) ->
     error(no_arguments).
 
 
+-spec directive_ttl([string()], #state{}) -> {'ok', #state{}} | no_return().
 directive_ttl([Ttl], State) ->
     case dnslib:list_to_ttl(resolve(Ttl)) of
         {ok, Ttl1} -> {ok, State#state{defttl=Ttl1, prevttl=Ttl1}};
@@ -241,83 +286,87 @@ directive_ttl([], _) ->
 
 
 % Remember to verify the include depth
+-spec directive_include([string()], #state{}) -> {'ok', #state{}} | no_return().
 directive_include(_, #state{include_depth=0}) ->
     error(include_depth);
 directive_include([_, {Value, quoted}], #state{}) ->
     error({unexpected_quoted, Value});
 directive_include([{File0, quoted}, NewOrigin], State = #state{}) ->
     directive_include([File0, NewOrigin], State);
-directive_include([File0, NewOrigin], State = #state{origin=Origin}) ->
-    case dnslib:list_to_domain(NewOrigin) of
-        {absolute, _, NewOrigin1} -> directive_include1(File0, NewOrigin1, State);
-        {relative, _, _} when Origin =:= undefined -> error(missing_origin);
-        {relative, _, NewOrigin1} ->
-            case dnslib:concat(punyencode(NewOrigin1, State), Origin) of
-                {ok, _, Fqdn} -> directive_include1(File0, Fqdn, State);
+directive_include([File0, NewOrigin], State = #state{origin=Origin,origin_str=OriginStr}) ->
+    case dnslib:list_to_codepoint_domain(NewOrigin) of
+        {ok, absolute, _, NewOrigin1} ->
+            {ok, NewOrigin2} = dnslib:codepoint_domain_to_domain(punyencode(NewOrigin1, State)),
+            directive_include(File0, NewOrigin2, NewOrigin, State);
+        {ok, relative, _, _} when Origin =:= undefined -> error(missing_origin);
+        {ok, relative, _, NewOrigin1} ->
+            {ok, NewOrigin2} = dnslib:codepoint_domain_to_domain(punyencode(NewOrigin1, State)),
+            case dnslib:append_domain(NewOrigin2, Origin) of
+                {ok, Fqdn} -> directive_include(File0, Fqdn, lists:append(NewOrigin, [$.|OriginStr]), State);
                 {error, Reason} -> error({invalid_domain, Reason, NewOrigin})
             end;
         {error, Reason} -> error({invalid_domain, Reason, NewOrigin})
     end;
 directive_include([{File0, quoted}], State) ->
     directive_include([File0], State);
-directive_include([File0], State = #state{origin=Origin}) ->
-    directive_include1(File0, Origin, State);
+directive_include([File0], State = #state{origin=Origin,origin_str=OriginStr}) ->
+    directive_include(File0, Origin, OriginStr, State);
 directive_include([], _) ->
     error(no_arguments).
 
 
-directive_include1(Path0, Origin, State = #state{path=PrevPath}) ->
+directive_include(Path0, Origin, OriginStr, State = #state{path=PrevPath,include_depth=Depth,records=Records,included_from=IncludedFrom}) ->
     Path = resolve(Path0),
     File = case filename:pathtype(Path) of
         absolute -> Path;
         _ -> filename:join(filename:dirname(PrevPath), Path)
     end,
-    #state{
-        include_depth=Depth,
-        records=Records,
-        prevclass=Class,
-        directives=Dirs,
-        punyencode=Punyencode,
-        line_break=LB,
-        type_blacklist=BLTypes,
-        included_from=IncludedFrom
-    } = State,
-    TmpState = #state{
+    TmpState = State#state{
         origin=Origin,
+        origin_str=OriginStr,
+        line=1,
+        startline=1,
+        fn=fun line_start/2,
+        parentheses=false,
+        entry_parts=[[]],
+        path=File,
         include_depth=Depth-1,
-        prevclass=Class,
-        % Should we include previous domain?
-        % Should we include previous ttl?
-        directives=Dirs,
-        punyencode=Punyencode,
-        line_break=LB,
-        type_blacklist=BLTypes,
-        included_from=[PrevPath|IncludedFrom],
-        path=File
+        records=[],
+        included_from=[PrevPath|IncludedFrom]
     },
-    case consult(File, TmpState) of
-        {ok, NewRecords} -> {ok, State#state{records=lists:flatten([lists:reverse(NewRecords)|Records])}};
+    case consult_file(File, TmpState) of
+        {ok, NewRecords} -> {ok, State#state{records=lists:append(lists:reverse(NewRecords), Records)}};
         {error, Reason} -> error({include_error, Reason})
     end.
 
 
-directive_punyencode([Arg], State0) ->
-    State1 = case Arg of
-        "1"     -> State0#state{punyencode=true};
-        "yes"   -> State0#state{punyencode=true};
-        "yep"   -> State0#state{punyencode=true};
-        "true"  -> State0#state{punyencode=true};
-        "0"     -> State0#state{punyencode=false};
-        "no"    -> State0#state{punyencode=false};
-        "nope"  -> State0#state{punyencode=false};
-        "false" -> State0#state{punyencode=false};
-        _ -> error({punyencode, {invalid_argument, Arg}})
-    end,
-    {ok, State1};
+list_to_boolean(List) ->
+    case List of
+        "1"     -> true;
+        "yes"   -> true;
+        "yep"   -> true;
+        "yup"   -> true;
+        "yay"   -> true;
+        "true"  -> true;
+        "0"     -> false;
+        "no"    -> false;
+        "nope"  -> false;
+        "nay"   -> false;
+        "false" -> false;
+        _ -> error
+    end.
+
+
+directive_punyencode([Arg], State) ->
+    case list_to_boolean(string:to_lower(Arg)) of
+        error -> error({punyencode, {invalid_argument, Arg}});
+        Boolean -> {ok, State#state{punyencode=Boolean}}
+    end;
 directive_punyencode(_, _) ->
     error({punyencode, invalid_number_of_arguments}).
 
 
+% Should be a more generalizable 'encode_high' type thingy...
 punyencode(Domain0, #state{punyencode=true}) ->
     {ok, Domain} = dnslib:punyencode(Domain0),
     Domain;
@@ -325,16 +374,33 @@ punyencode(Domain, _) ->
     Domain.
 
 
+directive_reverse_dns_pointer([Arg0], State) ->
+    Arg = string:to_lower(Arg0),
+    case list_to_boolean(Arg) of
+        error when Arg =:= "inet" -> {ok, State#state{reverse_dns_pointer=inet}};
+        error when Arg =:= "inet6" -> {ok, State#state{reverse_dns_pointer=inet6}};
+        error -> error({reverse_dns_pointer, {invalid_argument, Arg0}});
+        Boolean -> {ok, State#state{reverse_dns_pointer=Boolean}}
+    end;
+directive_reverse_dns_pointer(_, _) ->
+    error({reverse_dns_pointer, invalid_number_of_arguments}).
+
+
+
 handle_unknown_resource_data([]) ->
     {error, no_data};
 handle_unknown_resource_data([[$\\, $#], BytesList|HexValues]) ->
     try list_to_integer(BytesList) of
-        Bytes when Bytes >= 0, Bytes < 16#FFFF ->
-            try transform_unknown_resource_data(lists:flatten(HexValues), Bytes, <<>>) of
-                {ok, _}=Tuple -> Tuple;
-                {error, _}=Tuple -> Tuple
-            catch
-                error:function_clause -> {error, invalid_resource_data}
+        Bytes when Bytes >= 0, Bytes =< 16#FFFF ->
+            case lists:all(fun (FunStr) -> length(FunStr) rem 2 =:= 0 end, HexValues) of
+                false -> {error, invalid_resource_data};
+                true ->
+                    try transform_unknown_resource_data(lists:append(HexValues), Bytes, <<>>) of
+                        {ok, _}=Tuple -> Tuple;
+                        {error, _}=Tuple -> Tuple
+                    catch
+                        error:function_clause -> {error, invalid_resource_data}
+                    end
             end;
         Bytes -> {error, {data_too_long, Bytes}}
     catch
@@ -364,7 +430,7 @@ transform_unknown_resource_data_hex_to_integer(C) when C >= $A, C =< $F ->
 
 
 
--spec compile_entry(proto_resource(), [line_part()], map()) -> {'ok', proto_resource()}.
+-spec compile_entry(proto_resource(), [line_part()], #state{}) -> {'ok', proto_resource()}.
 compile_entry(Entry, [], _) ->
     {ok, Entry};
 compile_entry(_, [{Value, quoted}|_], #state{startline=LineNumber,path=File}) ->
@@ -380,6 +446,18 @@ compile_entry(Entry = {_, undefined, _, _, _}, [Type0|Parts], State) ->
     try_type(Entry, [Type1|Parts], State).
 
 
+try_class({Domain, Type, undefined, Ttl, Data}=Entry, Parts = [[$c,$l,$a,$s,$s|ClassNumber]|Rest], State = #state{startline=LineNumber,path=File,allow_unknown_classes=AllowUnknown}) ->
+    try list_to_integer(ClassNumber) of
+        Value when Value >= 0, Value < 16#FFFF ->
+            case dnsclass:from_to(Value, value, atom) of
+                Value when AllowUnknown -> compile_entry({Domain, Type, Value, Ttl, Data}, Rest, State);
+                Value -> error(syntax_error(File, LineNumber, {unknown_class, Value}));
+                Atom -> compile_entry({Domain, Type, Atom, Ttl, Data}, Rest, State)
+            end;
+        Value -> error(syntax_error(File, LineNumber, {class_out_of_range, Value}))
+    catch
+        error:badarg -> try_ttl(Entry, Parts, State)
+    end;
 try_class({Domain, Type, undefined, Ttl, Data}=Entry, Parts = [Token|Rest], State) ->
     case dnsclass:from_to(Token, masterfile_token, atom) of
         Token -> try_ttl(Entry, Parts, State);
@@ -398,10 +476,17 @@ try_ttl(Entry, Parts, State) ->
     try_type(Entry, Parts, State).
 
 
-try_type({Domain, undefined, Class, Ttl, undefined}=Tuple, [[$t,$y,$p,$e|TypeValue]|Rest], State = #state{startline=LineNumber,path=File,allow_unknown_resources=true}) ->
+% Why is try_type here twice?
+try_type({Domain, undefined, Class, Ttl, undefined}=Tuple, [[$t,$y,$p,$e|TypeValue]|Rest], State = #state{startline=LineNumber,path=File,allow_unknown_resources=AllowUnknown}) ->
     try list_to_integer(TypeValue) of
         Type when Type >= 0, Type < 16#FFFF ->
             case dnsrr:from_to(Type, value, module) of
+                Type when AllowUnknown ->
+                    case handle_unknown_resource_data(Rest) of
+                        {ok, Data} -> {ok, {Domain, Type, Class, Ttl, Data}};
+                        {error, Reason} -> error(syntax_error(File, LineNumber, {invalid_unknown_resource, Reason}))
+                    end;
+                Type -> error(syntax_error(File, LineNumber, {unknown_resource_type, Type}));
                 Module when is_atom(Module) ->
                     % If we know that resource, use Module:from_binary to produce internal resource representation
                     % If the data contains domain compressions, produce error
@@ -410,19 +495,26 @@ try_type({Domain, undefined, Class, Ttl, undefined}=Tuple, [[$t,$y,$p,$e|TypeVal
                         [[$\\, $#]|_] ->
                             case handle_unknown_resource_data(Rest) of
                                 {ok, Data} ->
-                                    case Module:from_binary(Data) of
+                                    try Module:from_binary(Data) of
                                         {ok, Rdata} -> {ok, {Domain, Atom, Class, Ttl, Rdata}};
-                                        {error, Reason} -> {error, Reason};
-                                        {domains, _} -> {error, resource_contains_domain_compressions}
+                                        {error, Reason} -> error(resource_record_error(File, LineNumber, Reason));
+                                        {domains, DataList} ->
+                                            case [GenTuple || GenTuple <- DataList, is_tuple(GenTuple), element(1, GenTuple) =:= compressed] of
+                                                [] ->
+                                                    Fn = fun
+                                                        ({domain, FunDomain, _}) -> FunDomain;
+                                                        (FunMember) -> FunMember
+                                                    end,
+                                                    Rdata = dnswire:finalize_resource_data([Fn(GenMember) || GenMember <- DataList], Module),
+                                                    {ok, {Domain, Atom, Class, Ttl, Rdata}};
+                                                _ -> error(resource_record_error(File, LineNumber, resource_contains_domain_compressions))
+                                            end
+                                    catch
+                                        error:function_clause -> error(resource_record_error(File, LineNumber, invalid_data))
                                     end;
                                 {error, Reason} -> error(syntax_error(File, LineNumber, {invalid_unknown_resource, Reason}))
                             end;
                         _ -> try_type(Tuple, [Module:masterfile_token()|Rest], State)
-                    end;
-                Type ->
-                    case handle_unknown_resource_data(Rest) of
-                        {ok, Data} -> {ok, {Domain, Type, Class, Ttl, Data}};
-                        {error, Reason} -> error(syntax_error(File, LineNumber, {invalid_unknown_resource, Reason}))
                     end
             end;
         Type -> error(syntax_error(File, LineNumber, {type_value_out_of_range, Type}))
@@ -434,17 +526,42 @@ try_type({Domain, undefined, Class, Ttl, undefined}, [Type0|Rest], State = #stat
         Type0 -> error(resource_record_error(File, LineNumber, {invalid_token, Type0}));
         Module ->
             Atom = dnsrr:from_to(Module, module, atom),
-            case prepare_data(Rest, Module:masterfile_format(), State) of
-                {ok, Data} ->
-                    case Module:from_masterfile(Data) of
-                        {ok, ResourceData} -> {ok, {Domain, Atom, Class, Ttl, ResourceData}};
-                        {error, Reason}    -> error(resource_record_error(File, LineNumber, {invalid_data, Type0, Reason}))
+            case Rest of
+                [[$\\, $#]|_] ->
+                    case handle_unknown_resource_data(Rest) of
+                        {ok, Data} ->
+                            try Module:from_binary(Data) of
+                                {ok, Rdata} -> {ok, {Domain, Atom, Class, Ttl, Rdata}};
+                                {error, Reason} -> error(resource_record_error(File, LineNumber, {invalid_data, Type0, Reason}));
+                                {domains, DataList} ->
+                                    case [GenTuple || GenTuple <- DataList, is_tuple(GenTuple), element(1, GenTuple) =:= compressed] of
+                                        [] ->
+                                            Fn = fun
+                                                ({domain, FunDomain, _}) -> FunDomain;
+                                                (FunMember) -> FunMember
+                                            end,
+                                            Rdata = dnswire:finalize_resource_data([Fn(GenMember) || GenMember <- DataList], Module),
+                                            {ok, {Domain, Atom, Class, Ttl, Rdata}};
+                                        _ -> error(resource_record_error(File, LineNumber, resource_contains_domain_compressions))
+                                    end
+                            catch
+                                error:function_clause -> error(resource_record_error(File, LineNumber, invalid_data))
+                            end;
+                        {error, Reason} -> error(syntax_error(File, LineNumber, {invalid_unknown_resource, Reason}))
                     end;
-                {error, Reason = {unexpected_quoted, _}} -> error(syntax_error(File, LineNumber, Reason));
-                {error, Reason = {invalid_integer, _}} -> error(syntax_error(File, LineNumber, Reason));
-                {error, Reason = {invalid_ttl, _}} -> error(syntax_error(File, LineNumber, Reason));
-                {error, Reason = {invalid_domain, _, _}} -> error(syntax_error(File, LineNumber, Reason));
-                {error, Reason} -> error(resource_record_error(File, LineNumber, {invalid_data, Type0, Reason}))
+                _ ->
+                    case prepare_data(Rest, Module:masterfile_format(), State) of
+                        {ok, Data} ->
+                            case Module:from_masterfile(Data) of
+                                {ok, ResourceData} -> {ok, {Domain, Atom, Class, Ttl, ResourceData}};
+                                {error, Reason}    -> error(resource_record_error(File, LineNumber, {invalid_data, Type0, Reason}))
+                            end;
+                        {error, Reason = {unexpected_quoted, _}} -> error(syntax_error(File, LineNumber, Reason));
+                        {error, Reason = {invalid_integer, _}} -> error(syntax_error(File, LineNumber, Reason));
+                        {error, Reason = {invalid_ttl, _}} -> error(syntax_error(File, LineNumber, Reason));
+                        {error, Reason = {invalid_domain, _, _}} -> error(syntax_error(File, LineNumber, Reason));
+                        {error, Reason} -> error(resource_record_error(File, LineNumber, {invalid_data, Type0, Reason}))
+                    end
             end
     end.
 
@@ -452,11 +569,17 @@ try_type({Domain, undefined, Class, Ttl, undefined}, [Type0|Rest], State = #stat
 -spec complete_entry(proto_resource(), #state{}) -> {'ok', dnslib:resource()}.
 complete_entry({_, _, undefined, _, _}, #state{prevclass=undefined,path=File,startline=LineNumber}) ->
     error(syntax_error(File, LineNumber, missing_class));
+complete_entry({_, _, undefined, _, _}=RR, State = #state{prevclass={assume, Class}}) ->
+    complete_entry(setelement(3, RR, Class), State#state{prevclass=Class});
+complete_entry({_, _, undefined, _, _}=RR, State = #state{prevclass=Class}) ->
+    complete_entry(setelement(3, RR, Class), State);
 complete_entry({_, _, _, undefined, _}, #state{prevttl=undefined,defttl=undefined,path=File,startline=LineNumber}) ->
     error(syntax_error(File, LineNumber, missing_ttl));
 
 complete_entry({Domain, Type, undefined, Ttl, Data}, State = #state{prevclass=Class}) ->
     complete_entry({Domain, Type, Class, Ttl, Data}, State);
+complete_entry({_, _, EntryClass, _, _}=RR, State = #state{prevclass={assume, _}}) ->
+    complete_entry(RR, State#state{prevclass=EntryClass});
 complete_entry({_, _, EntryClass, _, _}, #state{prevclass=Class,path=File,startline=LineNumber})
 when EntryClass =/= Class, Class =/= undefined ->
     error(syntax_error(File, LineNumber, class_mismatch));
@@ -505,7 +628,7 @@ check_type_class_compatibility(Entry = {Domain, Type, Class, Ttl, _}, State0 = #
                 case Module:class() of
                     Class -> ok;
                     List when is_list(List) ->
-                        case lists:member(Type, List) of
+                        case lists:member(Class, List) of
                             true -> ok;
                             false -> error
                         end;
@@ -513,9 +636,22 @@ check_type_class_compatibility(Entry = {Domain, Type, Class, Ttl, _}, State0 = #
                 end
         end
     of
-        ok -> {ok, State1};
+        %ok -> {ok, State1};
+        ok -> create_reverse_dns_pointer(Entry, State1);
         error -> error(resource_record_error(File, LineNumber, invalid_class))
     end.
+
+
+create_reverse_dns_pointer(_, State = #state{reverse_dns_pointer=false}) ->
+    {ok, State};
+create_reverse_dns_pointer({Domain, a, _, Ttl, Address}, State = #state{reverse_dns_pointer=CreatePointer,records=Records})
+when CreatePointer =:= inet; CreatePointer =:= true ->
+    Pointer = {dnslib:reverse_dns_domain(Address), ptr, in, Ttl, Domain}, % A can only have class IN
+    {ok, State#state{records=[Pointer|Records]}};
+create_reverse_dns_pointer({Domain, aaaa, _, Ttl, Address}, State = #state{reverse_dns_pointer=CreatePointer,records=Records})
+when CreatePointer =:= inet6; CreatePointer =:= true ->
+    Pointer = {dnslib:reverse_dns_domain(Address), ptr, in, Ttl, Domain}, % AAAA can only have class IN
+    {ok, State#state{records=[Pointer|Records]}}.
 
 
 -type handle_entry_error() ::
@@ -554,17 +690,21 @@ handle_entry(["@"|_], #state{origin=undefined,path=File,startline=LineNumber}) -
     error(syntax_error(File, LineNumber, at_no_origin));
 handle_entry([{_, quoted}|_], #state{startline=LineNumber,path=File}) ->
     error(syntax_error(File, LineNumber, quoted_domain));
-handle_entry([Domain0|Rest], State = #state{origin=Origin,prevdomain=PrevDomain,startline=LineNumber,path=File}) ->
+handle_entry([Domain0|Rest], State = #state{origin=Origin,prevdomain=PrevDomain,startline=LineNumber,path=File,'allow_@'=AllowAt}) ->
     case Domain0 of
+        "@" when not AllowAt -> error(syntax_error(File, LineNumber, 'configuration_disallows_@'));
         "@" -> handle_entry_details(Origin, Rest, State);
         ""  -> handle_entry_details(PrevDomain, Rest, State);
         _ ->
-            case dnslib:list_to_domain(Domain0) of
-                {absolute, _, Result} -> handle_entry_details(punyencode(Result, State), Rest, State);
-                {relative, _, _} when Origin =:= undefined -> error(syntax_error(File, LineNumber, relative_no_origin));
-                {relative, _, Result} ->
-                    case dnslib:concat(punyencode(Result, State), Origin) of
-                        {ok, _, Fqdn} -> handle_entry_details(Fqdn, Rest, State);
+            case dnslib:list_to_codepoint_domain(Domain0) of
+                {ok, absolute, _, Result0} ->
+                    {ok, Result1} = dnslib:codepoint_domain_to_domain(punyencode(Result0, State)),
+                    handle_entry_details(Result1, Rest, State);
+                {ok, relative, _, _} when Origin =:= undefined -> error(syntax_error(File, LineNumber, relative_no_origin));
+                {ok, relative, _, Result0} ->
+                    {ok, Result1} = dnslib:codepoint_domain_to_domain(punyencode(Result0, State)),
+                    case dnslib:append_domain(Result1, Origin) of
+                        {ok, Fqdn} -> handle_entry_details(Fqdn, Rest, State);
                         {error, Reason} -> error(syntax_error(File, LineNumber, {invalid_domain, Reason, Domain0}))
                     end;
                 {error, Reason} -> error(syntax_error(File, LineNumber, {invalid_domain, Reason, Domain0}))
@@ -602,7 +742,7 @@ escape([C1, C2, C3|Tail], State = #state{entry_parts=[Latest|Parts], fn=Fn, path
 when C1 >= $0, C1 =< $9 ->
     try list_to_integer([C1, C2, C3], 10) of
         Value when Value > 255 -> error(syntax_error(File, LineNumber, {escape_out_of_range, [$\\, C1, C2, C3]}));
-        Value -> Fn(Tail, State#state{entry_parts=[[Value, $\\|Latest]|Parts]})
+        Value -> Fn(Tail, State#state{entry_parts=[[{integer, Value}, $\\|Latest]|Parts]})
     catch
         error:badarg -> error(syntax_error(File, LineNumber, {invalid_escape_integer, [$\\, C1, C2, C3]}))
     end;
@@ -631,10 +771,7 @@ token([Char|Tail], State = #state{entry_parts=[Latest|Parts]}) ->
 
 
 quoted([], State = #state{line_break=LB,entry_parts=[Latest0|Parts]}) ->
-    Latest = case LB of
-        LB when is_list(LB) -> lists:flatten([lists:reverse(LB), Latest0]);
-        _ -> lists:flatten([LB, Latest0])
-    end,
+    Latest = lists:flatten([lists:reverse(LB), Latest0]),
     {partial, State#state{entry_parts=[Latest|Parts],fn=fun quoted/2}};
 quoted([$\n|Rest], State) ->
     quoted(Rest, State);
@@ -674,6 +811,37 @@ line_start([$\t|Rest], State = #state{entry_parts=Parts}) ->
     whitespace(Rest, State#state{entry_parts=[[]|Parts]});
 line_start(Line, State) ->
     token(Line, State).
+
+
+%parse_resource_partition($)
+
+parse_resource(Line) ->
+    parse_resource(Line, []).
+
+parse_resource(Line, _Opts) when is_list(_Opts) ->
+    % We should also somehow disallow @ -replacement
+    % and return an error on non-ASCII characters (in domains).
+    State = #state{
+        text_encoding=unicode,
+        'allow_@'=false,
+        path="fun parse_entry/1",
+        origin_str=".",
+        origin=[],
+        directives=#{}
+    },
+    % What if Line contains a newline?
+    try parse_entry(Line, State) of
+        {complete, Parts, State1} ->
+            try handle_entry(Parts, State1) of
+                {ok, #state{records=[Record]}} -> {ok, Record}
+            catch
+                error:Reason -> {error, Reason}
+            end;
+        {empty, _} -> {error, empty};
+        {partial, _} -> {error, partial}
+    catch
+        error:Reason -> {error, Reason}
+    end.
 
 
 parse_entry(Line, State = #state{fn=Fn}) ->
@@ -730,31 +898,36 @@ parse_line(Line, Fd, State = #state{line=LineNumber}) ->
     end.
 
 
-%% @doc Get DNS resource records from a file.
-%%
-%% Intended to be analogous to file:consult/1.
-%%
-%% @end
 -spec consult(Filename :: string()) -> {'ok', Resources :: [dnslib:resource()]}.
 consult(Filename) ->
-    consult(Filename, #state{}).
+    consult(Filename, []).
 
 
 -type consult_opt() ::
-    {'linebreak', string()}                                |
-    {'directive', string(), 'false'}                       |
-    {'type_blacklist', [dnslib:resource_type()]}           |
-    {'type_blacklist', [dnslib:resource_type()], 'append'} |
-    {'type_whitelist', [dnslib:resource_type()]}.
--spec consult
-    (Filename :: string(), Options :: [consult_opt()]) -> {'ok', Resources :: [dnslib:resource()]} | {'error', ErrorSpec :: term()};
-    (Filename :: string(), State :: #state{}) -> {'ok', Resources :: [dnslib:resource()]} | {'error', ErrorSpec :: term()}.
+      {'line_break', string()}
+    | {class, dnsrr:class()}
+    | {'type_blacklist', [dnsrr:type()]}
+    | {'domain', dnslib:domain()}
+    | {'origin', dnslib:domain()}
+    | {'ttl', dnslib:ttl()}
+    | {'max_line_length', pos_integer()}
+    | {'allow_unknown_resources', boolean()}
+    | {'allow_unknown_classes', boolean()}
+    | {'encoding', unicode:encoding()}
+    | {'text_encoding', unicode:encoding()}.
+-spec consult(Filename :: string(), Options :: [consult_opt()])
+    -> {'ok', Resources :: [dnslib:resource()]}
+     | {'error', ErrorSpec :: term()}.
 consult(Filename, Opts) when is_list(Opts) ->
-    consult(Filename, prepare_state(#state{}, Opts));
-consult(Filename, State = #state{}) ->
+    case prepare_state(#state{}, Opts) of
+        {ok, State} -> consult_file(Filename, State);
+        {error, Reason} -> {error, {invalid_opt, Reason}}
+    end.
+
+consult_file(Filename, State = #state{encoding=Encoding}) ->
     case filename:pathtype(Filename) of
         absolute ->
-            case file:open(Filename, [read, {encoding, latin1}]) of
+            case file:open(Filename, [read, {encoding, Encoding}]) of
                 {ok, Fd} ->
                     Result = parse_file(Fd, State#state{path=Filename}),
                     ok = file:close(Fd),
@@ -763,39 +936,54 @@ consult(Filename, State = #state{}) ->
                 {error, enoent} -> {error, {file_error, enoent, Filename}};
                 {error, eisdir} -> {error, {file_error, eisdir, Filename}}
             end;
-        _ -> consult(filename:absname(Filename), State)
+        _ -> consult_file(filename:absname(Filename), State)
     end.
 
 
 prepare_state(State = #state{}, []) ->
-    State;
+    {ok, State};
 prepare_state(State = #state{}, [{line_break, Str}|Rest]) when is_list(Str) ->
     prepare_state(State#state{line_break=Str}, Rest);
-prepare_state(State = #state{}, [{class, Class}|Rest]) when is_atom(Class) ->
-    true = dnslib:is_valid_resource_class(Class),
-    prepare_state(State#state{prevclass=Class}, Rest);
-prepare_state(State = #state{directives=Directives0}, [{directive, Str, false}|Rest]) when is_list(Str) ->
-    Directives1 = maps:remove(string:to_lower(Str), Directives0),
-    prepare_state(State#state{directives=Directives1}, Rest);
-prepare_state(State = #state{type_blacklist=BL}, [{type_blacklist, List = [Atom|_], append}|Rest]) when is_atom(Atom) ->
-    prepare_state(State#state{type_blacklist=lists:flatten([BL, List])}, Rest);
-prepare_state(State = #state{}, [{type_blacklist, List = [Atom|_]}|Rest]) when is_atom(Atom) ->
-    prepare_state(State#state{type_blacklist=List}, Rest);
-prepare_state(State = #state{type_blacklist=BL0}, [{type_whitelist, List = [Atom|_]}|Rest]) when is_atom(Atom) ->
-    BL1 = [Type || Type <- List, not lists:member(Type, BL0)],
-    prepare_state(State#state{type_blacklist=BL1}, Rest);
+prepare_state(State = #state{}, [{class, explicit}|Rest]) ->
+    prepare_state(State#state{prevclass=undefined}, Rest);
+prepare_state(State = #state{}, [{class, Class0}|Rest]) ->
+    case {is_integer(Class0), is_atom(Class0)} of
+        {true, _} ->
+            case dnsclass:from_to(Class0, value, atom) of
+                Class0 -> prepare_state(State#state{prevclass=Class0}, Rest);
+                Class -> prepare_state(State#state{prevclass=Class}, Rest)
+            end;
+        {_, true} ->
+            case dnsclass:from_to(Class0, atom, value) of
+                Class0 -> {error, {invalid_class_atom, Class0}};
+                _ -> prepare_state(State#state{prevclass=Class0}, Rest)
+            end
+    end;
+%prepare_state(State = #state{directives=Directives0}, [{directive, Str, false}|Rest]) when is_list(Str) ->
+%    Directives1 = maps:remove(string:to_lower(Str), Directives0),
+%    prepare_state(State#state{directives=Directives1}, Rest);
+prepare_state(State = #state{type_blacklist=BL}, [{type_blacklist, List}|Rest]) when is_list(List) ->
+    prepare_state(State#state{type_blacklist=lists:append(BL, [dnsrr:from_to(GenType, value, atom) || GenType <- List])}, Rest);
 prepare_state(State = #state{}, [{domain, Domain}|Rest]) ->
-    {true, _} = dnslib:is_valid_domain(Domain),
+    true = dnslib:is_valid_domain(Domain),
     prepare_state(State#state{prevdomain=Domain}, Rest);
 prepare_state(State = #state{}, [{origin, Domain}|Rest]) ->
-    {true, false} = dnslib:is_valid_domain(Domain),
+    true = dnslib:is_valid_domain(Domain),
     prepare_state(State#state{origin=Domain}, Rest);
 prepare_state(State = #state{}, [{ttl, Ttl}|Rest]) when is_integer(Ttl), Ttl >= 0, Ttl =< ?MAX_TTL ->
     prepare_state(State#state{prevttl=Ttl,defttl=Ttl}, Rest);
 prepare_state(State = #state{}, [{max_line_length, Len}|Rest]) ->
     prepare_state(State#state{max_line_length=Len}, Rest);
 prepare_state(State = #state{}, [{allow_unknown_resources, Value}|Rest]) when Value =:= true; Value =:= false ->
-    prepare_state(State#state{allow_unknown_resources=Value}, Rest).
+    prepare_state(State#state{allow_unknown_resources=Value}, Rest);
+prepare_state(State = #state{}, [{allow_unknown_classes, Value}|Rest]) when Value =:= true; Value =:= false ->
+    prepare_state(State#state{allow_unknown_classes=Value}, Rest);
+prepare_state(State = #state{}, [{encoding, Encoding}|Rest]) ->
+    prepare_state(State#state{encoding=Encoding}, Rest);
+prepare_state(State = #state{}, [{text_encoding, Encoding}|Rest]) ->
+    prepare_state(State#state{text_encoding=Encoding}, Rest);
+prepare_state(_, [{Key, _}|_]) ->
+    {error, {unknown_opt, Key}}.
 
 
 %%
@@ -803,11 +991,11 @@ prepare_state(State = #state{}, [{allow_unknown_resources, Value}|Rest]) when Va
 %%
 
 
-escape_text(Txt) ->
-    escape_text(Txt, []).
+to_masterfile_escape_text(Txt) ->
+    escape_text(Txt, [$"]).
 
 escape_text(<<>>, Acc) ->
-    lists:reverse(Acc);
+    lists:reverse([$"|Acc]);
 escape_text(<<C, Rest/binary>>, Acc) ->
     escape_text(Rest, escape_char(C, Acc));
 escape_text([], Acc) ->
@@ -837,11 +1025,14 @@ indicate_domain(Domain) ->
     {domain, Domain}.
 
 
+-spec write_resources(Path :: string(), Resources :: [dnslib:resource()]) -> 'ok'.
 write_resources(Filename, Rrs) ->
-    write_resources(Filename, Rrs, #{}).
+    write_resources(Filename, Rrs, []).
 
-
-write_resources(Filename, Rrs, _Opts) ->
+-type write_resources_opt() ::
+    {'generic', boolean()}.
+-spec write_resources(Path :: string(), Resources :: [dnslib:resource()], Opts :: [write_resources_opt()]) -> 'ok'.
+write_resources(Filename, Rrs, Opts) ->
     % Make sure that each record has the same class
     % Order records (SOA first)
     %
@@ -852,55 +1043,88 @@ write_resources(Filename, Rrs, _Opts) ->
     % introducing directives and mangling Resource record data as necessary
     % to produce a shorter file
     {ok, Fd} = file:open(Filename, [write, binary]),
-    ok = write_resource(Rrs, Fd, #{}),
+    ok = write_resource(Rrs, Fd, handle_write_resources_opts(Opts)),
     ok = file:close(Fd).
+
+
+handle_write_resources_opts(Opts) ->
+    handle_write_resources_opts(Opts, #{
+        generic => false,
+        linebreak => $\n,
+        whitespace => $\t
+    }).
+
+handle_write_resources_opts([], Opts) ->
+    Opts;
+handle_write_resources_opts([{generic, Boolean}|Rest], Opts) when Boolean =:= true; Boolean =:= false ->
+    handle_write_resources_opts(Rest, Opts#{generic => Boolean}).
 
 
 write_resource([], _, _) ->
     ok;
-write_resource([{iodata, Line}|Rest], Fd, Map) ->
-    ok = file:write(Fd, [Line, $\n]),
-    write_resource(Rest, Fd, Map);
-write_resource([{Domain, Type, Class, Ttl, Data}|Rest], Fd, Map) ->
+write_resource([{iodata, Line}|Rest], Fd, Opts = #{linebreak := Linebreak}) ->
+    ok = file:write(Fd, [Line, Linebreak]),
+    write_resource(Rest, Fd, Opts);
+write_resource([{Domain, Type, Class0, Ttl, Data}|Rest], Fd, Opts = #{linebreak := Linebreak, whitespace := Whitespace, generic := Generic}) ->
+    % This allows us to write files with multiple classes
+    Class = case dnsclass:from_to(Class0, atom, masterfile_token) of
+        _ when Generic, is_atom(Class0) -> lists:append("class", integer_to_list(dnsclass:from_to(Class0, atom, value)));
+        Class0 when is_integer(Class0) -> lists:append("class", integer_to_list(Class0));
+        CaseClass when is_list(CaseClass) -> CaseClass
+    end,
     Iodata = [
         dnslib:domain_to_list(Domain),
-        $\t,
-        string:to_upper(dnsclass:from_to(Class, atom, masterfile_token)),
-        $\t,
+        Whitespace,
+        string:to_upper(Class),
+        Whitespace,
         integer_to_list(Ttl),
-        $\t,
-        resource_specific(Type, Data, Map)
+        Whitespace,
+        resource_specific(Type, Data, Opts)
     ],
     case Rest of
         [] -> ok = file:write(Fd, Iodata);
-        _  -> ok = file:write(Fd, [Iodata, $\n])
+        _  -> ok = file:write(Fd, [Iodata, Linebreak])
     end,
-    write_resource(Rest, Fd, Map).
+    write_resource(Rest, Fd, Opts).
 
 
-resource_specific(Type, Data, Map) ->
+resource_specific(Type, Data, Opts = #{whitespace := Whitespace, generic := Generic}) ->
     case dnsrr:from_to(Type, atom, module) of
         Type when is_integer(Type), is_binary(Data) ->
             [
-                string:to_upper(lists:append("type"), integer_to_list(Type)),
-                $\t,
-                resource_data_to_io(Type, Data, Map)
+                string:to_upper(lists:append("type", integer_to_list(Type))),
+                Whitespace,
+                resource_data_to_io(Type, Data, Opts)
             ];
         Module ->
-            [
-                string:to_upper(dnsrr:from_to(Type, atom, masterfile_token)),
-                $\t,
-                resource_data_to_io(Module, Data, Map)
-            ]
+            case erlang:function_exported(Module, to_masterfile, 1) of
+                true when not Generic ->
+                    [
+                        string:to_upper(dnsrr:from_to(Type, atom, masterfile_token)),
+                        Whitespace,
+                        resource_data_to_io(Module, Data, Opts)
+                    ];
+                _ -> resource_specific(Module:value(), resource_data_to_binary(Module, Data), Opts)
+            end
+    end.
+
+
+resource_data_to_binary(Module, Data) ->
+    case Module:to_binary(Data) of
+        {ok, BinData} -> iolist_to_binary(BinData);
+        {domains, List} ->
+            Fn = fun
+                ({domain, _, Domain}) -> {ok, Bin} = dnslib:domain_to_binary(Domain), Bin;
+                (FunData) -> FunData
+            end,
+            iolist_to_binary([Fn(GenTuple) || GenTuple <- List])
     end.
 
 
 resource_data_to_io(Type, Data, _) when is_integer(Type), is_binary(Data) ->
     % Produce a representation of an unknown resource type according to
     % RFC3597
-    Start = io_lib:format("\\# ~b ", [byte_size(Data)]),
-    % Produce hex representation of the data
-    [Start, resource_data_to_io_hex_unknown_data(Data, [])];
+    [io_lib:format("\\# ~b ", [byte_size(Data)]), resource_data_to_io_hex_unknown_data(Data, [])];
 resource_data_to_io(Module, Data, _) when is_atom(Module) ->
     List = Module:to_masterfile(Data),
     Fn = fun

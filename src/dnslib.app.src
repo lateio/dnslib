@@ -65,6 +65,6 @@
     'dnszone'
   ]},
   {maintainers, ["Lauri Moisio"]},
-  {licenses, ["MIT"]},
+  {licenses, ["ISC"]},
   {links, ["https://github.com/lateio/dnslib"]}
  ]}.

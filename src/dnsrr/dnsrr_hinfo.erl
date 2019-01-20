@@ -10,7 +10,8 @@
     from_masterfile/1,
     to_masterfile/1,
     to_binary/1,
-    from_binary/1
+    from_binary/1,
+    valid_data/1
 ]).
 
 masterfile_token() -> "hinfo".
@@ -26,8 +27,8 @@ from_masterfile([Cpu, Os]) ->
 
 to_masterfile({Cpu, Os}) ->
     [
-        dnsfile:escape_text(Cpu),
-        dnsfile:escape_text(Os)
+        dnsfile:to_masterfile_escape_text(Cpu),
+        dnsfile:to_masterfile_escape_text(Os)
     ].
 
 
@@ -37,3 +38,10 @@ to_binary({Cpu, Os}) ->
 
 from_binary(<<Len1, Cpu:Len1/binary, Len2, Os:Len2/binary>>) ->
     {ok, {Cpu, Os}}.
+
+
+valid_data({Cpu, Os}) ->
+    Fn = fun
+        (FunTxt) -> is_binary(FunTxt) andalso byte_size(FunTxt) =< 16#FF
+    end,
+    Fn(Cpu) andalso Fn(Os).

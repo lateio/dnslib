@@ -44,7 +44,7 @@ to_masterfile({Algorithm, FingerprintType, Fingerprint}) ->
     [
         integer_to_list(algorithm(Algorithm)),
         integer_to_list(fptype(FingerprintType)),
-        dnsfile:escape_text(Fingerprint)
+        dnsfile:to_masterfile_escape_text(Fingerprint)
     ].
 
 

@@ -38,16 +38,19 @@
     from_masterfile/1,
     to_masterfile/1,
     to_binary/1,
-    from_binary/1
+    from_binary/1,
+    valid_data/1
 ]).
 
 -export([bitmap_to_ports/1,ports_to_bitmap/1]).
+
+-define(MAX_BITMAP, 8192).
 
 masterfile_token() -> "wks".
 atom() -> wks.
 value() -> 11.
 
-class() -> in.
+class() -> [in].
 
 masterfile_format() -> [token, token, token, '...'].
 
@@ -258,7 +261,7 @@ to_binary({{B1, B2, B3, B4}, Protocol, Bitmap}) ->
     {ok, [B1, B2, B3, B4, Protocol, Bitmap]}.
 
 
-from_binary(<<B1, B2, B3, B4, Protocol, Bitmap/binary>>) ->
+from_binary(<<B1, B2, B3, B4, Protocol, Bitmap/binary>>) when byte_size(Bitmap) =< ?MAX_BITMAP ->
     {ok, {{B1, B2, B3, B4}, Protocol, Bitmap}}.
 
 
@@ -286,9 +289,18 @@ ports_to_bitmap(Ports) ->
 
 ports_to_bitmap([], Bitmap) ->
     Bitmap;
-ports_to_bitmap([Port|Rest], Bitmap0) when is_integer(Port) ->
+ports_to_bitmap([Port|Rest], Bitmap0)
+when is_integer(Port), Port >= 0, Port =< 16#FFFF ->
     {ok, Bitmap1} = port(Port, Bitmap0),
     ports_to_bitmap(Rest, Bitmap1);
 ports_to_bitmap([Port|Rest], Bitmap0) when is_list(Port) ->
     {ok, Bitmap1} = port(string:lowercase(Port), Bitmap0),
     ports_to_bitmap(Rest, Bitmap1).
+
+
+valid_data({Address, Protocol, Bitmap})
+when is_integer(Protocol), Protocol >= 0, Protocol =< 16#FF ->
+    case dnsrr_a:valid_data(Address) of
+        true -> is_binary(Bitmap) andalso byte_size(Bitmap) =< ?MAX_BITMAP;
+        false -> false
+    end.

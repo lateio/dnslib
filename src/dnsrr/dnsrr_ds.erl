@@ -40,6 +40,4 @@ to_binary({Tag, Algorithm, Type, Digest}) ->
 
 
 from_binary(<<Tag:16, Algorithm, Type, Digest>>) ->
-    {ok, {Tag, Algorithm, Type, Digest}};
-from_binary(_) ->
-    {error, invalid_data}.
+    {ok, {Tag, Algorithm, Type, Digest}}.

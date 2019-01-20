@@ -25,7 +25,7 @@ from_masterfile(_) ->
 
 to_binary({Domain, Bitmap}) ->
     {domains, [
-        dnswire:indicate_domain(Domain),
+        dnswire:to_binary_domain(Domain, false),
         Bitmap
     ]}.
 

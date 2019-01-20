@@ -9,13 +9,17 @@
     cacheable/0,
 
     to_binary/1,
-    from_binary/1
+    from_binary/1,
+
+    message_section/0
 ]).
 
 atom() -> opt.
 value() -> 41.
 
 cacheable() -> false.
+
+message_section() -> [additional].
 
 
 to_binary(Attributes) ->

@@ -10,7 +10,8 @@
     from_masterfile/1,
     to_masterfile/1,
     to_binary/1,
-    from_binary/1
+    from_binary/1,
+    valid_data/1
 ]).
 
 masterfile_token() -> "uri".
@@ -27,9 +28,9 @@ from_masterfile([Priority, Weight, Uri]) ->
 
 to_masterfile({Priority, Weight, Uri}) ->
     [
-        list_to_integer(Priority),
-        list_to_integer(Weight),
-        dnsfile:escape_text(Uri)
+        integer_to_list(Priority),
+        integer_to_list(Weight),
+        dnsfile:to_masterfile_escape_text(Uri)
     ].
 
 
@@ -39,3 +40,17 @@ to_binary({Priority, Weight, Uri}) ->
 
 from_binary(<<Priority:16, Weight:16, Uri/binary>>) ->
     {ok, {Priority, Weight, Uri}}.
+
+
+valid_data(Data0) when tuple_size(Data0) =:= 3 ->
+    Data = tuple_to_list(Data0),
+    case lists:last(Data) of
+        Bin when is_binary(Bin), byte_size(Bin) =< 16#FFFF - 4 ->
+            Fn = fun
+                (FunUint) ->
+                    is_integer(FunUint) andalso
+                    FunUint >= 0 andalso
+                    FunUint =< 16#FFFF
+            end,
+            lists:all(Fn, lists:droplast(Data))
+    end.

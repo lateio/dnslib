@@ -52,7 +52,7 @@ from_masterfile(_) ->
 to_binary({Type, Algorithm, Labels, Ttl, Expiration, Inception, Tag, Signer, Signature}) ->
     {domains, [
         <<Type:16, Algorithm, Labels, Ttl:32, Expiration:32, Inception:32, Tag:16>>,
-        dnswire:indicate_domain(Signer),
+        dnswire:to_binary_domain(Signer, false),
         Signature
     ]}.
 
@@ -61,6 +61,4 @@ from_binary(<<Type:16, Algorithm, Labels, Ttl:32, Expiration:32, Inception:32, T
     case dnslib:binary_to_domain(Tail) of
         {ok, Signer, Signature} -> {ok, {Type, Algorithm, Labels, Ttl, Expiration, Inception, Tag, Signer, Signature}};
         _ -> {error, invalid_data}
-    end;
-from_binary(_) ->
-    {error, invalid_data}.
+    end.

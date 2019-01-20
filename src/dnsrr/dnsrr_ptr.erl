@@ -11,7 +11,8 @@
     to_masterfile/1,
     to_binary/1,
     from_binary/1,
-    from_binary_finalize/1
+    valid_data/1,
+    normalize_data/1
 ]).
 
 masterfile_token() -> "ptr".
@@ -24,4 +25,5 @@ from_masterfile(Data) -> dnsrr_domain_common:from_masterfile(Data).
 to_masterfile(Data) -> dnsrr_domain_common:to_masterfile(Data).
 to_binary(Data) -> dnsrr_domain_common:to_binary(Data).
 from_binary(Data) -> dnsrr_domain_common:from_binary(Data).
-from_binary_finalize(Data) -> dnsrr_domain_common:from_binary_finalize(Data).
+valid_data(Data) -> dnsrr_domain_common:valid_data(Data).
+normalize_data(Data) -> dnsrr_domain_common:normalize_data(Data).

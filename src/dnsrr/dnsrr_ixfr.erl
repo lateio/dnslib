@@ -1,5 +1,5 @@
-% This module implements support for DNS AXFR QTYPE (RFC1034, RFC1035)
--module(dnsrr_axfr).
+% This module implements support for DNS IXFR QTYPE (RFC1995)
+-module(dnsrr_ixfr).
 
 -behavior(dnsrr).
 -export([
@@ -11,8 +11,8 @@
 ]).
 
 
-atom() -> axfr.
-value() -> 252.
+atom() -> ixfr.
+value() -> 251.
 cacheable() -> false.
 
 

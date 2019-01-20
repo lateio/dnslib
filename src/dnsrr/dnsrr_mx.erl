@@ -12,7 +12,8 @@
     to_masterfile/1,
     to_binary/1,
     from_binary/1,
-    from_binary_finalize/1
+    valid_data/1,
+    normalize_data/1
 ]).
 
 -ifdef(EUNIT).
@@ -24,11 +25,13 @@ atom() -> mx.
 value() -> 15.
 
 
-additionally({_, _, Class, _, {_, Domain}}) ->
+additionally({_, _, in, _, {_, Domain}}) ->
     [
-        {Domain, a, Class},
-        {Domain, aaaa, Class}
-    ].
+        {Domain, a, in},
+        {Domain, aaaa, in}
+    ];
+additionally(_) ->
+    [].
 
 
 masterfile_format() -> [uint16, domain].
@@ -45,24 +48,25 @@ to_masterfile({Priority, Domain}) ->
 
 
 to_binary({Priority, Domain}) ->
-    {domains, [<<Priority:16>>, dnswire:indicate_domain_compress(Domain)]}.
+    {domains, [<<Priority:16>>, dnswire:to_binary_domain(Domain, true)]}.
 
 
 from_binary(<<Priority:16, Bin/binary>>) ->
     case dnslib:binary_to_domain(Bin) of
-        {ok, Domain, <<>>} -> {domains, [Priority, dnswire:indicate_domain(Domain, 2)]};
-        {{compressed, _, _} = Tuple, <<>>} ->
-            {domains, [Priority, dnswire:indicate_domain_decompress(Tuple, 2)]};
-        _ -> error
-    end;
-from_binary(_) ->
-    {error, invalid_data}.
+        {error, Reason} -> {error, Reason};
+        {_, Domain, <<>>} -> {domains, [Priority, dnswire:from_binary_domain(Domain, 2)]}
+    end.
 
 -ifdef(EUNIT).
 from_binary_test() ->
-    {error, _} = from_binary(<<>>).
+    {'EXIT', {function_clause, _}} = (catch from_binary(<<>>)).
 -endif.
 
 
-from_binary_finalize([Priority, Domain]) ->
-    {ok, {Priority, Domain}}.
+valid_data({Priority, Domain})
+when is_integer(Priority), Priority >= 0, Priority =< 16#FFFF ->
+    true =:= dnslib:is_valid_domain(Domain).
+
+
+normalize_data({Priority, Domain}) ->
+    {Priority, dnslib:normalize_domain(Domain)}.

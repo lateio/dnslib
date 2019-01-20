@@ -10,7 +10,9 @@
     from_masterfile/1,
     to_masterfile/1,
     to_binary/1,
-    from_binary/1
+    from_binary/1,
+    valid_data/1,
+    normalize_data/1
 ]).
 
 masterfile_token() -> "naptr".
@@ -33,11 +35,11 @@ from_masterfile([Order, Preference, Flags, Services, Regexp, Replacement]) ->
 
 to_masterfile({Order, Preference, Flags, Services, Regexp, Replacement}) ->
     [
-        list_to_integer(Order),
-        list_to_integer(Preference),
-        dnsfile:escape_text(Flags),
-        dnsfile:escape_text(Services),
-        dnsfile:escape_text(Regexp),
+        integer_to_list(Order),
+        integer_to_list(Preference),
+        dnsfile:to_masterfile_escape_text(Flags),
+        dnsfile:to_masterfile_escape_text(Services),
+        dnsfile:to_masterfile_escape_text(Regexp),
         dnsfile:indicate_domain(Replacement)
     ].
 
@@ -50,24 +52,48 @@ to_binary({Order, Preference, Flags, Services, Regexp, Replacement}) ->
             (byte_size(Services)), Services/binary,
             (byte_size(Regexp)), Regexp/binary
         >>,
-        dnswire:indicate_domain(Replacement)
+        dnswire:to_binary_domain(Replacement, false)
     ]}.
 
 
 from_binary(<<Order:16, Preference:16, Tail/binary>>) ->
-    from_binary([Preference, Order], Tail);
-from_binary(_) ->
-    {error, invalid_data}.
+    from_binary([Preference, Order], Tail).
 
 from_binary([Regexp, Services, Flags, Preference, Order], Bin) ->
     case dnslib:binary_to_domain(Bin) of
         {ok, Replacement, <<>>} ->
             Offset = 4 + 3 + byte_size(Flags) + byte_size(Services) + byte_size(Regexp),
-            {domains, [Order, Preference, Flags, Services, Regexp, dnswire:indicate_domain(Replacement, Offset)]};
+            {domains, [Order, Preference, Flags, Services, Regexp, dnswire:from_binary_domain(Replacement, Offset)]};
         _ -> {error, invalid_data}
     end;
 from_binary(Acc, <<Len, Str:Len/binary, Tail/binary>>) ->
     from_binary([Str|Acc], Tail).
 
-%from_binary_finalize([Order, Preference, Flags, Services, Regexp, Replacement]) ->
-%    {ok {Order, Preference, Flags, Services, Regexp, Replacement}}.
+
+valid_data(Data0) when tuple_size(Data0) =:= 6 ->
+    [Order, Preference|Tail] = tuple_to_list(Data0),
+    Domain = lists:last(Tail),
+    FnUint = fun
+        (FunData) ->
+            is_integer(FunData) andalso
+            FunData >= 0 andalso
+            FunData =< 16#FFFF
+    end,
+    FnTxt = fun
+        (FunData) ->
+            is_binary(FunData) andalso
+            byte_size(FunData) =< 16#FF
+    end,
+    case
+        FnUint(Order) andalso
+        FnUint(Preference) andalso
+        true =:= dnslib:is_valid_domain(Domain)
+    of
+        true -> lists:all(FnTxt, lists:droplast(Tail));
+        false -> false
+    end.
+
+
+normalize_data({_, _, _, _, _, Replacement}=Data) ->
+    % Character case in text?
+    setelement(6, Data, dnslib:normalize_domain(Replacement)).

@@ -13,21 +13,24 @@
     to_masterfile/1,
     to_binary/1,
     from_binary/1,
-    from_binary_finalize/1
+    valid_data/1,
+    normalize_data/1
 ]).
 
 masterfile_token() -> "srv".
 atom() -> srv.
 value() -> 33.
 
-class() -> in.
+class() -> [in].
 
 
-additionally({_, _, Class, _, {_, _, _, Domain}}) ->
+additionally({_, _, in, _, {_, _, _, Domain}}) ->
     [
-        {Domain, dnsrr_a:atom(), Class},
-        {Domain, dnsrr_aaaa:atom(), Class}
-    ].
+        {Domain, a, in},
+        {Domain, aaaa, in}
+    ];
+additionally(_) ->
+    [].
 
 masterfile_format() -> [uint16, uint16, uint16, domain].
 
@@ -48,20 +51,32 @@ to_masterfile({Priority, Weight, Port, Domain}) ->
 to_binary({Priority, Weight, Port, Domain}) ->
     {domains, [
         <<Priority:16, Weight:16, Port:16>>,
-        dnswire:indicate_domain_compress(Domain)
+        dnswire:to_binary_domain(Domain, true)
     ]}.
 
 
 from_binary(<<Priority:16, Weight:16, Port:16, Tail/binary>>) ->
     case dnslib:binary_to_domain(Tail) of
-        {ok, Domain, <<>>} ->
-            {domains, [Priority, Weight, Port, dnswire:indicate_domain(Domain, 3)]};
-        {{compressed, _, _} = Tuple, <<>>} ->
-            Domain = dnswire:indicate_domain_decompress(Tuple, 6),
-            {domains, [Priority, Weight, Port, Domain]};
-        _ -> {error, invalid_domain}
+        {error, _} -> {error, invalid_domain};
+        {_, Domain, <<>>} ->
+            {domains, [Priority, Weight, Port, dnswire:from_binary_domain(Domain, 6)]}
     end.
 
 
-from_binary_finalize([Priority, Weight, Port, Domain]) ->
-    {ok, {Priority, Weight, Port, Domain}}.
+valid_data(Data0) when tuple_size(Data0) =:= 4 ->
+    Data = tuple_to_list(Data0),
+    case dnslib:is_valid_domain(lists:last(Data)) of
+        true ->
+            Fn = fun
+                (FunUint) ->
+                    is_integer(FunUint) andalso
+                    FunUint >= 0 andalso
+                    FunUint =< 16#FFFF
+            end,
+            lists:all(Fn, lists:droplast(Data));
+        _ -> false
+    end.
+
+
+normalize_data({_, _, _, Domain}=Data) ->
+    setelement(4, Data, dnslib:normalize_domain(Domain)).

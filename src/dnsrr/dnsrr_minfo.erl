@@ -11,7 +11,7 @@
     to_masterfile/1,
     to_binary/1,
     from_binary/1,
-    from_binary_finalize/1
+    valid_data/1
 ]).
 
 masterfile_token() -> "minfo".
@@ -34,38 +34,24 @@ to_masterfile({Domain1, Domain2}) ->
 
 to_binary({Domain1, Domain2}) ->
     {domains, [
-        dnswire:indicate_domain_compress(Domain1),
-        dnswire:indicate_domain_compress(Domain2)
+        dnswire:to_binary_domain(Domain1, true),
+        dnswire:to_binary_domain(Domain2, true)
     ]}.
 
 from_binary(Bin) ->
-    from_binary([], 0, Bin).
+    from_binary([], Bin).
 
-
-from_binary([D2, D1], _, <<>>) when is_tuple(D1), is_tuple(D2) ->
-    {domains, [D1, D2]};
-from_binary([{compressed, _, _, _}=D2, D1], _, <<>>) ->
-    {domains, [dnswire:indicate_domain(D1, 0), D2]};
-from_binary([D2, {compressed, _, Acc, _}=D1], _, <<>>) ->
-    Offset = dnslib:domain_binary_length(Acc) + 1,
-    {domains, [D1, dnswire:indicate_domain(D2, Offset)]};
-from_binary([D2, D1], _, <<>>) ->
-    Offset = dnslib:domain_binary_length(D1),
+from_binary([D2, D1], <<>>) ->
     {domains, [
-        dnswire:indicate_domain(D1,0),
-        dnswire:indicate_domain(D2,Offset)
+        dnswire:from_binary_domain(D1, 0),
+        dnswire:from_binary_domain(D2, dnslib:domain_binary_length(D1))
     ]};
-from_binary([_, _], _, _) ->
-    error;
-from_binary(Acc, Offset, Bin) ->
+from_binary(Acc, Bin) when length(Acc) < 2 ->
     case dnslib:binary_to_domain(Bin) of
-        {ok, Domain, Tail} -> from_binary([Domain|Acc], dnslib:domain_binary_length(Domain) + Offset, Tail);
-        {{compressed, _, DomainAcc} = Tuple, Tail} ->
-            Domain = dnswire:indicate_domain_decompress(Tuple, Offset),
-            from_binary([Domain|Acc], dnslib:domain_binary_length(DomainAcc) + 1, Tail);
-        _ -> error
+        {error, _} -> {error, invalid_data};
+        {_, Domain, Tail} -> from_binary([Domain|Acc], Tail)
     end.
 
 
-from_binary_finalize([Domain1, Domain2]) ->
-    {ok, {Domain1, Domain2}}.
+valid_data({Domain1, Domain2}) ->
+    true =:= dnslib:is_valid_domain(Domain1) andalso true =:= dnslib:is_valid_domain(Domain2).

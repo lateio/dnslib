@@ -11,7 +11,11 @@
     to_masterfile/1,
     to_binary/1,
     from_binary/1,
-    from_binary_finalize/1
+    from_binary_finalize/1,
+    valid_data/1,
+    normalize_data/1,
+
+    serial/1
 ]).
 
 -include_lib("dnslib/include/dnslib.hrl").
@@ -53,8 +57,8 @@ to_masterfile({Nameserv, Admin, Serial, Refresh, Retry, Expire, Minimum}) ->
 
 to_binary({Ns, Contact, Id, Refresh, Retry, Expire, Minimum}) ->
     {domains, [
-        dnswire:indicate_domain_compress(Ns),
-        dnswire:indicate_domain_compress(Contact),
+        dnswire:to_binary_domain(Ns, true),
+        dnswire:to_binary_domain(Contact, true),
         <<Id:32, Refresh:32, Retry:32, Expire:32, Minimum:32>>
     ]}.
 
@@ -63,28 +67,50 @@ from_binary(Bin) ->
     from_binary([], 0, Bin).
 
 
-from_binary([Contact, Ns], _, <<Id:32,Refresh:32,Retry:32,Expire:32,Minimum:32>>)
-when is_tuple(Contact), is_tuple(Ns) ->
-    {domains, [Ns, Contact, Id, Refresh, Retry, Expire, Minimum]};
-from_binary([Contact, {compressed, _, Acc, _}=Ns], _, <<Id:32,Refresh:32,Retry:32,Expire:32,Minimum:32>>) ->
-    Offset = dnslib:domain_binary_length(Acc) + 1,
-    {domains, [Ns, dnswire:indicate_domain(Contact, Offset), Id, Refresh, Retry, Expire, Minimum]};
-from_binary([Contact, Ns], _, <<Id:32,Refresh:32,Retry:32,Expire:32,Minimum:32>>) when is_tuple(Contact) ->
-    {domains, [dnswire:indicate_domain(Ns, 0), Contact, Id, Refresh, Retry, Expire, Minimum]};
 from_binary([Contact, Ns], _, <<Id:32,Refresh:32,Retry:32,Expire:32,Minimum:32>>) ->
-    Offset = dnslib:domain_binary_length(Ns),
-    {domains, [dnswire:indicate_domain(Ns, 0), dnswire:indicate_domain(Contact, Offset), Id, Refresh, Retry, Expire, Minimum]};
-from_binary([_, _], _, _) ->
-    error;
-from_binary(Acc, Offset, Bin) ->
+    {domains, [Ns, Contact, Id, Refresh, Retry, Expire, Minimum]};
+from_binary(Acc, Offset0, Bin) when length(Acc) < 2 ->
     case dnslib:binary_to_domain(Bin) of
-        {ok, Domain, Tail} -> from_binary([Domain|Acc], dnslib:domain_binary_length(Domain)+Offset, Tail);
-        {{compressed, _, NsAcc} = Tuple, Tail} ->
-            Domain = dnswire:indicate_domain_decompress(Tuple, Offset),
-            from_binary([Domain|Acc], dnslib:domain_binary_length(NsAcc) + 1 + Offset, Tail);
-        _ -> error
+        {error, Reason} -> {error, Reason};
+        {_, Domain, Tail} ->
+            Offset = Offset0 + dnslib:domain_binary_length(Domain),
+            from_binary([dnswire:from_binary_domain(Domain, Offset0)|Acc], Offset, Tail)
     end.
 
 
 from_binary_finalize([Ns, Contact, Id, Refresh, Retry, Expire, Minimum]) ->
     {ok, {Ns, Contact, Id, ?FIX_TTL(Refresh), ?FIX_TTL(Retry), ?FIX_TTL(Expire), ?FIX_TTL(Minimum)}}.
+
+
+valid_data(Data) when tuple_size(Data) =:= 7 ->
+    [Nameserv, Admin, Serial|Ttls] = tuple_to_list(Data),
+    case
+        true =:= dnslib:is_valid_domain(Nameserv) andalso
+        true =:= dnslib:is_valid_domain(Admin)
+    of
+        true when is_integer(Serial), Serial >= 0, Serial =< 16#FFFFFFFF ->
+            Fn = fun
+                (FunTtl) ->
+                    is_integer(FunTtl) andalso
+                    FunTtl >= 0 andalso
+                    FunTtl =< ?MAX_TTL
+            end,
+            lists:all(Fn, Ttls);
+        false -> false
+    end.
+
+
+normalize_data({Nameserv, Admin, Id, Refresh, Retry, Expire, Minimum}) ->
+    {
+        dnslib:normalize_domain(Nameserv),
+        dnslib:normalize_domain(Admin),
+        Id,
+        Refresh,
+        Retry,
+        Expire,
+        Minimum
+    }.
+
+
+serial(Data) ->
+    element(3, Data).

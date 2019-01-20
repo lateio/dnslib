@@ -6,7 +6,7 @@
     atom/0,
     value/0,
 
-    can_appear_in/0,
+    message_section/0,
 
     aka/0
 ]).
@@ -16,7 +16,7 @@ atom() -> all.
 value() -> 255.
 
 
-can_appear_in() -> question.
+message_section() -> [question].
 
 
 aka() -> ['_'].

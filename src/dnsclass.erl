@@ -26,18 +26,15 @@
 %
 -module(dnsclass).
 
+-callback atom() -> atom().
 -callback value() -> 0..16#FFFF.
 -callback masterfile_token() -> string().
 
+-optional_callbacks([masterfile_token/0]).
+
 -export([builtin/0,from_to/3]).
 
--type class() ::
-    'in'   |
-    'cs'   |
-    'ch'   |
-    'hs'   |
-    'none' |
-    'any'.
+-type class() :: atom() | 0..16#FFFF.
 
 -export_type([class/0]).
 
@@ -53,45 +50,23 @@ builtin() ->
     ].
 
 
-value_map() ->
-    #{
-        1   => in,   %% RFC1035
-        2   => cs,   %% RFC1035
-        3   => ch,   %% RFC1035
-        4   => hs,   %% RFC1035
-        254 => none,
-        255 => any
-    }.
-
-
-atom_map() ->
-    #{
-        in   => 1,   %% RFC1035
-        cs   => 2,   %% RFC1035
-        ch   => 3,   %% RFC1035
-        hs   => 4,   %% RFC1035
-        none => 254,
-        any  => 255
-    }.
-
-
-masterfile_token_map() ->
-    #{
-        "in"  => in,   %% RFC1035
-        "cs"  => cs,   %% RFC1035
-        "ch"  => ch,   %% RFC1035
-        "hs"  => hs    %% RFC1035
-    }.
-
-
-from_to(Value, value, atom) ->
-    maps:get(Value, value_map(), Value);
-from_to(Value, atom, value) ->
-    maps:get(Value, atom_map(), Value);
-from_to(Value, masterfile_token, atom) ->
-    maps:get(Value, masterfile_token_map(), Value);
-from_to(Value, atom, masterfile_token) ->
-    case [FileToken || {FileToken, Atom} <- maps:to_list(masterfile_token_map()), Atom =:= Value] of
-        [Token] -> Token;
-        _ -> Value
+from_to(Value, value, module) ->
+    maps:get(Value, dnsclass_classes:value(), Value);
+from_to(Value, atom, module) ->
+    maps:get(Value, dnsclass_classes:atom(), Value);
+from_to(Value, masterfile_token, module) ->
+    maps:get(Value, dnsclass_classes:masterfile_token(), Value);
+from_to(Module, module, value) ->
+    Module:value();
+from_to(Module, module, atom) ->
+    Module:atom();
+from_to(Module, module, masterfile_token) ->
+    Module:masterfile_token();
+    % However, with CLASS100 -syntax, every class has a masterfile token, even
+    % if it doesn't export one...
+from_to(Value, From, To) when From =/= To ->
+    % If either From or To are not allowed, function_clause exception will result
+    case from_to(Value, From, module) of
+        Value -> Value;
+        Module -> from_to(Module, module, To)
     end.

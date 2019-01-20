@@ -34,27 +34,38 @@
 
 %% API exports
 -export([
-    subdomain/2,
-    in_zone/2,
-    concat/2,
-    normalize/1,
+    list_to_domain/1,
+    list_to_codepoint_domain/1,
+    codepoint_domain_to_domain/1,
+    binary_to_domain/1,
+    domain_to_list/1,
+    domain_to_codepoint_domain/1,
+    domain_to_binary/1,
+    domain_binary_length/1,
+    is_subdomain/2,
+    domain_in_zone/2,
+    append_domain/1,
+    append_domain/2,
+    %domain/1,
+    question/2,
+    question/3,
+    resource/1,
+    resource/5,
+    normalize_domain/1,
     normalize_question/1,
     normalize_resource/1,
-    domain_to_binary/1,
-    binary_to_domain/1,
-    list_to_domain/1,
-    domain_to_list/1,
     is_valid_domain/1,
-    reverse_dns_domain/1,
-    domain_binary_length/1,
     is_valid_hostname/1,
-    reverse_ip_query/1,
+    reverse_dns_domain/1,
+    reverse_dns_question/1,
     list_to_ttl/1,
     is_valid_opcode/1, % This should be in dnsmsg?
     is_valid_resource_type/1,
     is_valid_resource_class/1,
     is_valid_return_code/1,
-    punyencode/1
+    punyencode/1,
+    punyencode_label/1,
+    deduplicate/1
 ]).
 
 -include_lib("dnslib/include/dnslib.hrl").
@@ -63,10 +74,20 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
--type domain_label() :: binary().
--type domain() :: [domain_label()].
--type wildcard_domain() :: ['_'|domain()].
+-type domain_label() :: <<_:8, _:_*8>>.
+-type non_wildcard_domain() :: [domain_label()].
+-type wildcard_domain() :: ['_'|domain_label()].
+%-type normalized_domain() :: {normalized, OrigDomain :: domain(), NormDomain :: domain()}.
+-type domain() :: wildcard_domain() | non_wildcard_domain().
+%-type domain() :: wildcard_domain() | non_wildcard_domain() | normalized_domain().
+-type compressed_domain() :: {'compressed', Ref :: non_neg_integer(), dnslib:domain()}.
 
+-type codepoint_label() :: string().
+-type non_wildcard_codepoint_domain() :: [codepoint_label()].
+-type wildcard_codepoint_domain() :: ['_'|codepoint_label()].
+-type codepoint_domain() :: wildcard_codepoint_domain() | non_wildcard_codepoint_domain().
+
+% Do return_code and opcode belong here?
 -type return_code() ::
     'ok'              |
     'format_error'    |
@@ -102,7 +123,7 @@
 
 -type question() ::
     {
-        Domain :: dnslib:domain(),
+        Domain :: dnslib:non_wildcard_domain(),
         Type   :: dnsrr:type(),
         Class  :: dnsclass:class()
     }.
@@ -110,8 +131,13 @@
 
 -export_type([
     domain_label/0,
-    domain/0,
+    non_wildcard_domain/0,
     wildcard_domain/0,
+    domain/0,
+    codepoint_label/0,
+    non_wildcard_codepoint_domain/0,
+    wildcard_codepoint_domain/0,
+    codepoint_domain/0,
     resource/0,
     resource/1,
     question/0,
@@ -120,7 +146,8 @@
     return_code/0,
     ttl/0,
     list_to_domain_error/0,
-    compressed_binary_to_domain_result/0
+    compressed_binary_to_domain_result/0,
+    compressed_domain/0
 ]).
 
 %%====================================================================
@@ -135,197 +162,437 @@ stop(_) ->
     ok.
 
 init([]) ->
+    %dnclass:compile_dnsclass_types(),
     dnsrr:compile_dnsrr_types(),
     {ok, {{one_for_one,3,10},[]}}.
 
 
-%% @doc Test if domain This is a subdomain of OfThis.
-%%
-%% Neither domain is normalized in any way, thus labels which
-%% differ merely in character case will not be considered identical
-%% (<<"abc">> =/= <<"ABC">>). Thus:
-%% subdomain([<<"def">>, <<"abc">>], [<<"ABC">>]) -> false.
-%%
-%% Identical domains (This =:= OfThis) are not considered to
-%% be subdomains of each other. Thus:
-%% subdomain([<<"abc">>], [<<"abc">>]) -> false.
-%%
-%% @end
--spec subdomain(This :: domain(), OfThis :: domain()) -> boolean().
-subdomain([], _) ->
+-spec is_subdomain(This :: domain(), OfThis :: domain()) -> boolean().
+is_subdomain([], _) ->
     false;
-subdomain(_, []) ->
+is_subdomain(_, []) ->
     true;
-subdomain(This, OfThis) ->
+is_subdomain(This, OfThis) ->
     subdomain_of(lists:reverse(This), lists:reverse(OfThis)).
 
 -ifdef(EUNIT).
 subdomain_test() ->
-    false = subdomain([], []),
-    false = subdomain([], [<<"abc">>]),
-    true  = subdomain([<<"abc">>], []),
-    true  = subdomain([<<"abc">>, <<"com">>], [<<"com">>]),
-    false  = subdomain([<<"abc">>, <<"com">>], [<<"COM">>]).
+    false = is_subdomain([], []),
+    false = is_subdomain([], [<<"abc">>]),
+    true  = is_subdomain([<<"abc">>], []),
+    true  = is_subdomain([<<"abc">>, <<"com">>], [<<"com">>]),
+    false = is_subdomain([<<"abc">>, <<"com">>], [<<"COM">>]).
 -endif.
 
 
-in_zone(D1, D2) ->
-    D1 =:= D2 orelse subdomain(D1, D2).
+domain_in_zone(['_'|D1], ['_'|D2]) ->
+    domain_in_zone(D1, D2);
+domain_in_zone(['_'|D1], [_|_] = D2) ->
+    domain_in_zone(D1, D2);
+domain_in_zone([_|_] = D1, ['_'|D2]) ->
+    is_subdomain(D1, D2);
+domain_in_zone(D1, D2) ->
+    is_subdomain(D1, D2) orelse D1 =:= D2.
+
+question(Domain, Type) ->
+    question(Domain, Type, in).
+
+question(_, Type, _)
+when is_integer(Type) andalso Type < 0 orelse is_integer(Type) andalso Type > 16#FFFF ->
+    error(badarg);
+question(_, _, Class)
+when is_integer(Class) andalso Class < 0 orelse is_integer(Class) andalso Class > 16#FFFF ->
+    error(badarg);
+question([Head|_] = DomainStr, Type, Class) when is_integer(Head) ->
+    case list_to_domain(DomainStr) of
+        {ok, _, ['_'|Domain]} -> question([<<"*">>|Domain], Type, Class);
+        {ok, _, Domain} -> question(Domain, Type, Class);
+        _ -> error(badarg)
+    end;
+question(Domain, Type0, Class0) ->
+    case is_valid_domain(Domain) of
+        true -> ok;
+        _ -> error(badarg)
+    end,
+    Type = case is_integer(Type0) of
+        true -> dnsrr:from_to(Type0, value, atom);
+        false ->
+            case dnsrr:from_to(Type0, atom, value) of
+                Type0 -> error(badarg); % Should we throw?
+                _ -> Type0
+            end
+    end,
+    Class = case is_integer(Class0) of
+        true -> dnsclass:from_to(Class0, value, atom);
+        false ->
+            case dnsclass:from_to(Class0, atom, value) of
+                Class0 -> error(badarg);  % Should we throw?
+                _ -> Class0
+            end
+    end,
+    % Make sure that the type+class combination is allowed
+    {Domain, Type, Class}.
+
+
+resource(Line) when is_list(Line) ->
+    case dnsfile:parse_resource(Line) of
+        {ok, Resource} -> Resource;
+        _ -> error(badarg)
+    end.
+
+resource(_, Type, _, _, _)
+when is_integer(Type) andalso Type < 0 orelse is_integer(Type) andalso Type > 16#FFFF ->
+    error(badarg);
+resource(_, _, Class, _, _)
+when is_integer(Class) andalso Class < 0 orelse is_integer(Class) andalso Class > 16#FFFF ->
+    error(badarg);
+resource(_, _, _, Ttl, _)
+when is_integer(Ttl) andalso Ttl < 0 orelse is_integer(Ttl) andalso Ttl > ?MAX_TTL ->
+    error(badarg);
+resource(Domain, Type, Class, TtlStr, Data) when is_list(TtlStr) ->
+    case list_to_ttl(TtlStr) of
+        {ok, Ttl} -> resource(Domain, Type, Class, Ttl, Data);
+        _ -> error(badarg)
+    end;
+resource(_, _, _, Ttl, _) when not is_integer(Ttl) ->
+    error(badarg);
+resource([Head|_] = DomainStr, Type, Class, Ttl, Data) when is_integer(Head) ->
+    case list_to_domain(DomainStr) of
+        {ok, _, ['_'|Domain]} -> resource([<<"*">>|Domain], Type, Class, Ttl, Data);
+        {ok, _, Domain} -> resource(Domain, Type, Class, Ttl, Data);
+        _ -> error(badarg)
+    end;
+resource(Domain, Type0, Class0, Ttl, Data0) ->
+    case is_valid_domain(Domain) of
+        true -> ok;
+        _ -> error(badarg)
+    end,
+    Class = case is_integer(Class0) of
+        true -> dnsclass:from_to(Class0, value, atom);
+        false ->
+            case dnsclass:from_to(Class0, atom, value) of
+                Class0 -> error(badarg);  % Should we throw?
+                _ -> Class0
+            end
+    end,
+    {Type, Data} = case {is_integer(Type0), dnsrr:from_to(Type0, value, module), dnsrr:from_to(Type0, atom, module)} of
+        {true, Type0, _} when is_binary(Data0) -> {Type0, Data0};
+        %{true, Type0, _} when is_list(Data0) ->
+        % If data is string, it might be in generic format...
+        {true, Module, _} when Module =/= Type0 ->
+            {_, RecurseType, _, _, RecurseData} = resource(Domain, Module:atom(), Class, Ttl, Data0),
+            {RecurseType, RecurseData};
+        {false, _, Type0} -> error(badarg);
+        {false, _, Module} ->
+            case dnsrr:validate_data(Module:atom(), Data0) of
+                true -> {Module:atom(), Data0};
+                false when is_binary(Data0) ->
+                    case Module:from_binary(Data0) of
+                        {ok, TermData} -> {Module:atom(), TermData};
+                        {domains, DataList} ->
+                            case [GenTuple || GenTuple <- DataList, is_tuple(GenTuple), element(1, GenTuple) =:= compressed] of
+                                [] ->
+                                    Fn = fun
+                                        ({domain, FunDomain, _}) -> FunDomain;
+                                        (FunMember) -> FunMember
+                                    end,
+                                    Rdata = dnswire:finalize_resource_data([Fn(GenMember) || GenMember <- DataList], Module),
+                                    {Module:atom(), Rdata};
+                                _ -> error(badarg)
+                            end;
+                        % Should we have different error for compressed domains?
+                        _ -> error(badarg)
+                    end;
+                false when is_list(Data0) ->
+                    % Need to check if the module has from_masterfile
+                    Line = lists:append([
+                        ". in 0 ",
+                        Module:masterfile_token(),
+                        " ",
+                        Data0
+                    ]),
+                    case dnsfile:parse_resource(Line) of
+                        {ok, {_, _, _, _, ParsedData}} -> {Module:atom(), ParsedData};
+                        _ -> error(badarg)
+                    end;
+                false -> error(badarg)
+            end
+    end,
+    % Make sure that type can be a resource.
+    % Make sure that the type+class combination is allowed
+    {Domain, Type, Class, Ttl, Data}.
 
 
 %% @doc Normalize ascii character case in domain labels.
--spec normalize(Domain :: domain()) -> domain().
-normalize([]) ->
+-spec normalize_domain(Domain :: domain()) -> domain().
+normalize_domain([]) ->
     [];
-normalize(Domain) ->
-    normalize_label(Domain, []).
+normalize_domain(['_'|Domain]) ->
+    ['_'|[normalize_label(Label) || Label <- Domain]];
+normalize_domain(Domain) ->
+    [normalize_label(Label) || Label <- Domain].
 
 
-normalize_question({Domain, Type, Class}) ->
-    {normalize(Domain), Type, Class}.
+%normalized_domain(Domain) ->
+%    .
 
 
-normalize_resource({Domain, Type, Class, Ttl, Data}) ->
-    {normalize(Domain), Type, Class, Ttl, Data}.
+-spec normalize_question(dnslib:question()) -> dnslib:question() | no_return().
+normalize_question({Domain, Type0, Class0}) ->
+    Type = if
+        is_integer(Type0) -> dnsrr:from_to(Type0, value, atom);
+        true -> Type0
+    end,
+    Class = if
+        is_integer(Class0) -> dnsclass:from_to(Class0, value, atom);
+        true -> Class0
+    end,
+    case
+        {
+            is_integer(dnsrr:from_to(Type, atom, value)),
+            is_integer(dnsclass:from_to(Class, atom, value))
+        }
+    of
+        {true, true} -> ok;
+        _ -> error(badarg)
+    end,
+    {normalize_domain(Domain), Type, Class}.
 
 
--spec concat(domain(), domain()) ->
-    {'ok', boolean(), domain()} |
+-spec normalize_resource(dnslib:resource()) -> dnslib:resource() | no_return().
+normalize_resource({Domain, Type0, Class0, Ttl, Data}) ->
+    Class = if
+        is_integer(Class0) -> dnsclass:from_to(Class0, value, atom);
+        true -> Class0
+    end,
+    Type = if
+        is_integer(Type0) -> dnsrr:from_to(Type0, value, atom);
+        true -> Type0
+    end,
+    case dnsrr:from_to(Type, atom, module) of
+        Type when is_binary(Data), is_integer(Type) ->
+            {
+                normalize_domain(Domain),
+                Type,
+                Class,
+                Ttl,
+                Data
+            };
+        Type -> error(badarg);
+        Module when is_binary(Data) ->
+            case Module:from_binary(Data) of
+                {ok, Data1} ->
+                    {
+                        normalize_domain(Domain),
+                        Module:atom(),
+                        Class,
+                        Ttl,
+                        dnsrr:normalize_data(Module:atom(), Data1)
+                    };
+                {domains, DataList} ->
+                    case [GenTuple || GenTuple <- DataList, is_tuple(GenTuple), element(1, GenTuple) =:= compressed] of
+                        [] ->
+                            Fn = fun
+                                ({domain, FunDomain, _}) -> FunDomain;
+                                (FunMember) -> FunMember
+                            end,
+                            Rdata = dnswire:finalize_resource_data([Fn(GenMember) || GenMember <- DataList], Module),
+                            {
+                                normalize_domain(Domain),
+                                Module:atom(),
+                                Class,
+                                Ttl,
+                                dnsrr:normalize_data(Module:atom(), Rdata)
+                            };
+                        _ -> error(badarg)
+                    end;
+                _ -> error(badarg)
+            end;
+        Module ->
+            {
+                normalize_domain(Domain),
+                Module:atom(),
+                Class,
+                Ttl,
+                dnsrr:normalize_data(Module:atom(), Data)
+            }
+    end.
+
+
+-spec append_domain([domain()]) ->
+    {'ok', domain()} |
     {'error',
         'domain_too_long' |
         'label_too_long'  |
         'empty_label'
     }.
-concat(Domain1, Domain2) ->
-    Domain3 = lists:flatten([Domain1, Domain2]),
+append_domain([]) ->
+    {ok, []};
+append_domain([Domain1]) ->
+    {ok, Domain1};
+append_domain([Domain1|Rest]) ->
+    Fn = fun
+        (['_'|FunDomain], FunAcc) -> lists:append(FunAcc, [<<"*">>|FunDomain]);
+        (FunDomain, FunAcc) -> lists:append(FunAcc, FunDomain)
+    end,
+    append_domain(Domain1, lists:foldl(Fn, [], Rest)).
+
+
+-spec append_domain(domain(), domain()) ->
+    {'ok', domain()} |
+    {'error',
+        'domain_too_long' |
+        'label_too_long'  |
+        'empty_label'
+    }.
+append_domain(Domain1, ['_'|Domain2]) ->
+    append_domain(Domain1, [<<"*">>|Domain2]);
+append_domain(Domain1, Domain2) ->
+    Domain3 = lists:append(Domain1, Domain2),
     case is_valid_domain(Domain3) of
-        {true, IsWildcard} -> {ok, IsWildcard, Domain3};
+        true -> {ok, Domain3};
         {false, Reason} -> {error, Reason}
     end.
 
 
 %% @doc Normalize character case in domain labels.
--spec domain_to_binary(Domain :: domain()) -> binary().
+-spec domain_to_binary(Domain :: non_wildcard_domain() | compressed_domain())
+    -> {'ok', binary()}
+     | {'error',
+         'domain_too_long' |
+         'label_too_long'  |
+         'empty_label'     |
+         'ref_out_of_range'
+       }.
+domain_to_binary({compressed, Ref, _}) when Ref > 16#3FFF; Ref < 0 ->
+    {error, ref_out_of_range};
+domain_to_binary({compressed, Ref, Domain}) ->
+    case domain_to_binary(lists:reverse(Domain), <<>>) of
+        {ok, Bin} when byte_size(Bin) < ?DOMAIN_MAX_OCTETS - 1 ->
+            StartLen = byte_size(Bin) - 1,
+            <<BinStart:StartLen/binary, 0>> = Bin,
+            {ok, <<BinStart/binary, 3:2, Ref:14>>};
+        {error, _}=Tuple -> Tuple
+    end;
 domain_to_binary(Domain) ->
     domain_to_binary(Domain, <<>>).
 
 
 -type compressed_binary_to_domain_result() :: {'compressed', Ref :: pos_integer(), dnslib:domain()}.
--spec binary_to_domain(Bin :: binary()) ->
-    {'ok', dnslib:domain(), Tail :: binary()} |
-    {compressed_binary_to_domain_result(), Tail :: binary()} |
-    %{'extended', Type :: 0..63, binary()},
-    {'error',
-        {'invalid_length', Bit1 :: 0..1, Bit2 :: 0..1} |
-        'truncated_domain' |
-        'empty_binary'
-    }.
+-spec binary_to_domain(Bin :: binary())
+    -> {'ok', dnslib:non_wildcard_domain(), Tail :: binary()}
+     | {'compressed', dnslib:compressed_domain(), Tail :: binary()}
+     %{'extended', Type :: 0..63, binary()},
+     | {'error',
+         'truncated_domain' |
+         'empty_binary'     |
+         'domain_too_long'  |
+         {'invalid_length', Bit1 :: 0..1, Bit2 :: 0..1}
+       }.
 %binary_to_domain(<<0:1, 1:1, Type:6, Rest/binary>>) ->
 %    {extended, Type, Rest};
 binary_to_domain(<<>>) ->
     {error, empty_binary};
 binary_to_domain(Bin) ->
-    binary_to_domain(Bin, []).
+    binary_to_domain(Bin, [], 0).
 
 
-%% @doc Transforms a string to a domain.
-%%
-%% If the first label of the domain consist only of an
-%% unescaped asterisk (*), it is transformed to '_' atom. Thus:
-%% "*.abc.*.tld"   -> ['_', <<"abc">>, <<"*">>, <<"tld">>]
-%% "\\*.abc.tld" -> [<<"*">>, <<"abc">>, <<"tld">>]
-%% "abc.\\*.tld" -> [<<"abc">>, <<"*">>, <<"tld">>]
-%% "*abc.tld*"   -> [<<"*abc">>, <<"tld*">>]
-%%
-%% '_' represents a wildcard label.
-%%
-%%
-%% Label and Domain lengths are enforced:
-%% - Labels have to be at least 1 byte long
-%% - Labels can be at most 63 bytes long
-%% - Domain can be at most 255 bytes long
-%%   - Domain length =
-%%     Sum of labels lengths +
-%%     Byte per label +
-%%     Terminating zero byte
-%%   - Thus the length of arv.io would be 8 bytes
-%%     <<3, "arv">>
-%%     <<2, "io">>
-%%     <<0>>
-%%
-%% Function allows single character and numerical escape sequences:
-%% "acb\\.def" -> [<<"abc\\.def">>]
-%% "hello\\.world.tld" -> [<<"hello.world">>, <<"tld">>]
-%% "hello\\032world.tld" -> [<<"hello world">>, <<"tld">>]
-%%
-%% This function does not impose any restrictions on the characters present
-%% in labels. Thus:
-%% "abc def.tld" -> [<<"abc def">>, <<"tld">>]
-%% is handled without errors, even though space is not a valid character
-%% in hostnames (and generally not present in domain names). Likewise:
-%% "-invalid_hostname-.-tld-" -> [<<"-invalid_hostname-">>, <<"-tld-">>]
-%% is handled without errors.
-%%
-%%
-%% Characters are not normalized in any way, thus:
-%% "ADCdef.TLD" -> [<<"ADCdef">>, <<"TLD">>]
-%%
-%% @end
 -type list_to_domain_error() ::
     'domain_too_long' |
     'label_too_long'  |
     'empty_label'     |
-    {'escape_out_of_range', integer()} |
+    'empty_string'    |
+    {'escape_out_of_range', integer()}   |
     {'invalid_escape_integer', string()}.
--type domain_type() :: 'absolute' | 'relative'.
--spec list_to_domain(Str :: string()) ->
-    {domain_type(), 'false', domain()} |
-    {domain_type(), 'true',  wildcard_domain()} |
-    {'error', list_to_domain_error()}.
+-spec list_to_domain(Str :: [byte(), ...]) ->
+    {'ok', 'absolute' | 'relative', domain()} |
+    {'error',
+        list_to_domain_error() |
+        {'non_ascii_codepoint', string()}
+    }.
+list_to_domain([]) ->
+    {error, empty_string};
 list_to_domain(".") ->
-    {absolute, false, []};
+    {ok, absolute, []};
 list_to_domain(Str) ->
-    list_to_domain(Str, <<>>, [], 1).
+    case list_to_codepoint_domain(Str) of
+        {ok, _, false, Domain} -> % Catch non-ascii characters early
+            [First|_] = lists:filter(fun (FunLabel) -> not lists:all(fun (FunChar) -> FunChar < 128 end, FunLabel) end, Domain),
+            {error, {non_ascii_codepoint, First}};
+        {ok, DomainType, true, Domain} ->
+            {ok, BinDomain} = codepoint_domain_to_domain(Domain),
+            {ok, DomainType, BinDomain};
+        {error, _}=Tuple -> Tuple
+    end.
 
 
-%% @doc Transforms a domain to a string.
--spec domain_to_list(Domain :: domain()) -> string().
+-spec list_to_codepoint_domain(Domain :: string()) ->
+    {'ok', 'absolute' | 'relative', ASCIIOnly :: boolean(), codepoint_domain()} |
+    {'error', list_to_domain_error()}.
+list_to_codepoint_domain([]) ->
+    {error, empty_string};
+list_to_codepoint_domain(".") ->
+    {ok, absolute, true, []};
+list_to_codepoint_domain(Str) ->
+    list_to_codepoint_domain(Str, [], [], 1, true).
+
+
+-spec codepoint_domain_to_domain(codepoint_domain())
+    -> {'ok', domain()}
+     | {'error', {'codepoint_too_large', string()}}.
+codepoint_domain_to_domain(['_'|CodepointDomain]) ->
+    case codepoint_domain_to_domain(CodepointDomain, []) of
+        {error, _}=Tuple -> Tuple;
+        {ok, Domain} -> {ok, ['_'|Domain]}
+    end;
+codepoint_domain_to_domain(CodepointDomain) ->
+    codepoint_domain_to_domain(CodepointDomain, []).
+
+
+-spec domain_to_codepoint_domain(dnslib:domain()) -> dnslib:codepoint_domain().
+domain_to_codepoint_domain(['_'|Domain]) ->
+    ['_'|[binary_to_list(Label) || Label <- Domain]];
+domain_to_codepoint_domain(Domain) ->
+    [binary_to_list(Label) || Label <- Domain].
+
+
+-spec domain_to_list(Domain :: domain() | codepoint_domain()) -> string().
 domain_to_list([]) ->
     ".";
 domain_to_list(['_'|Domain]) ->
-    domain_to_list(Domain, [$., $*]);
+    [$*, $.|domain_to_list(Domain)];
+domain_to_list([Head|_]=Domain) when is_binary(Head) ->
+    domain_to_list(domain_to_codepoint_domain(Domain));
+domain_to_list(["*"|Domain]) ->
+    domain_to_list(Domain, lists:reverse("\\*."));
 domain_to_list(Domain) ->
     domain_to_list(Domain, []).
 
 
-%% @doc Verifies that the provided domain is valid.
-%%
-%% To this function valid means simply that
-%% the domain adheres to domain and label length
-%% limits:
-%% - Total domain length at most 255 bytes
-%% - Label length between 1 and 63 bytes
-%%
-%% @end
--spec is_valid_domain(Domain :: domain()) -> {'true', IsWildcard :: boolean()} | {'false', Reason :: atom()}.
+-spec is_valid_domain(Domain :: domain())
+    -> 'true'
+     | {'false',
+         'not_a_list'       |
+         'domain_too_long'  |
+         'label_too_long'   |
+         'non_binary_label' |
+         'empty_label'
+       }.
+is_valid_domain(Domain) when not is_list(Domain) ->
+    {false, not_a_list};
 is_valid_domain([]) ->
-    {true, false};
+    true;
 is_valid_domain(['_'|Domain]) ->
-    is_valid_domain(Domain, 1, true);
+    is_valid_domain(Domain, 1);
 is_valid_domain(Domain) ->
-    is_valid_domain(Domain, 1, false).
+    is_valid_domain(Domain, 1).
 
 
--spec reverse_dns_domain(inet:ip_address()) -> domain().
-reverse_dns_domain({_, _, _, _}) ->
-    [<<"in-addr">>, <<"arpa">>];
-reverse_dns_domain({_, _, _, _, _, _, _, _}) ->
-    [<<"ip6">>, <<"arpa">>].
-
-
--spec domain_binary_length(domain()) -> 1..255.
+-spec domain_binary_length(non_wildcard_domain() | compressed_domain()) -> pos_integer().
 domain_binary_length([]) ->
     1;
+domain_binary_length({compressed, _, Domain}) ->
+    domain_binary_length(Domain, 0) + 1;
 domain_binary_length(Domain) ->
     domain_binary_length(Domain, 0).
 
@@ -334,12 +601,12 @@ domain_binary_length(Domain) ->
 is_valid_hostname([]) ->
     false;
 is_valid_hostname(Domain) ->
-    [Head|Tail] = normalize(Domain),
+    [Head|Tail] = normalize_domain(Domain),
     is_valid_hostname(Head, Tail).
 
 
--spec reverse_ip_query(inet:ip_address()) -> question().
-reverse_ip_query(Address) ->
+-spec reverse_dns_domain(inet:ip_address()) -> domain().
+reverse_dns_domain(Address) ->
     ElementBits = tuple_size(Address) * 2, % As it happens, 4 * 2 = 8, 2 * 8 = 16
     LabelBits = case Address of
         {_, _, _, _} -> 8;
@@ -350,15 +617,30 @@ reverse_ip_query(Address) ->
     % Make Nibbles into binary labels
     Fn = label_to_binary_fun(Address),
     Labels = [ Fn(Label) || Label <- Nibbles],
-    Domain = lists:foldl(fun (Label, Acc) -> [Label|Acc] end, dnslib:reverse_dns_domain(Address), Labels),
-    {Domain, ptr, in}.
+    lists:append(lists:reverse(Labels),
+        case tuple_size(Address) of
+            4 -> [<<"in-addr">>, <<"arpa">>];
+            8 -> [<<"ip6">>, <<"arpa">>]
+        end
+    ).
+
+
+-spec reverse_dns_question(inet:ip_address()) -> question().
+reverse_dns_question(Address) when tuple_size(Address) =:= 4; tuple_size(Address) =:= 8 ->
+    {reverse_dns_domain(Address), ptr, in}.
 
 
 -spec list_to_ttl(string()) ->
     {'ok', 0..16#7FFFFFFF} |
-    {'error', {'out_of_range', integer()} | 'invalid_ttl' }.
+    {'error',
+        {'out_of_range', integer()} |
+        'invalid_ttl' |
+        'empty_string'
+    }.
 list_to_ttl([]) ->
 	{error, empty_string};
+list_to_ttl([$-|Str]) ->
+	list_to_ttl(Str, [$-]);
 list_to_ttl(Str) when is_list(Str) ->
 	list_to_ttl(Str, []).
 
@@ -388,9 +670,17 @@ is_valid_resource_type(Type) -> dnsrr:from_to(Type, atom, value) =/= Type.
 is_valid_resource_class(Class) -> dnsclass:from_to(Class, atom, value) =/= Class.
 
 
-% punyencode implements the
 punyencode(Domain) ->
     punyencode(Domain, []).
+
+
+-spec deduplicate([dnslib:question()] | [dnslib:resource()]) -> [dnslib:question()] | [dnslib:resource()].
+deduplicate([]) ->
+    [];
+deduplicate(Questions = [{_, _, _}|_]) ->
+    deduplicate(fun dnslib:normalize_question/1, Questions, [], []);
+deduplicate(Resources = [{_, _, _, _, _}|_]) ->
+    deduplicate(fun dnslib:normalize_resource/1, Resources, [], []).
 
 
 %%====================================================================
@@ -402,88 +692,98 @@ subdomain_of([], _) ->
     false;
 subdomain_of(_, []) ->
     true;
-subdomain_of([Label|This], OfThis = ['_', Label|OfThis]) ->
-    subdomain_of(This, OfThis);
-subdomain_of([_|This], OfThis = ['_'|_]) ->
-    subdomain_of(This, OfThis);
+subdomain_of([_], ['_']) ->
+    false;
+subdomain_of(_, ['_']) ->
+    true;
 subdomain_of([Label|This], [Label|OfThis]) ->
     subdomain_of(This, OfThis);
 subdomain_of(_, _) ->
     false.
 
 
-normalize_label([], Acc) when is_list(Acc)->
-    lists:reverse(Acc);
-normalize_label(['_'|Rest], Acc) when is_list(Acc) ->
-    normalize_label(Rest, ['_'|Acc]);
-normalize_label([Label|Rest], Acc) when is_binary(Label), is_list(Acc) ->
-    normalize_label(Rest, [normalize_label(Label, <<>>)|Acc]);
-normalize_label(<<>>, Acc) when is_binary(Acc) ->
+normalize_label(Label) ->
+    normalize_label(Label, <<>>).
+
+normalize_label(<<>>, Acc) ->
     Acc;
-normalize_label(<<Char0, Tail/binary>>, Acc) when is_binary(Acc), Char0 >= $A, Char0 =< $Z ->
+normalize_label(<<Char0, Tail/binary>>, Acc) when Char0 >= $A, Char0 =< $Z ->
     Char = Char0 + ($a - $A),
     normalize_label(Tail, <<Acc/bits, Char>>);
-normalize_label(<<Char, Tail/binary>>, Acc) when is_binary(Acc) ->
+normalize_label(<<Char, Tail/binary>>, Acc) ->
     normalize_label(Tail, <<Acc/bits, Char>>).
 
 
--spec domain_to_binary(dnslib:domain(), binary()) -> binary().
+-spec domain_to_binary(dnslib:domain(), binary()) ->
+    {'ok', binary()} |
+    {'error',
+        'domain_too_long' |
+        'label_too_long'  |
+        'empty_label'
+    }.
+domain_to_binary(_, Acc) when byte_size(Acc) >= ?DOMAIN_MAX_OCTETS -> %
+    {error, domain_too_long};
 domain_to_binary([], Acc) ->
-    <<Acc/binary, 0>>;
-domain_to_binary([Label|Rest], Acc) when is_binary(Label) ->
+    {ok, <<Acc/binary, 0>>};
+domain_to_binary([Label|_], _) when byte_size(Label) > 63 ->
+    {error, label_too_long};
+domain_to_binary([<<>>|_], _) ->
+    {error, empty_label};
+domain_to_binary([Label|Rest], Acc) ->
     domain_to_binary(Rest, <<Acc/binary, (byte_size(Label)), Label/binary>>).
 
 
-binary_to_domain(<<0, Tail/binary>>, Acc) ->
-    % What if there are trailing bytes?
-    {ok, lists:reverse(Acc), Tail};
-binary_to_domain(<<1:1, 1:1, Ref:14, Tail/bits>>, Acc) ->
-    % What if there are trailing bytes?
-    {{compressed, Ref, Acc}, Tail};
-binary_to_domain(<<0:1, 0:1, Len:6, Label:Len/binary, Tail/binary>>, Acc) ->
-    binary_to_domain(Tail, [Label|Acc]);
-binary_to_domain(<<0:1, 0:1, _:6, _/binary>>, _) ->
+binary_to_domain(_, _, BytesUsed) when BytesUsed >= ?DOMAIN_MAX_OCTETS ->
+    {error, domain_too_long};
+binary_to_domain(<<>>, _, _) ->
     {error, truncated_domain};
-binary_to_domain(<<B1:1, B2:1, _:6, _/binary>>, _) ->
+binary_to_domain(<<0, Tail/binary>>, Acc, _) ->
+    {ok, lists:reverse(Acc), Tail};
+binary_to_domain(<<1:1, 1:1, Rest/bits>>, Acc, BytesUsed) ->
+    case Rest of
+        _ when BytesUsed =:= ?DOMAIN_MAX_OCTETS -> {error, domain_too_long};
+        <<Ref:14, Tail/binary>> -> {compressed, {compressed, Ref, Acc}, Tail};
+        _ -> {error, truncated_domain}
+    end;
+binary_to_domain(<<0:1, 0:1, Rest/bits>>, Acc, BytesUsed) ->
+    case Rest of
+        <<Len:6, Label:Len/binary, Tail/binary>> -> binary_to_domain(Tail, [Label|Acc], BytesUsed+1+Len);
+        _ -> {error, truncated_domain}
+    end;
+binary_to_domain(<<B1:1, B2:1, _:6, _/binary>>, _, _) ->
     {error, {invalid_length, B1, B2}}.
 
 
-list_to_domain(_, _, _, TotalLength) when TotalLength > 255 ->
+list_to_codepoint_domain(_, _, _, TotalLength, _) when TotalLength > ?DOMAIN_MAX_OCTETS ->
     {error, domain_too_long};
-list_to_domain(_, Acc, _, _) when byte_size(Acc) > 63 ->
+list_to_codepoint_domain(_, Acc, _, _, _) when length(Acc) > 63 ->
     {error, label_too_long};
-list_to_domain([], <<>>, Acc, _) ->
-    case lists:reverse(Acc) of
-        ['_'|_] = Domain -> {absolute, true, Domain};
-        Domain -> {absolute, false, Domain}
-    end;
-list_to_domain([], <<$*>>, [], _) ->
-    {relative, true, ['_']};
-list_to_domain([], Cur, Acc, _) ->
-    case lists:reverse([Cur|Acc]) of
-        ['_'|_] = Domain -> {relative, true, Domain};
-        Domain -> {relative, false, Domain}
-    end;
-list_to_domain([$.|_], <<>>, _, _) ->
+list_to_codepoint_domain([], [], Acc, _, ASCIIOnly) ->
+    {ok, absolute, ASCIIOnly, lists:reverse(Acc)};
+list_to_codepoint_domain([], [$*], [], _, ASCIIOnly) ->
+    {ok, relative, ASCIIOnly, ['_']};
+list_to_codepoint_domain([], Cur, Acc, _, ASCIIOnly) ->
+    {ok, relative, ASCIIOnly, lists:reverse([lists:reverse(Cur)|Acc])};
+list_to_codepoint_domain([$.|_], [], _, _, _) ->
     {error, empty_label};
-list_to_domain([$.|Rest], <<$*>>, [], _) ->
-    list_to_domain(Rest, <<>>, ['_'], 0);
-list_to_domain([$.|Rest], Cur, Acc, TotalLength) ->
-    list_to_domain(Rest, <<>>, [Cur|Acc], TotalLength+1);
-list_to_domain([$\\, C1, C2, C3|Rest], Cur, Acc, TotalLength)
+list_to_codepoint_domain([$.|Rest], [$*], [], _, ASCIIOnly) ->
+    list_to_codepoint_domain(Rest, [], ['_'], 0, ASCIIOnly);
+list_to_codepoint_domain([$.|Rest], Cur, Acc, TotalLength, ASCIIOnly) ->
+    list_to_codepoint_domain(Rest, [], [lists:reverse(Cur)|Acc], TotalLength+1, ASCIIOnly);
+list_to_codepoint_domain([$\\, C1, C2, C3|Rest], Cur, Acc, TotalLength, ASCIIOnly)
 when C1 >= $0, C1 =< $9, C2 >= $0, C2 =< $9, C3 >= $0, C3 =< $9 ->
     case list_to_integer([C1, C2, C3]) of
         Value when Value > 255 -> {error, {escape_out_of_range, Value}};
-        Value -> list_to_domain(Rest, <<Cur/binary, Value>>, Acc, TotalLength+1)
+        Value -> list_to_codepoint_domain(Rest, [Value|Cur], Acc, TotalLength+1, ASCIIOnly andalso Value < 128)
     end;
-list_to_domain([$\\, C1, C2, C3|_], _, _, _) when C1 >= $0, C1 =< $9 ->
+list_to_codepoint_domain([$\\, C1, C2, C3|_], _, _, _, _) when C1 >= $0, C1 =< $9 ->
     {error, {invalid_escape_integer, [C1, C2, C3]}};
-list_to_domain([$\\, $*, $.|Rest], <<>>, Acc, TotalLength) ->
-    list_to_domain(Rest, <<>>, [<<$*>>|Acc], TotalLength+2);
-list_to_domain([$\\, Char|Rest], Cur, Acc, TotalLength) when Char >= 0, Char =< 255 ->
-    list_to_domain(Rest, <<Cur/binary, Char>>, Acc, TotalLength+1);
-list_to_domain([Char|Rest], Cur, Acc, TotalLength) ->
-    list_to_domain(Rest, <<Cur/binary, Char>>, Acc, TotalLength+1).
+list_to_codepoint_domain([$\\, $*, $.|Rest], [], Acc, TotalLength, ASCIIOnly) ->
+    list_to_codepoint_domain(Rest, [], [[$*]|Acc], TotalLength+2, ASCIIOnly);
+list_to_codepoint_domain([$\\, Char|Rest], Cur, Acc, TotalLength, ASCIIOnly) ->
+    list_to_codepoint_domain(Rest, [Char|Cur], Acc, TotalLength+1, ASCIIOnly andalso Char < 128);
+list_to_codepoint_domain([Char|Rest], Cur, Acc, TotalLength, ASCIIOnly) ->
+    list_to_codepoint_domain(Rest, [Char|Cur], Acc, TotalLength+1, ASCIIOnly andalso Char < 128).
 
 
 domain_to_list([], Acc) ->
@@ -491,26 +791,35 @@ domain_to_list([], Acc) ->
 domain_to_list([Label|Rest], Acc) ->
     domain_to_list(Rest, label_to_list(Label, Acc)).
 
-label_to_list(<<>>, Acc) ->
+label_to_list([], Acc) ->
     [$.|Acc];
-label_to_list(<<$., Tail/binary>>, Acc) ->
+label_to_list([Char|Tail], []) when Char =:= $"; Char =:= $( ->
+    label_to_list(Tail, [Char, $\\]);
+label_to_list([$.|Tail], Acc) ->
     label_to_list(Tail, [$., $\\|Acc]);
-label_to_list(<<Char, Tail/binary>>, Acc) ->
+label_to_list([Char|Tail], Acc) when Char =< 16#20; Char =:= 127 ->
+    Str0 = integer_to_list(Char),
+    Str1 = lists:append(lists:reverse(Str0), [$0 || _ <- lists:seq(1,3-length(Str0))]),
+    label_to_list(Tail, lists:append(Str1, [$\\|Acc]));
+label_to_list([Char|Tail], Acc) ->
     label_to_list(Tail, [Char|Acc]).
 
 
-is_valid_domain(_, TotalLength, _) when TotalLength > 255 ->
+is_valid_domain(_, TotalLength) when TotalLength > ?DOMAIN_MAX_OCTETS ->
     {false, domain_too_long};
-is_valid_domain([], _, IsWildcard) ->
-    {true, IsWildcard};
-is_valid_domain(['_'|_], _, _) ->
+is_valid_domain([], _) ->
+    true;
+is_valid_domain(['_'|_], _) ->
     {false, wildcard_label_not_first};
-is_valid_domain([Label|_], _, _) when byte_size(Label) > 63 ->
+is_valid_domain([Label|_], _) when byte_size(Label) > 63 ->
     {false, label_too_long};
-is_valid_domain([Label|_], _, _) when byte_size(Label) =:= 0 ->
+is_valid_domain([Label|_], _) when byte_size(Label) =:= 0 ->
     {false, empty_label};
-is_valid_domain([Label|Rest], TotalLength, IsWildcard) when is_binary(Label) ->
-    is_valid_domain(Rest, TotalLength + byte_size(Label) + 1, IsWildcard).
+is_valid_domain([Label|Rest], TotalLength) when is_binary(Label) ->
+    is_valid_domain(Rest, TotalLength + byte_size(Label) + 1);
+is_valid_domain([Label|_], _) when not is_binary(Label) ->
+    {false, non_binary_label}.
+
 
 
 domain_binary_length([], Len) ->
@@ -547,7 +856,7 @@ label_to_binary_fun({_, _, _, _, _, _, _, _}) ->
         (Label) when Label >= 10 -> <<(Label+87)>> % $a - 10 = 87
     end.
 
-list_to_ttl(Value, []) when is_integer(Value), Value >= 0, Value =< ?MAX_TTL ->
+list_to_ttl(Value, []) when is_integer(Value) andalso Value >= 0, Value =< ?MAX_TTL ->
     {ok, Value}; % TTL range as per RFC2181, Section 8
 list_to_ttl(Value, []) when is_integer(Value) ->
     {error, {out_of_range, Value}};
@@ -564,38 +873,38 @@ list_to_ttl([], Acc0) ->
     end;
 list_to_ttl([C|Tail], Acc) when C >= $0, C =< $9 ->
 	list_to_ttl(Tail, [C|Acc]);
-list_to_ttl(Tail, Acc0) ->
-    Acc = lists:reverse(Acc0),
-    Result =
-        try list_to_integer(Acc)
-        catch error:badarg -> {error, invalid_ttl}
-    end,
-    case Result of
-        {error, _} = Tuple -> Tuple;
-        Value ->
-            case string:to_lower(string:trim(Tail)) of
-                "m"       -> list_to_ttl(Value * 60, []);        %% Minutes
-                "min"     -> list_to_ttl(Value * 60, []);        %% Minutes
-                "mins"    -> list_to_ttl(Value * 60, []);        %% Minutes
-                "minute"  -> list_to_ttl(Value * 60, []);        %% Minutes
-                "minutes" -> list_to_ttl(Value * 60, []);        %% Minutes
-                "h"       -> list_to_ttl(Value * 3600, []);      %% Hours
-                "hour"    -> list_to_ttl(Value * 3600, []);      %% Hours
-                "hours"   -> list_to_ttl(Value * 3600, []);      %% Hours
-                "d"       -> list_to_ttl(Value * 86400, []);     %% Days
-                "day"     -> list_to_ttl(Value * 86400, []);     %% Days
-                "days"    -> list_to_ttl(Value * 86400, []);     %% Days
-                "w"       -> list_to_ttl(Value * 604800, []);    %% Weeks
-                "week"    -> list_to_ttl(Value * 604800, []);    %% Weeks
-                "weeks"   -> list_to_ttl(Value * 604800, []);    %% Weeks
-                "mon"     -> list_to_ttl(Value * 2592000, []);   %% Months (30 days)
-                "month"   -> list_to_ttl(Value * 2592000, []);   %% Months (30 days)
-                "months"  -> list_to_ttl(Value * 2592000, []);   %% Months (30 days)
-                "y"       -> list_to_ttl(Value * 31536000, []);  %% Years
-                "year"    -> list_to_ttl(Value * 31536000, []);  %% Years
-                "years"   -> list_to_ttl(Value * 31536000, []);  %% Years
-                "max" when Acc =:= [] -> list_to_ttl(?MAX_TTL, []);
-                _ -> {error, invalid_ttl}
+list_to_ttl(Tail0, Acc0) ->
+    Tail = string:to_lower(string:trim(Tail0)),
+    case lists:reverse(Acc0) of
+        [] when Tail =:= "max" -> list_to_ttl(?MAX_TTL, []);
+        Acc ->
+            try list_to_integer(Acc) of
+                Value ->
+                    case Tail of
+                        "m"       -> list_to_ttl(Value * 60, []);        %% Minutes
+                        "min"     -> list_to_ttl(Value * 60, []);        %% Minutes
+                        "mins"    -> list_to_ttl(Value * 60, []);        %% Minutes
+                        "minute"  -> list_to_ttl(Value * 60, []);        %% Minutes
+                        "minutes" -> list_to_ttl(Value * 60, []);        %% Minutes
+                        "h"       -> list_to_ttl(Value * 3600, []);      %% Hours
+                        "hour"    -> list_to_ttl(Value * 3600, []);      %% Hours
+                        "hours"   -> list_to_ttl(Value * 3600, []);      %% Hours
+                        "d"       -> list_to_ttl(Value * 86400, []);     %% Days
+                        "day"     -> list_to_ttl(Value * 86400, []);     %% Days
+                        "days"    -> list_to_ttl(Value * 86400, []);     %% Days
+                        "w"       -> list_to_ttl(Value * 604800, []);    %% Weeks
+                        "week"    -> list_to_ttl(Value * 604800, []);    %% Weeks
+                        "weeks"   -> list_to_ttl(Value * 604800, []);    %% Weeks
+                        "mon"     -> list_to_ttl(Value * 2592000, []);   %% Months (30 days)
+                        "month"   -> list_to_ttl(Value * 2592000, []);   %% Months (30 days)
+                        "months"  -> list_to_ttl(Value * 2592000, []);   %% Months (30 days)
+                        "y"       -> list_to_ttl(Value * 31536000, []);  %% Years
+                        "year"    -> list_to_ttl(Value * 31536000, []);  %% Years
+                        "years"   -> list_to_ttl(Value * 31536000, []);  %% Years
+                        _ -> {error, invalid_ttl}
+                    end
+            catch
+                error:badarg -> {error, invalid_ttl}
             end
     end.
 
@@ -622,27 +931,18 @@ list_to_ttl_test() ->
 
 punyencode([], Acc) ->
     {ok, lists:reverse(Acc)};
-punyencode([Label0|Rest], Acc) when is_binary(Label0) ->
-    {ok, Label} = punyencode_label(Label0),
+punyencode([Label0|Rest], Acc) when is_list(Label0) ->
+    {ok, Label} = punyencode_label(Label0, Label0, []),
     if
-        byte_size(Label) > 63 -> {error, label_too_long};
+        length(Label) > 63 -> {error, label_too_long};
         true -> punyencode(Rest, [Label|Acc])
     end.
 
-punyencode_label(Label0) ->
-    % Should normalize the unicode form as necessary
-    case unicode:characters_to_list(Label0, unicode) of
-        {error, _, _} ->
-            case unicode:characters_to_list(Label0, latin1) of
-                Label1 when is_list(Label1) ->
-                    punyencode_label(Label1, Label1, [])
-            end;
-        Label1 when is_list(Label1) ->
-            punyencode_label(Label1, Label1, [])
-    end.
+punyencode_label(Label) ->
+    punyencode_label(Label, Label, []).
 
 punyencode_label([], Label, Ascii) when length(Label) =:= length(Ascii) ->
-    {ok, list_to_binary(Label)};
+    {ok, Label};
 punyencode_label([], Label0, Ascii) ->
     Label1 = string:to_lower(unicode:characters_to_nfkc_list(Label0)),
     punyencode_extended(Label1, Ascii);
@@ -685,7 +985,7 @@ punyencode_bias_loop(Delta, K) -> {Delta, K}.
 
 
 punyencode_extended_choose_m_delta(_, _, _, _, Index, _, LabelLength, Acc) when Index =:= LabelLength ->
-    {ok, list_to_binary(lists:reverse(Acc))};
+    {ok, lists:reverse(Acc)};
 punyencode_extended_choose_m_delta(M0, N, Delta, Bias, Index, Label, LabelLength, Acc) ->
     M1 = lists:foldl(fun (C, FunM) when C >= N, C < FunM -> C; (_, FunM) -> FunM end, M0, Label),
     Delta1 = Delta + (M1 - N) * (Index + 1),
@@ -697,7 +997,7 @@ punyencode_extended_find_n(_, N, _, _, _, _, _, _, _) when N > 16#FFFFFFFF ->
 punyencode_extended_find_n(_, _, Delta, _, _, _, _, _, _) when Delta > 16#FFFFFFFF ->
     {error, punyencode_overflow};
 punyencode_extended_find_n(_, _, _, _, Index, _, LabelLength, _, Acc) when Index =:= LabelLength ->
-    {ok, list_to_binary(lists:reverse(Acc))};
+    {ok, lists:reverse(Acc)};
 punyencode_extended_find_n(M, N, Delta0, Bias0, Index, Label, LabelLength, LabelSubStr0, Acc0) ->
     case adjust_delta(N, Delta0, LabelSubStr0) of
         {pass, Delta1} -> punyencode_extended_choose_m_delta(16#FFFFFFFF, N + 1, Delta1 + 1, Bias0, Index, Label, LabelLength, Acc0);
@@ -734,3 +1034,23 @@ punyencode_value(Value) when Value =< 25 ->
     Value + $a;
 punyencode_value(Value) ->
     Value + ($0 - 26).
+
+
+codepoint_domain_to_domain([], Acc) ->
+    {ok, lists:reverse(Acc)};
+codepoint_domain_to_domain([Label|Rest], Acc) ->
+    try list_to_binary(Label) of
+        BinLabel -> codepoint_domain_to_domain(Rest, [BinLabel|Acc])
+    catch
+        error:badarg -> {error, {codepoint_too_large, Label}}
+    end.
+
+
+deduplicate(_, [], Keep, _) ->
+    lists:reverse(Keep);
+deduplicate(Fn, [Tuple|Rest], Keep, Hashes) ->
+    Hash = erlang:phash2(Fn(Tuple)),
+    case lists:member(Hash, Hashes) of
+        true -> deduplicate(Fn, Rest, Keep, Hashes);
+        false -> deduplicate(Fn, Rest, [Tuple|Keep], [Hash|Hashes])
+    end.

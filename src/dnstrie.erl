@@ -34,6 +34,7 @@
     set/3,
     get/2,
     get_path/2,
+    get_subkeys/2,
     remove/2,
     remove/3
 ]).
@@ -100,6 +101,16 @@ get_path([Key|Rest], Map, Acc) ->
                 [] -> {none, []};
                 _  -> {partial, Acc}
             end
+    end.
+
+
+-spec get_subkeys(Key :: get_key(), Trie :: trie()) -> Keys :: [term()] | 'undefined'.
+get_subkeys([], Map) ->
+    [Key || {Key, _} <- maps:to_list(Map), Key =/= ''];
+get_subkeys([Key|Rest], Map) ->
+    case Map of
+        #{Key := NextMap} -> get_subkeys(Rest, NextMap);
+        #{}               -> undefined
     end.
 
 

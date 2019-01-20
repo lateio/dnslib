@@ -31,7 +31,10 @@
 -export([
     valid/1,
     query/2,
-    to_zone/1
+    to_zone/1,
+    new_transfer/1,
+    continue_transfer/2
+%    diff/2
 ]).
 
 -type zone() ::
@@ -43,7 +46,14 @@
         minimum   => 0..16#7FFFFFFF
     }.
 
--export_type([zone/0]).
+-type zone_transfer() ::
+    {
+        TransferType :: 'zone' | 'change_sets',
+        NewSoa :: dnslib:resource(),
+        Resources :: [dnslib:resource()] | [dnsmsg:incremental_transfer_change_set()]
+    }.
+
+-export_type([zone/0,zone_transfer/0]).
 
 % Provide some functions to query a zone in Rrs form?
 % Instead of just adding Rrs, use interpretation form?
@@ -57,10 +67,10 @@ query(Query, #{resources := Rrs}) ->
 query({Domain0, Type, Class}, Rrs) ->
     Domain1 = case Domain0 of
         '_' -> Domain0;
-        _ -> dnslib:normalize(Domain0)
+        _ -> dnslib:normalize_domain(Domain0)
     end,
     lists:filter(fun ({ResourceDomain, RType, RClass, _, _}) ->
-        query_match(Domain1, dnslib:normalize(ResourceDomain)) andalso
+        query_match(Domain1, dnslib:normalize_domain(ResourceDomain)) andalso
         query_match(Type, RType) andalso
         query_match(Class, RClass)
     end,
@@ -81,7 +91,7 @@ to_zone(Rrs) ->
         true ->
             [{ApexDomain, _, Class, _, {_, _, ID, _, _, _, Minimum}}] = query({'_', soa, '_'}, Rrs),
             {ok, #{
-                apex => dnslib:normalize(ApexDomain),
+                apex => dnslib:normalize_domain(ApexDomain),
                 id => ID,
                 class => Class,
                 resources => Rrs,
@@ -90,25 +100,91 @@ to_zone(Rrs) ->
     end.
 
 
-%% @doc Check whether provided resource records constitute a valid DNS zone.
--spec valid(Resources :: [dnslib:resource()]) -> 'true' | {'false', Reason :: term()}.
+%diff(Changes = #{apex := Apex, class := Class}, FromThis = #{apex := Apex, class := Class}) ->
+%    [Soa1] = query({Apex, soa, Class}, FromThis),
+%    [Soa2] = query({Apex, soa, Class}, Changes),
+    % Figure out serial change
+    % Removed/added entries
+
+
+-spec new_transfer(dnsmsg:transfer_interpret_result())
+    -> {'ok', {'zone' | 'change_sets', NewSoa :: dnslib:resource(), Resources :: [dnslib:resource()] | [dnsmsg:transfer_interpret_result()]}}
+     | {'more', zone_transfer()}
+     | {'error', invalid_transfer_start}.
+new_transfer({_, TransferType0, {NewSoa, AnswerType, Resources}}) ->
+    TransferType = case TransferType0 of
+        zone_transfer -> zone;
+        incremental_zone_transfer -> change_sets
+    end,
+    case AnswerType of
+        complete -> {ok, {TransferType, NewSoa, Resources}};
+        first ->
+            Transfer = {
+                TransferType,
+                NewSoa,
+                Resources
+            },
+            {more, Transfer};
+        _ -> {error, invalid_transfer_start}
+    end.
+
+
+-spec continue_transfer(dnsmsg:transfer_interpret_result(), zone_transfer())
+    -> {'ok', {'zone' | 'change_sets', NewSoa :: dnslib:resource(), Resources :: [dnslib:resource()] | [dnsmsg:transfer_interpret_result()]}}
+     | {'more', zone_transfer()}
+     | {'error',
+           'unexpected_transfer_type'
+         | 'unexpected_answer_type'
+       }.
+continue_transfer({_, zone_transfer, {_, AnswerType, NewResources}}, {zone, NewSoa, PrevResources}=Tuple) ->
+    case AnswerType of
+        last -> {ok, setelement(3, Tuple, lists:append(PrevResources, NewResources))};
+        middle -> {more, setelement(3, Tuple, lists:append(PrevResources, NewResources))};
+        _ -> {error, unexpected_answer_type}
+    end;
+continue_transfer({_, zone_transfer, {_, last, []}}, {change_sets, _, _}=Tuple) ->
+    {ok, Tuple};
+continue_transfer({_, incremental_zone_transfer, {_, AnswerType, NewResources}}, {change_sets, NewSoa, PrevResources}=Tuple) ->
+    case AnswerType of
+        last -> {ok, setelement(3, Tuple, lists:append(PrevResources, NewResources))};
+        middle -> {more, setelement(3, Tuple, lists:append(PrevResources, NewResources))};
+        _ -> {error, unexpected_answer_type}
+    end;
+continue_transfer(_, _) ->
+    {error, unexpected_transfer_type}.
+
+
+-spec valid(Resources :: [dnslib:resource()]) ->
+      'true'
+    | {'false',
+          'missing_soa'
+        | {'multiple_soas', Soas :: [dnslib:domain()]}
+        | 'wildcard_soa'
+        | {'missing_glue', dnslib:domain()}
+        | {'other_than_glue_past_edges', dnslib:domain()}
+        | {'not_under_soa', dnslib:domain()}
+        | {'non_exclusive_cname', dnslib:domain()}
+        | {'cname_to_cname_loop', dnslib:domain()}
+        | {'cname_loop', dnslib:domain()}
+      }.
 valid([]) ->
-    {false, empty_zone};
-valid(Rrs) ->
+    {false, missing_soa};
+valid(Rrs0) ->
     % Find zone root (SOA)
+    Rrs = [dnslib:normalize_resource(GenRr) || GenRr <- Rrs0],
     {Cnames, Rrs1} = lists:partition(partition_fun(cname), Rrs),
     % Make sure that CNAMEs are the only records for their domains...
-    case unique_and_sane_cnames(Cnames, Rrs1) of
+    case unique_and_sane_cnames(Cnames, Rrs) of
         true ->
             case lists:partition(partition_fun(soa), Rrs1) of
                 {[], _} -> {false, missing_soa};
                 {Soas, _} when length(Soas) > 1 -> {false, {multiple_soas, [ Soa || {Soa, _, _, _, _} <- Soas ]}};
                 {[Soa], Rrs2} ->
                     SoaDomain = element(1, Soa),
-                    case dnslib:is_valid_domain(SoaDomain) of
-                        {true, true} -> {false, wildcard_soa};
-                        {true, false} ->
-                            case all_under_soa(dnslib:normalize(SoaDomain), lists:flatten([Cnames, Rrs2])) of
+                    case {dnslib:is_valid_domain(SoaDomain), SoaDomain} of
+                        {_, ['_'|_]}  -> {false, wildcard_soa};
+                        {true, _} ->
+                            case all_under_soa(SoaDomain, lists:append(Cnames, Rrs2)) of
                                 true ->
                                     % Find zone edges
                                     {Nss, _Rrs3} = lists:partition(partition_fun(ns), Rrs2),
@@ -131,8 +207,10 @@ valid(Rrs) ->
             end;
         {false, {duplicate, Label}} ->
             {false, {non_exclusive_cname, Label}};
+        {false, {ufo_cname, Label}} ->
+            {false, {cname_to_cname_loop, Label}};
         {false, {loop, Label}} ->
-            {false, {cname_to_cname_loop, Label}}
+            {false, {cname_loop, Label}}
     end.
     % Make sure that for every edge (NS) (That's not the root node), there's an ip (would CNAME suffice?)
     % If we're going to accept CNAMEs, make sure that we have glue for them if they're subdomains of the edge
@@ -147,20 +225,51 @@ valid(Rrs) ->
 unique_and_sane_cnames([], _) ->
     true;
 unique_and_sane_cnames([{Label, cname, _, _, Label}|_], _) ->
-    {false, {loop, Label}};
+    {false, {ufo_cname, Label}};
 unique_and_sane_cnames([Cname|Rest], Rrs) ->
     case unique_label(Cname, Rrs) of
-        true -> unique_and_sane_cnames(Rest, Rrs);
-        {false, Label} -> {false, {duplicate, Label}}
+        {false, Label} -> {false, {duplicate, Label}};
+        true ->
+            case check_cname_loop(Cname, Rrs, []) of
+                true -> {false, {loop, element(1, Cname)}};
+                false -> unique_and_sane_cnames(Rest, Rrs)
+            end
     end.
 
 
 unique_label(_, []) ->
     true;
+unique_label(Resource, [Resource|Rrs]) ->
+    unique_label(Resource, Rrs);
 unique_label({Label, _, _, _, _}, [{Label, _, _, _, _}|_]) ->
     {false, Label};
 unique_label(Cname, [_|Rrs]) ->
     unique_label(Cname, Rrs).
+
+
+check_cname_loop(_, []) ->
+    false;
+check_cname_loop(Domain, [{Domain, _, _, _, _}|_]) ->
+    true;
+check_cname_loop(Domain, [_|Rest]) ->
+    check_cname_loop(Domain, Rest).
+
+check_cname_loop(_, [], []) ->
+    false;
+check_cname_loop(Head, [], Tail) ->
+    case element(2, Head) of
+        cname -> check_cname_loop(element(5, Head), Tail);
+        _ -> false
+    end;
+check_cname_loop(Cname, [Cname|Rest], Acc) ->
+    check_cname_loop(Cname, Rest, Acc);
+check_cname_loop({_, cname, _, _, Domain}=Cname, [{Domain, _, _, _, _}=Resource|Rest], Acc) ->
+    case element(2, Resource) of
+        cname -> check_cname_loop(Resource, Rest, [Cname|Acc]);
+        _ -> false
+    end;
+check_cname_loop(Cname, [_|Rest], Acc) ->
+    check_cname_loop(Cname, Rest, Acc).
 
 
 partition_fun(Type) ->
@@ -190,7 +299,7 @@ only_glue_past_edge(_, []) ->
     true;
 only_glue_past_edge(Edge = {Label, ns, _, _, _}, [{EntryLabel, Type, _, _, _}|Rrs]) ->
     % Make sure that if EntryLabel is subdomain of label
-    case dnslib:subdomain(EntryLabel, Label) of
+    case dnslib:is_subdomain(EntryLabel, Label) of
         true ->
             case Type of
                 a -> only_glue_past_edge(Edge, Rrs);
@@ -208,7 +317,7 @@ only_glue_past_edge(Edge = {Label, ns, _, _, _}, [{EntryLabel, Type, _, _, _}|Rr
 all_glue_present([], _, _) ->
     true;
 all_glue_present([{_, _, _, _, Label}|Rest], Rrs, Soa = {SoaLabel, _, _, _, _}) ->
-    case dnslib:subdomain(Label, SoaLabel) of
+    case dnslib:is_subdomain(Label, SoaLabel) of
         true ->
             case glue_present(Label, Rrs) of
                 true -> all_glue_present(Rest, Rrs, Soa);
@@ -231,7 +340,7 @@ all_under_soa(_, []) ->
 all_under_soa(Soa, [{Soa, _, _, _, _}|Rrs]) ->
     all_under_soa(Soa, Rrs);
 all_under_soa(Soa, [{EntryLabel, _, _, _, _}|Rrs]) ->
-    case dnslib:subdomain(dnslib:normalize(EntryLabel), Soa) of
+    case dnslib:is_subdomain(EntryLabel, Soa) of
         true -> all_under_soa(Soa, Rrs);
         false -> {false, EntryLabel}
     end.

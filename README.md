@@ -8,6 +8,8 @@ A variety of functionality for working with DNS messages and assorted data types
 
 The reader should note that dnslib **does not** implement any of the networking functionality of DNS. While it will get an application up to the binary representation of a DNS message, dnslib will not send that binary anywhere.
 
+[Documentation](doc/src/manual/index.asciidoc) for dnslib can be found in the doc/ directory.
+
 Quick start
 -----------
 

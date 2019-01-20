@@ -1,0 +1,22 @@
+$ORIGIN .
+$TTL 60
+@   IN      SOA     ns1 hostmaster 0 60 60 60 60
+            A       0.0.0.0
+            AAAA    ::
+alias       CNAME   .
+.           HINFO   amd64 GNU/Linux
+            MB      .
+            MD      .
+            MF      .
+            MG      .
+            MINFO   . .
+            MR      .
+            MX      0 smtp
+            NAPTR   0 0 "" "" "" naptr
+            NS      ns1
+            TYPE10  \# 1 00     ; NULL
+            PTR     ptr
+            SRV     0 0 0 .
+            TXT     "Hello, world!" Token "\255\255" "\あ"
+            URI     0 0 "https://arv.io"
+            WKS     0.0.0.0 tcp quote ssh http

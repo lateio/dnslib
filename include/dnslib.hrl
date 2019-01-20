@@ -1,1 +1,2 @@
+-define(DOMAIN_MAX_OCTETS, 255).
 -define(MAX_TTL, 16#7FFFFFFF).

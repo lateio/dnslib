@@ -17,16 +17,16 @@ Domains:
 
 * link:dnslib.append_domain{ext-relative}[dnslib:append_domain] - Concatenate two or more domains
 * link:dnslib.binary_to_domain{ext-relative}[dnslib:binary_to_domain] - Transform a wire format binary into a domain
-* link:dnslib.codepoint_domain_to_domain{ext-relative}[dnslib:codepoint_domain_to_domain] - Transform a codepoint domain into a domain
+* link:dnslib.codepoint_domain_to_domain{ext-relative}[dnslib:codepoint_domain_to_domain] - Transform a code point domain into a domain
 * link:dnslib.domain_binary_length{ext-relative}[dnslib:domain_binary_length] - Get the `byte_size()` for wire encoding of a domain
 * link:dnslib.domain_in_zone{ext-relative}[dnslib:domain_in_zone] - Test if one domain is in the zone specified by another domain
 * link:dnslib.domain_to_binary{ext-relative}[dnslib:domain_to_binary] - Transform a domain into a wire format binary
-* link:dnslib.domain_to_codepoint_domain{ext-relative}[dnslib:domain_to_codepoint_domain] - Transform a domain into a codepoint domain
+* link:dnslib.domain_to_codepoint_domain{ext-relative}[dnslib:domain_to_codepoint_domain] - Transform a domain into a code point domain
 * link:dnslib.domain_to_list{ext-relative}[dnslib:domain_to_list] - Transform a domain into a string
 * link:dnslib.is_subdomain{ext-relative}[dnslib:is_subdomain] - Test if one domain is a subdomain of another
 * link:dnslib.is_valid_domain{ext-relative}[dnslib:is_valid_domain] - Check if a domain breaks any length limits
 * link:dnslib.list_to_domain{ext-relative}[dnslib:list_to_domain] - Transform a string into a domain
-* link:dnslib.list_to_codepoint_domain{ext-relative}[dnslib:list_to_codepoint_domain] - Transform a string into a codepoint domain
+* link:dnslib.list_to_codepoint_domain{ext-relative}[dnslib:list_to_codepoint_domain] - Transform a string into a code point domain
 * link:dnslib.normalize_domain{ext-relative}[dnslib:normalize_domain] - Normalize domain for comparison
 * link:dnslib.reverse_dns_domain{ext-relative}[dnslib:reverse_dns_domain] - Get the reverse dns domain for an ip address
 

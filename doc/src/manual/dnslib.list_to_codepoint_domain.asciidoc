@@ -5,7 +5,7 @@ Version 0.0.1, 2019.01.18
 
 == Name
 
-dnslib:list_to_codepoint_domain - Transform a string into a codepoint domain
+dnslib:list_to_codepoint_domain - Transform a string into a code point domain
 
 == Description
 
@@ -23,7 +23,7 @@ list_to_codepoint_domain(Domain :: string())
        }.
 ----
 
-Transform a string into a codepoint domain.
+Transform a string into a code point domain.
 
 == Arguments
 
@@ -104,7 +104,7 @@ TooLongDomain = lists:append([Label || _ <- lists:seq(1,4)]),
 
 == Notes
 
-`dnslib:list_to_codepoint_domain` function and `dnslib:codepoint_domain()` type should be considered necessary evils for bridging the gap between Erlang strings and domains. This is due to the fact that while Erlang strings have made the decision to only deal in codepoint values, when dealing with domains we have to be mindful that domains will ultimately have to be represented as binaries of octets. Thus we need a data type which is structurally analogous to the `dnslib:domain()` type, yet is capable of containing arbitrarily large codepoints.
+`dnslib:list_to_codepoint_domain` function and `dnslib:codepoint_domain()` type should be considered necessary evils for bridging the gap between Erlang strings and domains. This is due to the fact that while Erlang strings have made the decision to only deal in code point values, when dealing with domains we have to be mindful that domains will ultimately have to be represented as binaries of octets. Thus we need a data type which is structurally analogous to the `dnslib:domain()` type, yet is capable of containing arbitrarily large code points.
 
 `dnslib:codepoint_domain()` fulfills this intermediary role and after necessary processing, can be transformed into a `dnslib:domain()` with `dnslib:codepoint_domain_to_domain`.
 

@@ -5,7 +5,7 @@ Version 0.0.1, 2019.01.18
 
 == Name
 
-dnslib:codepoint_domain_to_domain - Transform a codepoint domain into a domain
+dnslib:codepoint_domain_to_domain - Transform a code point domain into a domain
 
 == Description
 
@@ -16,13 +16,13 @@ codepoint_domain_to_domain(Domain :: dnslib:codepoint_domain())
      | {'error', {'codepoint_too_large', Label :: string()}}.
 ----
 
-Transform a codepoint domain into a domain.
+Transform a code point domain into a domain.
 
 == Arguments
 
 Domain::
 
-Codepoint domain to transform
+Code point domain to transform
 
 == Return value
 
@@ -34,7 +34,7 @@ On error a tuple consisting of `error` atom and the reason is returned.
 
 `{'codepoint_too_large', string()}`::
 
-If the codepoint_domain contains a character not in range `0..255` -- and thus not representable by an octet -- this error is returned. The programmer should somehow eliminate these characters from the domain.
+If `Domain` contains a character not in range `0..255` -- and thus not representable by an octet -- this error is returned. The programmer should somehow eliminate these characters from the domain.
 
 == Examples
 

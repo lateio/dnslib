@@ -5,7 +5,7 @@ Version 0.0.1, 2019.01.18
 
 == Name
 
-dnslib:domain_to_codepoint_domain - Transform a domain into a codepoint domain
+dnslib:domain_to_codepoint_domain - Transform a domain into a code point domain
 
 == Description
 
@@ -15,7 +15,7 @@ domain_to_codepoint_domain(Domain :: dnslib:domain())
     -> dnslib:codepoint_domain().
 ----
 
-Transform a domain into a codepoint domain.
+Transform a domain into a code point domain.
 
 == Arguments
 
@@ -25,7 +25,7 @@ Domain to transform
 
 == Return value
 
-The produced codepoint domain is returned.
+The produced code point domain is returned.
 
 == Examples
 

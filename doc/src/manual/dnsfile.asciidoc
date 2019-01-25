@@ -58,22 +58,22 @@ In this example, the octets `255`, `254`, `253` are passed to the resource recor
 
 Directives allow certain oft-repeated parts of DNS master files to be specified only once and omitted from then on. This makes master files easier to write, understand and debug.
 
+`$ORIGIN` sets the domain which will be appended to relative domains. Has to be an absolute domain.
+
 [source]
 $ORIGIN arv.io.
 
-`$ORIGIN` sets the domain which will be appended to relative domains. Has to be an absolute domain.
+`$TTL` sets the time-to-live (TTL) value which will be used for entries without an explicit ttl.
 
 [source]
 $TTL 60
 
-`$TTL` sets the time-to-live (TTL) value which will be used for entries without an explicit ttl.
+`$INCLUDE` combines another zone file into the current one. Path is relative to the directory of the current file. Optionally a new origin domain can be specified.
 
 [source]
 $INCLUDE "other.zone"
 $INCLUDE "other.zone" neworigin
 $INCLUDE "other.zone" neworigin.arv.io.
-
-`$INCLUDE` combines another zone file into the current one. Path is relative to the directory of the current file. Optionally a new origin domain can be specified.
 
 ==== Time-To-Live (TTL) field
 

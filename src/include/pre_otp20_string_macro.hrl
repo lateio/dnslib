@@ -1,0 +1,7 @@
+-ifdef(PRE_OTP20_STRING_MODULE).
+-define(LOWER, to_lower).
+-define(TRIM, strip).
+-else.
+-define(LOWER, lowercase).
+-define(TRIM, trim).
+-endif.

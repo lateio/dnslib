@@ -34,7 +34,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
--include("pre_otp20_string_macro.hrl").
+-include("include/pre_otp20_string_macro.hrl").
 
 -type type() :: atom() | 0..16#FFFF.
 -type masterfile_format_type() ::

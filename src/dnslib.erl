@@ -68,7 +68,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
--include("pre_otp20_string_macro.hrl").
+-include("include/pre_otp20_string_macro.hrl").
 
 -type domain_label() :: <<_:8, _:_*8>>.
 -type non_wildcard_domain() :: [domain_label()].

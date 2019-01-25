@@ -38,7 +38,7 @@
 
 -export([bitmap_to_ports/1,ports_to_bitmap/1]).
 
--include("pre_otp20_string_macro.hrl").
+-include("../include/pre_otp20_string_macro.hrl").
 
 -define(MAX_BITMAP, 8192).
 

@@ -42,7 +42,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
--include("pre_otp20_string_macro.hrl").
+-include("include/pre_otp20_string_macro.hrl").
 
 -type proto_resource() ::
     {

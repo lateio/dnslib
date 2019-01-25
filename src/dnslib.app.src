@@ -1,6 +1,6 @@
 {application, dnslib,
  [{description, "Library for working with DNS data"},
-  {vsn, "0.0.1-rc1"},
+  {vsn, "0.0.1"},
   {registered, []},
   {applications,
    [kernel,

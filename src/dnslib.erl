@@ -68,6 +68,8 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
+-include("pre_otp20_string_macro.hrl").
+
 -type domain_label() :: <<_:8, _:_*8>>.
 -type non_wildcard_domain() :: [domain_label()].
 -type wildcard_domain() :: ['_'|domain_label()].
@@ -868,7 +870,7 @@ list_to_ttl([], Acc0) ->
 list_to_ttl([C|Tail], Acc) when C >= $0, C =< $9 ->
 	list_to_ttl(Tail, [C|Acc]);
 list_to_ttl(Tail0, Acc0) ->
-    Tail = string:to_lower(string:trim(Tail0)),
+    Tail = string:(?LOWER)(string:(?TRIM)(Tail0)),
     case lists:reverse(Acc0) of
         [] when Tail =:= "max" -> list_to_ttl(?MAX_TTL, []);
         Acc ->
@@ -938,7 +940,7 @@ punyencode_label(Label) ->
 punyencode_label([], Label, Ascii) when length(Label) =:= length(Ascii) ->
     {ok, Label};
 punyencode_label([], Label0, Ascii) ->
-    Label1 = string:to_lower(unicode:characters_to_nfkc_list(Label0)),
+    Label1 = string:(?LOWER)(unicode:characters_to_nfkc_list(Label0)),
     punyencode_extended(Label1, Ascii);
 punyencode_label([C|Rest], Label, Ascii) ->
     if

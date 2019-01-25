@@ -42,6 +42,8 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
+-include("pre_otp20_string_macro.hrl").
+
 -type proto_resource() ::
     {
         dnslib:domain(),
@@ -352,7 +354,7 @@ list_to_boolean(List) ->
 
 
 directive_punyencode([Arg], State) ->
-    case list_to_boolean(string:to_lower(Arg)) of
+    case list_to_boolean(string:(?LOWER)(Arg)) of
         error -> error({punyencode, {invalid_argument, Arg}});
         Boolean -> {ok, State#state{punyencode=Boolean}}
     end;
@@ -369,7 +371,7 @@ punyencode(Domain, _) ->
 
 
 directive_reverse_dns_pointer([Arg0], State) ->
-    Arg = string:to_lower(Arg0),
+    Arg = string:(?LOWER)(Arg0),
     case list_to_boolean(Arg) of
         error when Arg =:= "inet" -> {ok, State#state{reverse_dns_pointer=inet}};
         error when Arg =:= "inet6" -> {ok, State#state{reverse_dns_pointer=inet6}};
@@ -430,13 +432,13 @@ compile_entry(Entry, [], _) ->
 compile_entry(_, [{Value, quoted}|_], #state{startline=LineNumber,path=File}) ->
     error(syntax_error(File, LineNumber, {unexpected_quoted, Value}));
 compile_entry(Entry = {_, _, undefined, _, _}, [Class0|Parts], State) ->
-    Class1 = string:to_lower(Class0),
+    Class1 = string:(?LOWER)(Class0),
     try_class(Entry, [Class1|Parts], State);
 compile_entry(Entry = {_, _, _, undefined, _}, [Ttl0|Parts], State) ->
-    Ttl1 = string:to_lower(Ttl0),
+    Ttl1 = string:(?LOWER)(Ttl0),
     try_ttl(Entry, [Ttl1|Parts], State);
 compile_entry(Entry = {_, undefined, _, _, _}, [Type0|Parts], State) ->
-    Type1 = string:to_lower(Type0),
+    Type1 = string:(?LOWER)(Type0),
     try_type(Entry, [Type1|Parts], State).
 
 
@@ -660,7 +662,7 @@ when CreatePointer =:= inet6; CreatePointer =:= true ->
     {'ok', #state{}} |
     {'error', handle_entry_error()}.
 handle_entry([Cur = [$$|Directive0]|Rest], State = #state{directives=Directives,startline=LineNumber,path=File}) ->
-    Directive1 = string:to_lower(Directive0),
+    Directive1 = string:(?LOWER)(Directive0),
     case maps:get(Directive1, Directives, undefined) of
         undefined -> error(directive_error(File, LineNumber, {unknown_directive, Cur}));
         Handler ->
@@ -954,7 +956,7 @@ prepare_state(State = #state{}, [{class, Class0}|Rest]) ->
             end
     end;
 %prepare_state(State = #state{directives=Directives0}, [{directive, Str, false}|Rest]) when is_list(Str) ->
-%    Directives1 = maps:remove(string:to_lower(Str), Directives0),
+%    Directives1 = maps:remove(string:(?LOWER)(Str), Directives0),
 %    prepare_state(State#state{directives=Directives1}, Rest);
 prepare_state(State = #state{type_blacklist=BL}, [{type_blacklist, List}|Rest]) when is_list(List) ->
     prepare_state(State#state{type_blacklist=lists:append(BL, [dnsrr:from_to(GenType, value, atom) || GenType <- List])}, Rest);

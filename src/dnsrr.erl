@@ -34,6 +34,8 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
+-include("pre_otp20_string_macro.hrl").
+
 -type type() :: atom() | 0..16#FFFF.
 -type masterfile_format_type() ::
     'token'           | % String escaped, no further processing is done. Quoted strings are rejected
@@ -203,7 +205,7 @@ check_module_collisions([CustomMod|Rest], AtomMap, ValueMap, MasterfileTokenMap)
         maps:get(Value, ValueMap, false),
         maps:get(MasterfileToken, MasterfileTokenMap, false),
         if
-            is_list(MasterfileToken) -> string:prefix(string:to_lower(MasterfileToken), "type");
+            is_list(MasterfileToken) -> string:prefix(string:(?LOWER)(MasterfileToken), "type");
             true -> nomatch
         end
     } of

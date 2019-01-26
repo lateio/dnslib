@@ -153,7 +153,14 @@ builtin() ->
 -ifdef(EUNIT).
 builtin_modules_sanity_test() ->
     Builtin = builtin(),
-    CheckFn = fun (FunMod) -> FunAtom = FunMod:atom(), FunValue = FunMod:value(), not (from_to(FunAtom, atom, value) =:= FunValue andalso from_to(FunValue, value, atom) =:= FunAtom) end,
+    CheckFn = fun (FunMod) ->
+        FunAtom = FunMod:atom(),
+        FunValue = FunMod:value(),
+        not (
+            from_to(FunAtom, atom, value) =:= FunValue andalso
+            from_to(FunValue, value, atom) =:= FunAtom
+        )
+    end,
     [] = lists:filter(CheckFn, Builtin).
 -endif.
 

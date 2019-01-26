@@ -20,13 +20,17 @@
 %
 -module(dnsclass).
 
+-export([builtin/0,from_to/3]).
+
+-ifdef(EUNIT).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 -callback atom() -> atom().
 -callback value() -> 0..16#FFFF.
 -callback masterfile_token() -> string().
 
 -optional_callbacks([masterfile_token/0]).
-
--export([builtin/0,from_to/3]).
 
 -type class() :: atom() | 0..16#FFFF.
 
@@ -42,6 +46,21 @@ builtin() ->
         dnsclass_none,
         dnsclass_any
     ].
+
+
+-ifdef(EUNIT).
+builtin_modules_sanity_test() ->
+    Builtin = builtin(),
+    CheckFn = fun (FunMod) ->
+        FunAtom = FunMod:atom(),
+        FunValue = FunMod:value(),
+        not (
+            from_to(FunAtom, atom, value) =:= FunValue andalso
+            from_to(FunValue, value, atom) =:= FunAtom
+        )
+    end,
+    [] = lists:filter(CheckFn, Builtin).
+-endif.
 
 
 from_to(Value, value, module) ->

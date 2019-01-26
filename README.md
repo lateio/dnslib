@@ -63,7 +63,9 @@ dnslib claims to be compliant with the following specifications:
 Roadmap
 ---
 For version 0.0.2
+* Write a guide in addition to function documentation
 * Better eunit coverage
+* PropEr (?)
 * Custom classes similar to custom resource types
 * New opcodes/return codes as required by [Kurremkarmerruk](https://github.com/lateio/kurremkarmerruk)
 * Progress towards DNSSEC (?)

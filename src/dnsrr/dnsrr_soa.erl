@@ -15,7 +15,13 @@
     valid_data/1,
     normalize_data/1,
 
-    serial/1
+    nameserver/1,
+    contact/1,
+    serial/1,
+    refresh/1,
+    retry/1,
+    expire/1,
+    minimum/1
 ]).
 
 -include_lib("dnslib/include/dnslib.hrl").
@@ -112,5 +118,43 @@ normalize_data({Nameserv, Admin, Id, Refresh, Retry, Expire, Minimum}) ->
     }.
 
 
-serial(Data) ->
+nameserver(Resource = {_, _, _, _, _}) ->
+    element(1, element(5, Resource));
+nameserver(Data = {_, _, _, _, _, _, _}) ->
+    element(1, Data).
+
+
+contact(Resource = {_, _, _, _, _}) ->
+    element(2, element(5, Resource));
+contact(Data = {_, _, _, _, _, _, _}) ->
+    element(2, Data).
+
+
+serial(Resource = {_, _, _, _, _}) ->
+    element(3, element(5, Resource));
+serial(Data = {_, _, _, _, _, _, _}) ->
     element(3, Data).
+
+
+refresh(Resource = {_, _, _, _, _}) ->
+    element(4, element(5, Resource));
+refresh(Data = {_, _, _, _, _, _, _}) ->
+    element(4, Data).
+
+
+retry(Resource = {_, _, _, _, _}) ->
+    element(4, element(5, Resource));
+retry(Data = {_, _, _, _, _, _, _}) ->
+    element(4, Data).
+
+
+expire(Resource = {_, _, _, _, _}) ->
+    element(5, element(5, Resource));
+expire(Data = {_, _, _, _, _, _, _}) ->
+    element(5, Data).
+
+
+minimum(Resource = {_, _, _, _, _}) ->
+    element(5, element(5, Resource));
+minimum(Data = {_, _, _, _, _, _, _}) ->
+    element(5, Data).

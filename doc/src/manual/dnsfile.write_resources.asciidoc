@@ -1,6 +1,6 @@
 = dnsfile:write_resources
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.01.29
 :ext-relative: {outfilesuffix}
 
 == Name
@@ -26,13 +26,18 @@ Write resource records to a file. Inverse of link:dnsfile.consult{ext-relative}[
 
 [source,erlang]
 write_resources_opt() =
-    {'generic', boolean()}.
+      {'generic', boolean()}
+    | 'append'.
 
 The default value for each option -- when one exists -- is given in parentheses next to the option.
 
 `{'generic', boolean()}` (`'false'`)::
 
 link:https://tools.ietf.org/rfc/rfc3597.txt[RFC3597] specifies a generic syntax for representing unknown resource types and classes in DNS master files. Setting this option to `'true'` causes all resources -- known and unknown alike -- to be written in the aforementioned generic form.
+
+`'append'`::
+
+If option `'append'` is provided, writes take place at the end of the file. Otherwise if the file `Path` exists, it is truncated and the `Resources` will replace the current contents of the file.
 
 == Arguments
 
@@ -66,6 +71,7 @@ ok = dnsfile:write_resources("/tmp/test.zone", [Resource]).
 
 == Changelog
 
+* *0.0.2* `'append'` option added
 * *0.0.1* Function added
 
 == See also

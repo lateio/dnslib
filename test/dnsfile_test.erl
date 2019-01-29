@@ -54,3 +54,10 @@ write_consult_test() ->
 root_servers_test() ->
     {ok, Records} = dnsfile:consult("test/sample_files/root_servers"),
     {ok, Records} = dnsfile:consult("test/sample_files/root_servers", [{class, in}]).
+
+
+write_append_test() ->
+    Records = [First|Rest] = ?ALL_RESOURCES,
+    ok = dnsfile:write_resources("test/sample_files/append", [First]),
+    [ dnsfile:write_resources("test/sample_files/append", [GenResource], [append]) || GenResource <- Rest],
+    {ok, Records} = dnsfile:consult("test/sample_files/append").

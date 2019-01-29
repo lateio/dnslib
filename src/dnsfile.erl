@@ -1038,7 +1038,11 @@ write_resources(Filename, Rrs, Opts) ->
     % If optimizations haven't been disabled, run through the resource records,
     % introducing directives and mangling Resource record data as necessary
     % to produce a shorter file
-    {ok, Fd} = file:open(Filename, [write, binary]),
+    Mode = case lists:member(append, Opts) of
+        true -> append;
+        false -> write
+    end,
+    {ok, Fd} = file:open(Filename, [write, Mode]),
     ok = write_resource(Rrs, Fd, handle_write_resources_opts(Opts)),
     ok = file:close(Fd).
 
@@ -1053,7 +1057,9 @@ handle_write_resources_opts(Opts) ->
 handle_write_resources_opts([], Opts) ->
     Opts;
 handle_write_resources_opts([{generic, Boolean}|Rest], Opts) when Boolean =:= true; Boolean =:= false ->
-    handle_write_resources_opts(Rest, Opts#{generic => Boolean}).
+    handle_write_resources_opts(Rest, Opts#{generic => Boolean});
+handle_write_resources_opts([append|Rest], Opts) ->
+    handle_write_resources_opts(Rest, Opts).
 
 
 write_resource([], _, _) ->
@@ -1077,10 +1083,7 @@ write_resource([{Domain, Type, Class0, Ttl, Data}|Rest], Fd, Opts = #{linebreak 
         Whitespace,
         resource_specific(Type, Data, Opts)
     ],
-    case Rest of
-        [] -> ok = file:write(Fd, Iodata);
-        _  -> ok = file:write(Fd, [Iodata, Linebreak])
-    end,
+    ok = file:write(Fd, [Iodata, Linebreak]),
     write_resource(Rest, Fd, Opts).
 
 

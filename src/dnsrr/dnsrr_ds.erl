@@ -39,5 +39,5 @@ to_binary({Tag, Algorithm, Type, Digest}) ->
     ]}.
 
 
-from_binary(<<Tag:16, Algorithm, Type, Digest>>) ->
+from_binary(<<Tag:16, Algorithm, Type, Digest/binary>>) ->
     {ok, {Tag, Algorithm, Type, Digest}}.

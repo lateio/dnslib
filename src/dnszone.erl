@@ -42,8 +42,9 @@
 
 -type zone_transfer() ::
     {
-        TransferType :: 'zone' | 'change_sets',
-        NewSoa :: dnslib:resource(),
+        Question :: dnslib:question(),
+        TransferType :: 'zone' | 'change_sets' | 'nil',
+        NewSoa :: dnslib:resource() | 'nil',
         Resources :: [dnslib:resource()] | [dnsmsg:incremental_transfer_change_set()]
     }.
 
@@ -101,11 +102,37 @@ to_zone(Rrs) ->
     % Removed/added entries
 
 
--spec new_transfer(dnsmsg:transfer_interpret_result())
+-spec new_transfer(dnsmsg:question()) -> zone_transfer().
+new_transfer(Question) ->
+    {Question, nil, nil, []}.
+
+
+-spec continue_transfer(dnsmsg:message(), zone_transfer())
     -> {'ok', {'zone' | 'change_sets', NewSoa :: dnslib:resource(), Resources :: [dnslib:resource()] | [dnsmsg:transfer_interpret_result()]}}
      | {'more', zone_transfer()}
-     | {'error', invalid_transfer_start}.
-new_transfer({_, TransferType0, {NewSoa, AnswerType, Resources}}) ->
+     | {'error',
+           'unexpected_transfer_type'
+         | 'unexpected_answer_type'
+       }.
+
+continue_transfer(Msg, Transfer) ->
+    {ok, [Answer]} = dnsmsg:interpret_response(
+        case dnsmsg:questions(Msg) of
+            [] -> dnsmsg:add_question(Msg, element(1, Transfer));
+            _ -> Msg
+        end
+    ),
+    continue_transfer_answer(Answer, Transfer).
+
+
+-spec continue_transfer_answer(dnsmsg:transfer_interpret_result(), zone_transfer())
+    -> {'ok', {'zone' | 'change_sets', NewSoa :: dnslib:resource(), Resources :: [dnslib:resource()] | [dnsmsg:transfer_interpret_result()]}}
+     | {'more', zone_transfer()}
+     | {'error',
+           'unexpected_transfer_type'
+         | 'unexpected_answer_type'
+       }.
+continue_transfer_answer({_, TransferType0, {NewSoa, AnswerType, Resources}}, {Question, nil, nil, []}) ->
     TransferType = case TransferType0 of
         zone_transfer -> zone;
         incremental_zone_transfer -> change_sets
@@ -114,37 +141,29 @@ new_transfer({_, TransferType0, {NewSoa, AnswerType, Resources}}) ->
         complete -> {ok, {TransferType, NewSoa, Resources}};
         first ->
             Transfer = {
+                Question,
                 TransferType,
                 NewSoa,
                 Resources
             },
             {more, Transfer};
-        _ -> {error, invalid_transfer_start}
-    end.
-
-
--spec continue_transfer(dnsmsg:transfer_interpret_result(), zone_transfer())
-    -> {'ok', {'zone' | 'change_sets', NewSoa :: dnslib:resource(), Resources :: [dnslib:resource()] | [dnsmsg:transfer_interpret_result()]}}
-     | {'more', zone_transfer()}
-     | {'error',
-           'unexpected_transfer_type'
-         | 'unexpected_answer_type'
-       }.
-continue_transfer({_, zone_transfer, {_, AnswerType, NewResources}}, {zone, NewSoa, PrevResources}=Tuple) ->
-    case AnswerType of
-        last -> {ok, setelement(3, Tuple, lists:append(PrevResources, NewResources))};
-        middle -> {more, setelement(3, Tuple, lists:append(PrevResources, NewResources))};
         _ -> {error, unexpected_answer_type}
     end;
-continue_transfer({_, zone_transfer, {_, last, []}}, {change_sets, _, _}=Tuple) ->
-    {ok, Tuple};
-continue_transfer({_, incremental_zone_transfer, {_, AnswerType, NewResources}}, {change_sets, NewSoa, PrevResources}=Tuple) ->
+continue_transfer_answer({_, zone_transfer, {_, AnswerType, NewResources}}, {_, zone, NewSoa, PrevResources}=Tuple) ->
     case AnswerType of
-        last -> {ok, setelement(3, Tuple, lists:append(PrevResources, NewResources))};
-        middle -> {more, setelement(3, Tuple, lists:append(PrevResources, NewResources))};
+        last -> {ok, {zone, NewSoa, lists:append(PrevResources, NewResources)}};
+        middle -> {more, setelement(4, Tuple, lists:append(PrevResources, NewResources))};
         _ -> {error, unexpected_answer_type}
     end;
-continue_transfer(_, _) ->
+continue_transfer_answer({_, zone_transfer, {_, last, []}}, {_, change_sets, NewSoa, Resources}=Tuple) ->
+    {ok, {change_sets, NewSoa, Resources}};
+continue_transfer_answer({_, incremental_zone_transfer, {_, AnswerType, NewResources}}, {_, change_sets, NewSoa, PrevResources}=Tuple) ->
+    case AnswerType of
+        last -> {ok, {change_sets, NewSoa, lists:append(PrevResources, NewResources)}};
+        middle -> {more, setelement(4, Tuple, lists:append(PrevResources, NewResources))};
+        _ -> {error, unexpected_answer_type}
+    end;
+continue_transfer_answer(_, _) ->
     {error, unexpected_transfer_type}.
 
 

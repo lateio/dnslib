@@ -1,6 +1,6 @@
 = dnszone:new_transfer
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.01.29
 :ext-relative: {outfilesuffix}
 
 == Name
@@ -11,47 +11,24 @@ dnszone:new_transfer - Keep track of an ongoing zone transfer
 
 [source,erlang]
 ----
-new_transfer(Result :: dnsmsg:transfer_interpret_result())
-    -> {'more', State :: opaque()};
-     | {'ok',
-           {'zone', NewSoa :: dnslib:resource(), [dnslib:resource()]}
-         | {'change_sets', NewSoa :: dnslib:resource(), [dnsmsg:incremental_transfer_change_set()]}
-       }
-     | {'error', 'invalid_transfer_start'}.
+new_transfer(TransferQuestion :: dnslib:question()) -> State :: opaque().
 ----
 
 Keep track of an ongoing zone transfer.
 
 == Arguments
 
-Result::
+TransferQuestion::
 
-Zone transfer result from `dnsmsg:interpret_response`
+Zone transfer question, ie. `{[], axfr, in}`.
 
 == Return value
 
-If `Result` was a complete zone transfer, a tuple consisting of `'ok'` and a tuple containing the results of the zone transfer is returned.
-
-If `Result` was not a complete zone transfer, a tuple consisting of `'more'` and an opaque state is returned. This state is to be used in later `dnszone:continue_transfer` calls.
-
-If the transfer type was not any of the suitable starts, a tuple consisting of `'error'` and the error reason is returned.
-
-== Errors
-
-`'invalid_transfer_start'`::
-
-`Result` was not a complete transfer or a first part of a transfer.
-
-== Completed transfers
-
-Depending on the first member of the result tuple returned when a transfer is complete, contained terms might require further processing.
-
-If the first member of the result tuple is `'zone'`, it is possible to just add `NewSoa` to the list of resources and the resulting list represents the transferred zone.
-
-If the first member of the result tuple is `'change_sets'`, results are groups of removed and added resource records. These results should then be used to modify some existing zone.
+An opaque state is returned. This state is to be used in `dnszone:continue_transfer` calls.
 
 == Changelog
 
+* *0.0.2* Function is now only used to create a transfer. Argument is no longer a `dnsmsg:interpret_result()`, but `dnslib:question()`. *Breaking change*
 * *0.0.1* Function added
 
 == See also

@@ -1,6 +1,6 @@
 = dnszone:continue_transfer
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.01.29
 :ext-relative: {outfilesuffix}
 
 == Name
@@ -11,7 +11,7 @@ dnszone:continue_transfer - Continue an ongoing zone transfer
 
 [source,erlang]
 ----
-continue_transfer(Result :: dnsmsg:transfer_interpret_result(), State :: opaque())
+continue_transfer(Response :: dnsmsg:message(), State :: opaque())
     -> {'more', State :: opaque()};
      | {'ok',
            {'zone', NewSoa :: dnslib:resource(), [dnslib:resource()]}
@@ -27,9 +27,9 @@ Continue an ongoing zone transfer.
 
 == Arguments
 
-Result::
+Response::
 
-Zone transfer result from `dnsmsg:interpret_response`
+Response to a zone transfer request
 
 State::
 
@@ -63,6 +63,7 @@ If the first member of the result tuple is `'change_sets'`, results are groups o
 
 == Changelog
 
+* *0.0.2* First argument is `dnslib:message()` instead of `dnsmsg:interpret_result()`. *Breaking change*
 * *0.0.1* Function added
 
 == See also

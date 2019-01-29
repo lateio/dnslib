@@ -49,16 +49,17 @@ transfer_zone_test() ->
         Answer2,
         Soa
     ],
-    {ok, [AnswerFirst]} = dnsmsg:interpret_response(dnsmsg:new(o(), Question, First)),
-    {ok, [AnswerMiddle]} = dnsmsg:interpret_response(dnsmsg:new(o(), Question, Middle)),
-    {ok, [AnswerLast]} = dnsmsg:interpret_response(dnsmsg:new(o(), Question, Last)),
-    {ok, [AnswerComplete]} = dnsmsg:interpret_response(dnsmsg:new(o(), Question, Complete)),
-    {more, Transfer0} = dnszone:new_transfer(AnswerFirst),
-    {more, Transfer1} = dnszone:continue_transfer(AnswerMiddle, Transfer0),
-    {ok, {zone, Soa, [Answer1, Answer2, Answer1, Answer2, Answer1, Answer2]}} = dnszone:continue_transfer(AnswerLast, Transfer1),
-    {error, invalid_transfer_start} = dnszone:new_transfer(AnswerMiddle),
-    {error, invalid_transfer_start} = dnszone:new_transfer(AnswerLast),
-    {ok, {zone, Soa, [Answer1, Answer2]}} = dnszone:new_transfer(AnswerComplete).
+    FirstMsg = dnsmsg:new(o(), Question, First),
+    MiddleMsg = dnsmsg:new(o(), [], Middle),
+    LastMsg = dnsmsg:new(o(), [], Last),
+    CompleteMsg = dnsmsg:new(o(), Question, Complete),
+    Transfer0 = dnszone:new_transfer(Question),
+    {more, Transfer1} = dnszone:continue_transfer(FirstMsg, Transfer0),
+    {more, Transfer2} = dnszone:continue_transfer(MiddleMsg, Transfer1),
+    {ok, {zone, Soa, [Answer1, Answer2, Answer1, Answer2, Answer1, Answer2]}} = dnszone:continue_transfer(LastMsg, Transfer2),
+    {error, unexpected_answer_type} = dnszone:continue_transfer(MiddleMsg, Transfer0),
+    {error, unexpected_answer_type} = dnszone:continue_transfer(LastMsg, Transfer0),
+    {ok, {zone, Soa, [Answer1, Answer2]}} = dnszone:continue_transfer(CompleteMsg, Transfer0).
 
 transfer_incremental_test() ->
     % Copied from dnsmsg_test:interpret_response_incremental_transfer_test()
@@ -95,23 +96,25 @@ transfer_incremental_test() ->
         Answer2,
         NewSoa
     ],
-    {ok, [AnswerFirst]} = dnsmsg:interpret_response(dnsmsg:new(o(), Question, First)),
-    {ok, [AnswerMiddle]} = dnsmsg:interpret_response(dnsmsg:new(o(), Question, Middle)),
-    {ok, [AnswerLast]} = dnsmsg:interpret_response(dnsmsg:new(o(), Question, Last)),
-    {ok, [AnswerComplete]} = dnsmsg:interpret_response(dnsmsg:new(o(), Question, Complete)),
-    {more, Transfer0} = dnszone:new_transfer(AnswerFirst),
-    {more, Transfer1} = dnszone:continue_transfer(AnswerMiddle, Transfer0),
+    FirstMsg = dnsmsg:new(o(), Question, First),
+    MiddleMsg = dnsmsg:new(o(), [], Middle),
+    LastMsg = dnsmsg:new(o(), [], Last),
+    EmptyLastMsg = dnsmsg:new(o(), [], [NewSoa]),
+    CompleteMsg = dnsmsg:new(o(), Question, Complete),
+    Transfer0 = dnszone:new_transfer(Question),
+    {more, Transfer1} = dnszone:continue_transfer(FirstMsg, Transfer0),
+    {more, Transfer2} = dnszone:continue_transfer(MiddleMsg, Transfer1),
     {ok, {change_sets, NewSoa, [
         {{OldSoa, [Answer1]}, {NewSoa, [Answer2]}},
         {{OldSoa, [Answer1]}, {NewSoa, [Answer2]}},
         {{OldSoa, [Answer1]}, {NewSoa, [Answer2]}}
-    ]}} = dnszone:continue_transfer(AnswerLast, Transfer1),
-    {error, invalid_transfer_start} = dnszone:new_transfer(AnswerMiddle),
-    {error, invalid_transfer_start} = dnszone:new_transfer(AnswerLast),
+    ]}} = dnszone:continue_transfer(LastMsg, Transfer2),
+    {error, unexpected_answer_type} = dnszone:continue_transfer(MiddleMsg, Transfer0),
+    {error, unexpected_answer_type} = dnszone:continue_transfer(LastMsg, Transfer0),
     {ok, {change_sets, NewSoa, [
         {{OldSoa, [Answer1]}, {NewSoa, [Answer2]}}
-    ]}} = dnszone:new_transfer(AnswerComplete),
+    ]}} = dnszone:continue_transfer(CompleteMsg, Transfer0),
     {ok, {change_sets, NewSoa, [
         {{OldSoa, [Answer1]}, {NewSoa, [Answer2]}},
         {{OldSoa, [Answer1]}, {NewSoa, [Answer2]}}
-    ]}} = dnszone:continue_transfer({nil, zone_transfer, {NewSoa, last, []}}, Transfer1).
+    ]}} = dnszone:continue_transfer(EmptyLastMsg, Transfer2).

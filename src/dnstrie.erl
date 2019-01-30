@@ -27,6 +27,7 @@
     is_empty/1,
     set/3,
     get/2,
+    get/3,
     get_path/2,
     get_subkeys/2,
     remove/2,
@@ -58,15 +59,21 @@ set([Key|Rest], Value, Map) when Key =/= '_', Key =/= '' ->
 
 
 -spec get(Key :: get_key(), Trie :: trie()) -> {'ok', term()} | 'undefined' | 'nodata'.
-get([], #{'' := Value}) ->
+get(Key, Trie) ->
+    get(Key, Trie, true).
+
+
+-spec get(Key :: get_key(), Trie :: trie(), FollowWildcards :: boolean())
+    -> {'ok', term()} | 'undefined' | 'nodata'.
+get([], #{'' := Value}, _) ->
     {ok, Value};
-get([], _) ->
+get([], _, _) ->
     nodata;
-get([Key|Rest], Map) ->
+get([Key|Rest], Map, FollowWildcards) ->
     case Map of
-        #{Key := NextMap} -> get(Rest, NextMap);
-        #{'_' := Value}   -> {ok, Value};
-        #{}               -> undefined
+        #{Key := NextMap}                    -> get(Rest, NextMap, FollowWildcards);
+        #{'_' := Value} when FollowWildcards -> {ok, Value};
+        #{}                                  -> undefined
     end.
 
 

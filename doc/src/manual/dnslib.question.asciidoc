@@ -76,5 +76,6 @@ Question1 = dnslib:question("arv.io", 1, 1), % Value of A type and IN class are 
 
 == See also
 
+link:dnslib.domain{ext-relative}[dnslib:domain],
 link:dnslib.resource{ext-relative}[dnslib:resource],
 link:dnslib{ext-relative}[dnslib]

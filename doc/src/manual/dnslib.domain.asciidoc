@@ -1,0 +1,59 @@
+= dnslib:domain
+Lauri Moisio <l@arv.io>
+Version 0.0.2, 2019.01.31
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:domain - Create a domain term
+
+== Description
+
+[source,erlang]
+----
+question(StringDomain :: string() | dnslib:domain()) -> dnslib:domain().
+----
+
+Create a domain term.
+
+== Arguments
+
+StringDomain::
+
+Either a string representation of a domain -- which can contain escapes -- or a `dnslib:domain()` term
+
+== Return value
+
+On success the produced domain is returned.
+
+This function can throw `error:badarg` in the following cases:
+
+* link:dnslib.list_to_domain{ext-relative}[`dnslib:list_to_domain`] error when `Domain` is a string
+* link:dnslib.is_valid_domain{ext-relative}[`dnslib:is_valid_domain`] error when `Domain` is not a string
+
+== Examples
+
+[source,erlang]
+----
+[<<"arv">>,<<"io">>] = dnslib:domain("arv.io"),
+[<<"arv">>,<<"io">>] = dnslib:domain([<<"arv">>,<<"io">>]).
+----
+
+.Errors
+[source,erlang]
+----
+{'EXIT', {badarg, _}} = (catch dnslib:domain("väinämöinen.com")), % Non-ASCII
+Long = [$a || _ <- lists:seq(1,64)],
+{'EXIT', {badarg, _}} = (catch dnslib:domain(Long)), % Too long label
+{'EXIT', {badarg, _}} = (catch dnslib:domain("abc..com")). % Empty label
+----
+
+== Changelog
+
+* *0.0.2* Function added
+
+== See also
+
+link:dnslib.question{ext-relative}[dnslib:question],
+link:dnslib.resource{ext-relative}[dnslib:resource],
+link:dnslib{ext-relative}[dnslib]

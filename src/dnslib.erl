@@ -40,7 +40,7 @@
     domain_in_zone/2,
     append_domain/1,
     append_domain/2,
-    %domain/1,
+    domain/1,
     question/2,
     question/3,
     resource/1,
@@ -117,11 +117,34 @@
         Data   :: term()
     }.
 
+-type resource(Type, Class) ::
+    {
+        Domain :: dnslib:domain(),
+        Type,
+        Class,
+        Ttl    :: ttl(),
+        Data   :: term()
+    }.
+
 -type question() ::
     {
         Domain :: dnslib:non_wildcard_domain(),
         Type   :: dnsrr:type(),
         Class  :: dnsclass:class()
+    }.
+
+-type question(Type) ::
+    {
+        Domain :: dnslib:non_wildcard_domain(),
+        Type,
+        Class  :: dnsclass:class()
+    }.
+
+-type question(Type, Class) ::
+    {
+        Domain :: dnslib:non_wildcard_domain(),
+        Type,
+        Class
     }.
 
 
@@ -136,8 +159,10 @@
     codepoint_domain/0,
     resource/0,
     resource/1,
+    resource/2,
     question/0,
-    %question/1,
+    question/1,
+    question/2,
     opcode/0,
     return_code/0,
     ttl/0,
@@ -189,6 +214,19 @@ domain_in_zone([_|_] = D1, ['_'|D2]) ->
     is_subdomain(D1, D2);
 domain_in_zone(D1, D2) ->
     is_subdomain(D1, D2) orelse D1 =:= D2.
+
+
+domain(String) when is_integer(hd(String)) ->
+    case list_to_domain(String) of
+        {ok, _, Domain} -> Domain;
+        _ -> error(badarg)
+    end;
+domain(Domain) ->
+    case is_valid_domain(Domain) of
+        true -> Domain;
+        _ -> error(badarg)
+    end.
+
 
 question(Domain, Type) ->
     question(Domain, Type, in).

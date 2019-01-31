@@ -153,6 +153,7 @@ is_valid_domain_test() ->
 
 
 normalize_domain_test() ->
+    ['_'] = dnslib:normalize_domain(['_']),
     [<<"arv">>, <<"io">>] = dnslib:normalize_domain([<<"ARV">>, <<"io">>]),
     [<<"Ä">>, <<"arv">>, <<"io">>] = dnslib:normalize_domain([<<"Ä">>,<<"ARV">>, <<"io">>]).
 
@@ -253,3 +254,10 @@ deduplicate_test() ->
     Resource2 = dnslib:resource("ARV.IO", cname, in, 60, "ARV.IO"),
     Resource3 = dnslib:resource("ARV.IO", a, in, 60, "0.0.0.0"),
     [Resource1, Resource3] = dnslib:deduplicate([Resource1, Resource3, Resource2]).
+
+
+domain_test() ->
+    {'EXIT', {badarg, _}} = (catch dnslib:domain("väinämöinen.com")), % Non-ASCII
+    Long = [$a || _ <- lists:seq(1,64)],
+    {'EXIT', {badarg, _}} = (catch dnslib:domain(Long)), % Too long label
+    {'EXIT', {badarg, _}} = (catch dnslib:domain("abc..com")). % Empty label

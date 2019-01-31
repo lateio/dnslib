@@ -111,5 +111,6 @@ Resource3 = {[], a, in, 3600, {0,0,0,0}} = dnslib:resource([], a, in, "60min", "
 == See also
 
 link:dnslib.list_to_ttl{ext-relative}[dnslib:list_to_ttl],
+link:dnslib.domain{ext-relative}[dnslib:domain],
 link:dnslib.question{ext-relative}[dnslib:question],
 link:dnslib{ext-relative}[dnslib]

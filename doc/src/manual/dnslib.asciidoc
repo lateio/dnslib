@@ -1,6 +1,6 @@
 = dnslib
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.01.31
 :ext-relative: {outfilesuffix}
 
 == Module
@@ -18,6 +18,7 @@ Domains:
 * link:dnslib.append_domain{ext-relative}[dnslib:append_domain] - Concatenate two or more domains
 * link:dnslib.binary_to_domain{ext-relative}[dnslib:binary_to_domain] - Transform a wire format binary into a domain
 * link:dnslib.codepoint_domain_to_domain{ext-relative}[dnslib:codepoint_domain_to_domain] - Transform a code point domain into a domain
+* link:dnslib.domain{ext-relative}[dnslib:domain] - Create a domain term
 * link:dnslib.domain_binary_length{ext-relative}[dnslib:domain_binary_length] - Get the `byte_size()` for wire encoding of a domain
 * link:dnslib.domain_in_zone{ext-relative}[dnslib:domain_in_zone] - Test if one domain is in the zone specified by another domain
 * link:dnslib.domain_to_binary{ext-relative}[dnslib:domain_to_binary] - Transform a domain into a wire format binary

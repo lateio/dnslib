@@ -26,6 +26,9 @@
     from_binary/1,
     to_binary/1,
     to_binary/2,
+    binary_to_domain/1,
+    domain_to_binary/1,
+    domain_binary_length/1,
     to_iolist/1,
     to_iolist/2,
     to_binary_domain/2,
@@ -34,6 +37,8 @@
     opcode/1,
     finalize_resource_data/2
 ]).
+
+-include_lib("dnslib/include/dnslib.hrl").
 
 -spec boolean
     (1) -> 'true';
@@ -123,6 +128,96 @@ opcode(Value) when is_integer(Value) -> Value.
 }).
 
 
+-spec binary_to_domain(Bin :: binary())
+    -> {'ok', dnslib:non_wildcard_domain(), Tail :: binary()}
+     | {'compressed', dnslib:compressed_domain(), Tail :: binary()}
+     %{'extended', Type :: 0..63, binary()},
+     | {'error',
+         'truncated_domain' |
+         'empty_binary'     |
+         'domain_too_long'  |
+         {'invalid_length', Bit1 :: 0..1, Bit2 :: 0..1}
+       }.
+%binary_to_domain(<<0:1, 1:1, Type:6, Rest/binary>>) ->
+%    {extended, Type, Rest};
+binary_to_domain(<<>>) ->
+    {error, empty_binary};
+binary_to_domain(<<Bin/binary>>) ->
+    binary_to_domain(Bin, [], 0);
+binary_to_domain(_) ->
+    {error, truncated_domain}.
+
+binary_to_domain(<<_/binary>>, _, BytesUsed) when BytesUsed >= ?DOMAIN_MAX_OCTETS ->
+    {error, domain_too_long};
+binary_to_domain(<<0, Tail/binary>>, Acc, _) ->
+    {ok, lists:reverse(Acc), Tail};
+binary_to_domain(<<1:1, 1:1, Ref:14, Tail/binary>>, Acc, _) ->
+    {compressed, {compressed, Ref, Acc}, Tail};
+binary_to_domain(<<0:1, 0:1, Rest/bits>>, Acc, BytesUsed) ->
+    case Rest of
+        <<Len:6, Label:Len/binary, Tail/binary>> -> binary_to_domain(Tail, [Label|Acc], BytesUsed+1+Len);
+        _ -> {error, truncated_domain}
+    end;
+binary_to_domain(<<B1:1, B2:1, _:6, _/binary>>, _, _) ->
+    {error, {invalid_length, B1, B2}};
+binary_to_domain(_, _, _) ->
+    {error, truncated_domain}.
+
+
+-spec domain_to_binary(Domain :: dnslib:non_wildcard_domain() | dnslib:compressed_domain())
+    -> {'ok', binary()}
+     | {'error',
+         'domain_too_long' |
+         'label_too_long'  |
+         'empty_label'     |
+         'ref_out_of_range'
+       }.
+domain_to_binary({compressed, Ref, _}) when Ref > 16#3FFF; Ref < 0 ->
+    {error, ref_out_of_range};
+domain_to_binary({compressed, Ref, Domain}) ->
+    case domain_to_binary(lists:reverse(Domain), <<>>) of
+        {ok, Bin} when byte_size(Bin) < ?DOMAIN_MAX_OCTETS - 1 ->
+            StartLen = byte_size(Bin) - 1,
+            <<BinStart:StartLen/binary, 0>> = Bin,
+            {ok, <<BinStart/binary, 3:2, Ref:14>>};
+        {error, _}=Tuple -> Tuple
+    end;
+domain_to_binary(Domain) ->
+    domain_to_binary(Domain, <<>>).
+
+-spec domain_to_binary(dnslib:domain(), binary()) ->
+    {'ok', binary()} |
+    {'error',
+        'domain_too_long' |
+        'label_too_long'  |
+        'empty_label'
+    }.
+domain_to_binary(_, Acc) when byte_size(Acc) >= ?DOMAIN_MAX_OCTETS -> %
+    {error, domain_too_long};
+domain_to_binary([], Acc) ->
+    {ok, <<Acc/binary, 0>>};
+domain_to_binary([Label|_], _) when byte_size(Label) > 63 ->
+    {error, label_too_long};
+domain_to_binary([<<>>|_], _) ->
+    {error, empty_label};
+domain_to_binary([Label|Rest], Acc) ->
+    domain_to_binary(Rest, <<Acc/binary, (byte_size(Label)), Label/binary>>).
+
+
+-spec domain_binary_length(dnslib:non_wildcard_domain() | dnslib:compressed_domain()) -> pos_integer().
+domain_binary_length([]) ->
+    1;
+domain_binary_length({compressed, _, Domain}) ->
+    domain_binary_length(Domain, 0) + 1;
+domain_binary_length(Domain) ->
+    domain_binary_length(Domain, 0).
+
+domain_binary_length([], Len) ->
+    Len + 1;
+domain_binary_length([Label|Domain], Len) ->
+    domain_binary_length(Domain, Len + 1 + byte_size(Label)).
+
+
 % There's literally no point adding refs for root domain. It should not be considered when/for compression
 % But as it's possible to Ref to a root domain, we'll still keep those refs around...
 %add_domain_ref([], _, _, State) ->
@@ -149,7 +244,7 @@ compress_domain(Domain, AllowCompress, State0 = #bin_state{trie=Trie0,offset=Off
     case dnstrie:get_path(lists:reverse(Domain), Trie0) of
         {full, [Ref|_]} when AllowCompress -> {<<3:2, Ref:14>>, State0#bin_state{offset=Offset0+2}};
         {full, _} ->
-            {ok, Bin} = dnslib:domain_to_binary(Domain),
+            {ok, Bin} = domain_to_binary(Domain),
             {Bin, State0#bin_state{offset=Offset0+byte_size(Bin)}};
         {partial, Match = [Ref|_]} ->
             Diff = length(Domain) - length(Match),
@@ -157,17 +252,17 @@ compress_domain(Domain, AllowCompress, State0 = #bin_state{trie=Trie0,offset=Off
             case AllowCompress of
                 true ->
                     {NewLabels, _} = lists:split(Diff, Domain),
-                    {ok, Bin0} = dnslib:domain_to_binary(NewLabels),
+                    {ok, Bin0} = domain_to_binary(NewLabels),
                     LengthSansZero = byte_size(Bin0) - 1,
                     <<Bin:LengthSansZero/binary, _/binary>> = Bin0,
                     {<<Bin/binary, 3:2, Ref:14>>, State1#bin_state{offset=Offset1+2}};
                 false ->
-                    {ok, Bin} = dnslib:domain_to_binary(Domain),
+                    {ok, Bin} = domain_to_binary(Domain),
                     {Bin, State1#bin_state{offset=Offset0+byte_size(Bin)}}
             end;
         {none, []} ->
             State1 = #bin_state{offset=Offset1} = populate_compression_trie(Domain, length(Domain), State0),
-            {ok, Bin} = dnslib:domain_to_binary(Domain),
+            {ok, Bin} = domain_to_binary(Domain),
             {Bin, State1#bin_state{offset=Offset1+1}}
     end.
 
@@ -221,7 +316,7 @@ decompress_domain_from_binary({compressed, Ref, _}, Offset, _) when Ref >= Offse
     {error, forward_reference};
 decompress_domain_from_binary({compressed, Ref, Acc}, _, MessageBin) ->
     <<_:Ref/binary, Bin/binary>> = MessageBin,
-    case dnslib:binary_to_domain(Bin) of
+    case binary_to_domain(Bin) of
         {compressed, {compressed, NewRef, NewAcc}, _} ->
             decompress_domain_from_binary({compressed, NewRef, lists:append(NewAcc, Acc)}, Ref, MessageBin);
         {ok, DomainTail, _} ->
@@ -236,13 +331,13 @@ decompress_domain_from_binary({compressed, Ref, Acc}, _, MessageBin) ->
 decompress_ref_datalist([], Acc, State) ->
     {ok, lists:reverse(Acc), State};
 decompress_ref_datalist([{domain, Domain, DomainOffset}|Rest], Acc, State0 = #bin_state{offset=Offset}) ->
-    State1 = add_domain_ref(Domain, Offset+DomainOffset, dnslib:domain_binary_length(Domain), State0),
+    State1 = add_domain_ref(Domain, Offset+DomainOffset, domain_binary_length(Domain), State0),
     decompress_ref_datalist(Rest, [Domain|Acc], State1);
 decompress_ref_datalist([{compressed, _, DomainAcc, DomainOffset}=Tuple|Rest], Acc, State0 = #bin_state{offset=Offset}) ->
     % We need to add ref to this domain...
     case decompress_domain(Tuple, State0) of
         {ok, Domain} ->
-            State1 = add_domain_ref(Domain, Offset+DomainOffset, dnslib:domain_binary_length(DomainAcc), State0),
+            State1 = add_domain_ref(Domain, Offset+DomainOffset, domain_binary_length(DomainAcc), State0),
             decompress_ref_datalist(Rest, [Domain|Acc], State1);
         {error, _}=ErrTuple -> ErrTuple
     end;
@@ -270,20 +365,20 @@ find_ref_in_domain(Ref, Offset, [Label|Rest]) ->
     find_ref_in_domain(Ref, Offset+byte_size(Label)+1, Rest).
 
 
-from_binary_questions(Data, 0, [{Section, Count}|RestCounts], State, Acc) ->
+from_binary_questions(<<Data/binary>>, 0, [{Section, Count}|RestCounts], State, Acc) ->
     from_binary_resources(Data, Section, Count, RestCounts, State, Acc);
 from_binary_questions(<<>>, _, _, State, Acc) ->
     error({truncated_message, State, Acc});
-from_binary_questions(Data, Count, OtherCounts, State0 = #bin_state{offset=Offset,invalid_questions=Invalid,quit_on_error=Quit}, Acc) ->
+from_binary_questions(<<Data/binary>>, Count, OtherCounts, State0 = #bin_state{offset=Offset,invalid_questions=Invalid,quit_on_error=Quit}, Acc) ->
     case
-        case dnslib:binary_to_domain(Data) of
+        case binary_to_domain(Data) of
             {_, TmpDomain, TmpTail} ->
                 case decompress_domain(TmpDomain, State0) of
-                    {ok, Decompressed} -> {Decompressed, is_tuple(TmpDomain), dnslib:domain_binary_length(TmpDomain), TmpTail};
+                    {ok, Decompressed} -> {Decompressed, is_tuple(TmpDomain), domain_binary_length(TmpDomain), TmpTail};
                     {error, _} when Quit -> error({invalid_domain, State0, Acc});
                     {error, _} ->
                         %% Invalid compression, but we can skip the question
-                        {error, dnslib:domain_binary_length(TmpDomain) + 1, TmpTail}
+                        {error, domain_binary_length(TmpDomain) + 1, TmpTail}
                 end;
             {error, truncated_domain} -> error({truncated_domain, State0, Acc});
             {error, Reason} -> error({invalid_domain, Reason, State0, Acc})
@@ -385,25 +480,25 @@ from_binary_resource_data(_, _, _, _, _, _, Acc, State0) ->
     error({truncated_resource_data, State0, Acc}).
 
 
-from_binary_resources(Tail, _, 0, [], State, Acc) ->
+from_binary_resources(<<Tail/binary>>, _, 0, [], State, Acc) ->
     {ok, Tail, State, Acc};
-from_binary_resources(Tail, _, 0, [{NewSection, NewCount}|Rest], State, Acc) ->
+from_binary_resources(<<Tail/binary>>, _, 0, [{NewSection, NewCount}|Rest], State, Acc) ->
     from_binary_resources(Tail, NewSection, NewCount, Rest, State, Acc);
 from_binary_resources(<<>>, _, _, _, State, Acc) ->
     error({truncated_message, State, Acc});
-from_binary_resources(Data, Section, Count, RestCounts, State0 = #bin_state{offset=Offset0,invalid_resources=Invalid,quit_on_error=Quit}, Acc) ->
+from_binary_resources(<<Data/binary>>, Section, Count, RestCounts, State0 = #bin_state{offset=Offset0,invalid_resources=Invalid,quit_on_error=Quit}, Acc) ->
     case
-        case dnslib:binary_to_domain(Data) of
+        case binary_to_domain(Data) of
             {_, TmpDomain, TmpTail} ->
                 % It's possible that decompression produces an error.
                 % Because the domain was otherwise valid, we can skip the resource
                 % and just count the errors
                 case decompress_domain(TmpDomain, State0) of
-                    {ok, Decompressed} -> {Decompressed, is_tuple(TmpDomain), dnslib:domain_binary_length(TmpDomain), TmpTail};
+                    {ok, Decompressed} -> {Decompressed, is_tuple(TmpDomain), domain_binary_length(TmpDomain), TmpTail};
                     {error, _} when Quit -> error({invalid_domain, invalid_compression, State0, Acc});
                     {error, _} ->
                         %% Invalid compression, but we can skip the question
-                        {error, dnslib:domain_binary_length(TmpDomain) + 1, TmpTail}
+                        {error, domain_binary_length(TmpDomain) + 1, TmpTail}
                 end;
             {error, truncated_domain} -> error({truncated_domain, State0, Acc});
             {error, Reason} -> error({invalid_domain, Reason, State0, Acc})
@@ -761,7 +856,7 @@ to_iolist(Msg0, Opts) ->
                     {ok, Header} = to_bin_header(dnsmsg:set_header(Msg1, truncated, Truncate)),
                     % Add an error for situations where max_length is too small to fit a sane messages (at least one question?)
                     {Resources1, _} = lists:mapfoldl(fun (List, Count) -> SplitN = min(length(List), Count), {_, Remaining} = lists:split(SplitN, List), {Remaining, Count - SplitN} end, length(ResourcesBin), Resources),
-                    Result = [
+                    [
                         {AnswerCount, RemainingAnswers},
                         {NameserverCount, RemainingNameservers},
                         {AdditionalCount, RemainingAdditional}

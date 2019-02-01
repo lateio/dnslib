@@ -31,11 +31,8 @@
     list_to_domain/1,
     list_to_codepoint_domain/1,
     codepoint_domain_to_domain/1,
-    binary_to_domain/1,
     domain_to_list/1,
     domain_to_codepoint_domain/1,
-    domain_to_binary/1,
-    domain_binary_length/1,
     is_subdomain/2,
     domain_in_zone/2,
     append_domain/1,
@@ -167,7 +164,6 @@
     return_code/0,
     ttl/0,
     list_to_domain_error/0,
-    compressed_binary_to_domain_result/0,
     compressed_domain/0
 ]).
 
@@ -489,48 +485,6 @@ append_domain(Domain1, Domain2) ->
     end.
 
 
-%% @doc Normalize character case in domain labels.
--spec domain_to_binary(Domain :: non_wildcard_domain() | compressed_domain())
-    -> {'ok', binary()}
-     | {'error',
-         'domain_too_long' |
-         'label_too_long'  |
-         'empty_label'     |
-         'ref_out_of_range'
-       }.
-domain_to_binary({compressed, Ref, _}) when Ref > 16#3FFF; Ref < 0 ->
-    {error, ref_out_of_range};
-domain_to_binary({compressed, Ref, Domain}) ->
-    case domain_to_binary(lists:reverse(Domain), <<>>) of
-        {ok, Bin} when byte_size(Bin) < ?DOMAIN_MAX_OCTETS - 1 ->
-            StartLen = byte_size(Bin) - 1,
-            <<BinStart:StartLen/binary, 0>> = Bin,
-            {ok, <<BinStart/binary, 3:2, Ref:14>>};
-        {error, _}=Tuple -> Tuple
-    end;
-domain_to_binary(Domain) ->
-    domain_to_binary(Domain, <<>>).
-
-
--type compressed_binary_to_domain_result() :: {'compressed', Ref :: pos_integer(), dnslib:domain()}.
--spec binary_to_domain(Bin :: binary())
-    -> {'ok', dnslib:non_wildcard_domain(), Tail :: binary()}
-     | {'compressed', dnslib:compressed_domain(), Tail :: binary()}
-     %{'extended', Type :: 0..63, binary()},
-     | {'error',
-         'truncated_domain' |
-         'empty_binary'     |
-         'domain_too_long'  |
-         {'invalid_length', Bit1 :: 0..1, Bit2 :: 0..1}
-       }.
-%binary_to_domain(<<0:1, 1:1, Type:6, Rest/binary>>) ->
-%    {extended, Type, Rest};
-binary_to_domain(<<>>) ->
-    {error, empty_binary};
-binary_to_domain(Bin) ->
-    binary_to_domain(Bin, [], 0).
-
-
 -type list_to_domain_error() ::
     'domain_too_long' |
     'label_too_long'  |
@@ -620,15 +574,6 @@ is_valid_domain(['_'|Domain]) ->
     is_valid_domain(Domain, 1);
 is_valid_domain(Domain) ->
     is_valid_domain(Domain, 1).
-
-
--spec domain_binary_length(non_wildcard_domain() | compressed_domain()) -> pos_integer().
-domain_binary_length([]) ->
-    1;
-domain_binary_length({compressed, _, Domain}) ->
-    domain_binary_length(Domain, 0) + 1;
-domain_binary_length(Domain) ->
-    domain_binary_length(Domain, 0).
 
 
 -spec is_valid_hostname(domain()) -> boolean().
@@ -748,46 +693,6 @@ normalize_label(<<Char, Tail/binary>>, Acc) ->
     normalize_label(Tail, <<Acc/bits, Char>>).
 
 
--spec domain_to_binary(dnslib:domain(), binary()) ->
-    {'ok', binary()} |
-    {'error',
-        'domain_too_long' |
-        'label_too_long'  |
-        'empty_label'
-    }.
-domain_to_binary(_, Acc) when byte_size(Acc) >= ?DOMAIN_MAX_OCTETS -> %
-    {error, domain_too_long};
-domain_to_binary([], Acc) ->
-    {ok, <<Acc/binary, 0>>};
-domain_to_binary([Label|_], _) when byte_size(Label) > 63 ->
-    {error, label_too_long};
-domain_to_binary([<<>>|_], _) ->
-    {error, empty_label};
-domain_to_binary([Label|Rest], Acc) ->
-    domain_to_binary(Rest, <<Acc/binary, (byte_size(Label)), Label/binary>>).
-
-
-binary_to_domain(_, _, BytesUsed) when BytesUsed >= ?DOMAIN_MAX_OCTETS ->
-    {error, domain_too_long};
-binary_to_domain(<<>>, _, _) ->
-    {error, truncated_domain};
-binary_to_domain(<<0, Tail/binary>>, Acc, _) ->
-    {ok, lists:reverse(Acc), Tail};
-binary_to_domain(<<1:1, 1:1, Rest/bits>>, Acc, BytesUsed) ->
-    case Rest of
-        _ when BytesUsed =:= ?DOMAIN_MAX_OCTETS -> {error, domain_too_long};
-        <<Ref:14, Tail/binary>> -> {compressed, {compressed, Ref, Acc}, Tail};
-        _ -> {error, truncated_domain}
-    end;
-binary_to_domain(<<0:1, 0:1, Rest/bits>>, Acc, BytesUsed) ->
-    case Rest of
-        <<Len:6, Label:Len/binary, Tail/binary>> -> binary_to_domain(Tail, [Label|Acc], BytesUsed+1+Len);
-        _ -> {error, truncated_domain}
-    end;
-binary_to_domain(<<B1:1, B2:1, _:6, _/binary>>, _, _) ->
-    {error, {invalid_length, B1, B2}}.
-
-
 list_to_codepoint_domain(_, _, _, TotalLength, _) when TotalLength > ?DOMAIN_MAX_OCTETS ->
     {error, domain_too_long};
 list_to_codepoint_domain(_, Acc, _, _, _) when length(Acc) > 63 ->
@@ -853,13 +758,6 @@ is_valid_domain([Label|Rest], TotalLength) when is_binary(Label) ->
     is_valid_domain(Rest, TotalLength + byte_size(Label) + 1);
 is_valid_domain([Label|_], _) when not is_binary(Label) ->
     {false, non_binary_label}.
-
-
-
-domain_binary_length([], Len) ->
-    Len + 1;
-domain_binary_length([Label|Domain], Len) ->
-    domain_binary_length(Domain, Len + 1 + byte_size(Label)).
 
 
 is_valid_hostname(<<>>, []) ->
@@ -1009,8 +907,6 @@ punyencode_bias() ->
         end
     end,
     {?PUNYCODE_BIAS_INIT, Fun1(Fun2)}.
-
-%dnslib:punyencode([<<"väinämöinen">>]).
 
 
 punyencode_bias_loop(Delta, K) when Delta > (((?PUNYCODE_BASE - ?PUNYCODE_TMIN) * ?PUNYCODE_TMAX) div 2) ->

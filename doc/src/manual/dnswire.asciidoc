@@ -1,6 +1,6 @@
 = dnswire
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.02.01
 :ext-relative: {outfilesuffix}
 
 == Module
@@ -15,20 +15,24 @@ Transform messages from and to binary wire format.
 
 To wire format:
 
+* link:dnswire.domain_to_binary{ext-relative}[dnswire:domain_to_binary] - Transform a domain into a wire format binary
 * link:dnswire.to_binary{ext-relative}[dnswire:to_binary] - Transform DNS message to wire format
 * link:dnswire.to_iolist{ext-relative}[dnswire:to_iolist] - Transform DNS message to wire format
 
 From wire format:
 
+* link:dnswire.binary_to_domain{ext-relative}[dnswire:binary_to_domain] - Transform a wire format binary into a domain
 * link:dnswire.from_binary{ext-relative}[dnswire:from_binary] - Parse wire format to message
 
 Support functions:
 
+* link:dnswire.domain_binary_length{ext-relative}[dnswire:domain_binary_length] - Get the `byte_size()` for wire encoding of a domain
 * link:dnswire.from_binary_domain{ext-relative}[dnswire:from_binary_domain] - Indicate domain in link:dnsrr.callback.from_binary{ext-relative}[`Resource:from_binary`] callback
 * link:dnswire.to_binary_domain{ext-relative}[dnswire:to_binary_domain] - Indicate domain in link:dnsrr.callback.to_binary{ext-relative}[`Resource:to_binary`] callback
 
 == Changelog
 
+* *0.0.2* Functions `binary_to_domain/1`, `domain_to_binary/1` and `domain_binary_length/1` were moved from `dnslib` module
 * *0.0.0* Module added
 
 == See also

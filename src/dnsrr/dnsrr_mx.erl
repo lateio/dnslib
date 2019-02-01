@@ -52,7 +52,7 @@ to_binary({Priority, Domain}) ->
 
 
 from_binary(<<Priority:16, Bin/binary>>) ->
-    case dnslib:binary_to_domain(Bin) of
+    case dnswire:binary_to_domain(Bin) of
         {error, Reason} -> {error, Reason};
         {_, Domain, <<>>} -> {domains, [Priority, dnswire:from_binary_domain(Domain, 2)]}
     end.

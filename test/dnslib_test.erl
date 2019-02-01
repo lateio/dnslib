@@ -52,32 +52,6 @@ domain_to_codepoint_domain_test() ->
     ["ARV","io"] = dnslib:domain_to_codepoint_domain([<<"ARV">>,<<"io">>]).
 
 
-binary_to_domain_test() ->
-    {ok, [<<"arv">>,<<"io">>], <<>>} = dnslib:binary_to_domain(<<3, "arv", 2, "io", 0>>),
-    {compressed, {compressed, 2, [<<"io">>,<<"arv">>]}, <<>>} = dnslib:binary_to_domain(<<3, "arv", 2, "io", 1:1, 1:1, 2:14>>),
-    {error, truncated_domain} = dnslib:binary_to_domain(<<0:2>>),
-    {error, truncated_domain} = dnslib:binary_to_domain(<<3, "arv", 2, "io">>),
-    {error, empty_binary} = dnslib:binary_to_domain(<<>>),
-    BinLabel = << <<$a>> || _ <- lists:seq(1,63)>>,
-    LongBinary = <<63, BinLabel/binary, 63, BinLabel/binary, 63, BinLabel/binary, 63, BinLabel/binary, 0>>,
-    {error, domain_too_long} = dnslib:binary_to_domain(LongBinary),
-    LastLabel = << <<$a>> || _ <- lists:seq(1,61)>>,
-    MaxBinary = <<63, BinLabel/binary, 63, BinLabel/binary, 63, BinLabel/binary, 61, LastLabel/binary, 0>>,
-    {ok, _, <<>>} = dnslib:binary_to_domain(MaxBinary),
-    {error, {invalid_length, 0, 1}} = dnslib:binary_to_domain(<<0:1, 1:1, 0:6>>).
-
-
-domain_to_binary_test() ->
-    {ok, <<3, "ARV", 2, "io", 0>>} = dnslib:domain_to_binary([<<"ARV">>,<<"io">>]),
-    {ok, <<3, "ARV", 2, "io", 3:2, 12:14>>} = dnslib:domain_to_binary({compressed, 12, [<<"io">>, <<"ARV">>]}),
-    BinLabel = << <<$a>> || _ <- lists:seq(1,63)>>,
-    {error, domain_too_long} = dnslib:domain_to_binary([BinLabel || _ <- lists:seq(1,4)]),
-    {error, label_too_long} = dnslib:domain_to_binary([<< <<$a>> || _ <- lists:seq(1,64)>>]),
-    {error, empty_label} = dnslib:domain_to_binary([<<>>]),
-    {error, ref_out_of_range} = dnslib:domain_to_binary({compressed, -1, [<<"io">>, <<"ARV">>]}),
-    {error, ref_out_of_range} = dnslib:domain_to_binary({compressed, 16#4000, [<<"io">>, <<"ARV">>]}).
-
-
 domain_to_list_test() ->
     "*.arv.io." = dnslib:domain_to_list(['_',<<"arv">>,<<"io">>]),
     "\\\"arv.io." = dnslib:domain_to_list([<<"\"arv">>,<<"io">>]),
@@ -94,12 +68,6 @@ domain_to_list_test() ->
     "\\*.arv.*.io." = dnslib:domain_to_list(["*","arv","*","io"]),
     "\\(arv.*.io." = dnslib:domain_to_list(["(arv","*","io"]),
     "\\\"arv.*.io." = dnslib:domain_to_list(["\"arv","*","io"]).
-
-
-domain_binary_length_test() ->
-    1 = dnslib:domain_binary_length([]),
-    8 = dnslib:domain_binary_length([<<"arv">>,<<"io">>]),
-    9 = dnslib:domain_binary_length({compressed, 12, [<<"io">>,<<"arv">>]}).
 
 
 reset_id_test() ->

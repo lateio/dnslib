@@ -200,7 +200,7 @@ dnswire_encode_max_length_test() ->
 format_errors1_test() ->
     % Domain decompression produces an overly long domain
     MaxDomain = lists:append([<<"a">>|[<<"long">> || _ <- lists:seq(1,49)]], [<<"domain">>]),
-    {ok, MaxDomainBin} = dnslib:domain_to_binary(MaxDomain),
+    {ok, MaxDomainBin} = dnswire:domain_to_binary(MaxDomain),
     <<MaxDomainStart:254/binary, _/bits>> = MaxDomainBin,
     Bin1 = <<
         0:16, % ID
@@ -463,3 +463,35 @@ format_errors6_test() ->
         0, 41:16, 512:16, 0, 0, 0, 0, 0:16
     >>,
     {error, {format_error, _, _}} = dnswire:from_binary(Bin2).
+
+
+binary_to_domain_test() ->
+    {ok, [<<"arv">>,<<"io">>], <<>>} = dnswire:binary_to_domain(<<3, "arv", 2, "io", 0>>),
+    {compressed, {compressed, 2, [<<"io">>,<<"arv">>]}, <<>>} = dnswire:binary_to_domain(<<3, "arv", 2, "io", 1:1, 1:1, 2:14>>),
+    {error, truncated_domain} = dnswire:binary_to_domain(<<0:2>>),
+    {error, truncated_domain} = dnswire:binary_to_domain(<<3, "arv", 2, "io">>),
+    {error, empty_binary} = dnswire:binary_to_domain(<<>>),
+    BinLabel = << <<$a>> || _ <- lists:seq(1,63)>>,
+    LongBinary = <<63, BinLabel/binary, 63, BinLabel/binary, 63, BinLabel/binary, 63, BinLabel/binary, 0>>,
+    {error, domain_too_long} = dnswire:binary_to_domain(LongBinary),
+    LastLabel = << <<$a>> || _ <- lists:seq(1,61)>>,
+    MaxBinary = <<63, BinLabel/binary, 63, BinLabel/binary, 63, BinLabel/binary, 61, LastLabel/binary, 0>>,
+    {ok, _, <<>>} = dnswire:binary_to_domain(MaxBinary),
+    {error, {invalid_length, 0, 1}} = dnswire:binary_to_domain(<<0:1, 1:1, 0:6>>).
+
+
+domain_to_binary_test() ->
+    {ok, <<3, "ARV", 2, "io", 0>>} = dnswire:domain_to_binary([<<"ARV">>,<<"io">>]),
+    {ok, <<3, "ARV", 2, "io", 3:2, 12:14>>} = dnswire:domain_to_binary({compressed, 12, [<<"io">>, <<"ARV">>]}),
+    BinLabel = << <<$a>> || _ <- lists:seq(1,63)>>,
+    {error, domain_too_long} = dnswire:domain_to_binary([BinLabel || _ <- lists:seq(1,4)]),
+    {error, label_too_long} = dnswire:domain_to_binary([<< <<$a>> || _ <- lists:seq(1,64)>>]),
+    {error, empty_label} = dnswire:domain_to_binary([<<>>]),
+    {error, ref_out_of_range} = dnswire:domain_to_binary({compressed, -1, [<<"io">>, <<"ARV">>]}),
+    {error, ref_out_of_range} = dnswire:domain_to_binary({compressed, 16#4000, [<<"io">>, <<"ARV">>]}).
+
+
+domain_binary_length_test() ->
+    1 = dnswire:domain_binary_length([]),
+    8 = dnswire:domain_binary_length([<<"arv">>,<<"io">>]),
+    9 = dnswire:domain_binary_length({compressed, 12, [<<"io">>,<<"arv">>]}).

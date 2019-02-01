@@ -76,10 +76,10 @@ from_binary(Bin) ->
 from_binary([Contact, Ns], _, <<Id:32,Refresh:32,Retry:32,Expire:32,Minimum:32>>) ->
     {domains, [Ns, Contact, Id, Refresh, Retry, Expire, Minimum]};
 from_binary(Acc, Offset0, Bin) when length(Acc) < 2 ->
-    case dnslib:binary_to_domain(Bin) of
+    case dnswire:binary_to_domain(Bin) of
         {error, Reason} -> {error, Reason};
         {_, Domain, Tail} ->
-            Offset = Offset0 + dnslib:domain_binary_length(Domain),
+            Offset = Offset0 + dnswire:domain_binary_length(Domain),
             from_binary([dnswire:from_binary_domain(Domain, Offset0)|Acc], Offset, Tail)
     end.
 
@@ -143,18 +143,18 @@ refresh(Data = {_, _, _, _, _, _, _}) ->
 
 
 retry(Resource = {_, _, _, _, _}) ->
-    element(4, element(5, Resource));
+    element(5, element(5, Resource));
 retry(Data = {_, _, _, _, _, _, _}) ->
-    element(4, Data).
+    element(5, Data).
 
 
 expire(Resource = {_, _, _, _, _}) ->
-    element(5, element(5, Resource));
+    element(6, element(5, Resource));
 expire(Data = {_, _, _, _, _, _, _}) ->
-    element(5, Data).
+    element(6, Data).
 
 
 minimum(Resource = {_, _, _, _, _}) ->
-    element(5, element(5, Resource));
+    element(7, element(5, Resource));
 minimum(Data = {_, _, _, _, _, _, _}) ->
-    element(5, Data).
+    element(7, Data).

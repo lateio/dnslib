@@ -1,11 +1,11 @@
-= dnslib:binary_to_domain
+= dnswire:binary_to_domain
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.02.01
 :ext-relative: {outfilesuffix}
 
 == Name
 
-dnslib:binary_to_domain - Transform a wire format binary into a domain
+dnswire:binary_to_domain - Transform a wire format binary into a domain
 
 == Description
 
@@ -62,38 +62,39 @@ In wire format domains are encoded as a series of labels. Each label consist of 
 
 [source,erlang]
 BinDomain = <<3, "arv", 2, "io", 0>>,
-{ok, [<<"arv">>,<<"io">>], <<>>} = dnslib:binary_to_domain(BinDomain).
+{ok, [<<"arv">>,<<"io">>], <<>>} = dnswire:binary_to_domain(BinDomain).
 
 Setting the two most significant bits of an octet encoding the length of a label to 1 indicates domain compression. The 14 bits following the two bits set to 1 form the offset from the start of a DNS message where the rest of the domain can be located.
 
 [source,erlang]
 BinDomainCompressed = <<3, "arv", 2, "io", 1:1, 1:1, 20:14>>,
-{compressed, {compressed, 20, [<<"io">>, <<"arv">>]}, <<>>} = dnslib:binary_to_domain(BinDomainCompressed).
+{compressed, {compressed, 20, [<<"io">>, <<"arv">>]}, <<>>} = dnswire:binary_to_domain(BinDomainCompressed).
 
 == Examples
 
 [source,erlang]
 ----
 Bin1 = <<3, "ARV", 2, "io", 0, "trailing">>,
-{ok, [<<"ARV">>,<<"io">>], <<"trailing">>} = dnslib:binary_to_domain(Bin1),
+{ok, [<<"ARV">>,<<"io">>], <<"trailing">>} = dnswire:binary_to_domain(Bin1),
 Bin2 = <<3, "ARV", 2, "io", 3:2, 20:14, "trailing">>,
-{compressed, {compressed, 20, [<<"io">>,<<"ARV">>]}, <<"trailing">>} = dnslib:binary_to_domain(Bin2).
+{compressed, {compressed, 20, [<<"io">>,<<"ARV">>]}, <<"trailing">>} = dnswire:binary_to_domain(Bin2).
 ----
 
 .Various errors
 [source,erlang]
 ----
-{error, truncated_domain} = dnslib:binary_to_domain(<<0:2>>),
-{error, truncated_domain} = dnslib:binary_to_domain(<<3, "arv", 2, "io">>),
-{error, empty_binary} = dnslib:binary_to_domain(<<>>),
+{error, truncated_domain} = dnswire:binary_to_domain(<<0:2>>),
+{error, truncated_domain} = dnswire:binary_to_domain(<<3, "arv", 2, "io">>),
+{error, empty_binary} = dnswire:binary_to_domain(<<>>),
 BinLabel = << <<$a>> || _ <- lists:seq(1,63)>>,
 LongBinary = <<63, BinLabel/binary, 63, BinLabel/binary, 63, BinLabel/binary, 63, BinLabel/binary, 0>>,
-{error, domain_too_long} = dnslib:binary_to_domain(LongBinary),
-{error, {invalid_length, 0, 1}} = dnslib:binary_to_domain(<<0:1, 1:1, 0:6>>).
+{error, domain_too_long} = dnswire:binary_to_domain(LongBinary),
+{error, {invalid_length, 0, 1}} = dnswire:binary_to_domain(<<0:1, 1:1, 0:6>>).
 ----
 
 == Changelog
 
+* *0.0.2* Function moved from `dnslib` module to `dnswire`
 * *0.0.1*
 ** Added `domain_too_long` error
 ** Return tuple for compressed domains changed from `{Domain, Tail}` to `{'compressed', Domain, Tail}`
@@ -101,5 +102,5 @@ LongBinary = <<63, BinLabel/binary, 63, BinLabel/binary, 63, BinLabel/binary, 63
 
 == See also
 
-link:dnslib.domain_to_binary{ext-relative}[dnslib:domain_to_binary],
-link:dnslib{ext-relative}[dnslib]
+link:dnswire.domain_to_binary{ext-relative}[dnswire:domain_to_binary],
+link:dnswire{ext-relative}[dnswire]

@@ -60,7 +60,7 @@ from_binary(<<Order:16, Preference:16, Tail/binary>>) ->
     from_binary([Preference, Order], Tail).
 
 from_binary([Regexp, Services, Flags, Preference, Order], Bin) ->
-    case dnslib:binary_to_domain(Bin) of
+    case dnswire:binary_to_domain(Bin) of
         {ok, Replacement, <<>>} ->
             Offset = 4 + 3 + byte_size(Flags) + byte_size(Services) + byte_size(Regexp),
             {domains, [Order, Preference, Flags, Services, Regexp, dnswire:from_binary_domain(Replacement, Offset)]};

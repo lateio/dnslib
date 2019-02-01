@@ -1,11 +1,11 @@
-= dnslib:domain_binary_length
+= dnswire:domain_binary_length
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.02.01
 :ext-relative: {outfilesuffix}
 
 == Name
 
-dnslib:domain_binary_length - Get the `byte_size()` for wire encoding of a domain
+dnswire:domain_binary_length - Get the `byte_size()` for wire encoding of a domain
 
 == Description
 
@@ -32,17 +32,18 @@ The `byte_size()` of the wire encoding of the domain is returned.
 
 [source,erlang]
 ----
-1 = dnslib:domain_binary_length([]),
-8 = dnslib:domain_binary_length([<<"arv">>,<<"io">>]),
-9 = dnslib:domain_binary_length({compressed, 12, [<<"io">>,<<"arv">>]}).
+1 = dnswire:domain_binary_length([]),
+8 = dnswire:domain_binary_length([<<"arv">>,<<"io">>]),
+9 = dnswire:domain_binary_length({compressed, 12, [<<"io">>,<<"arv">>]}).
 ----
 
 == Changelog
 
+* *0.0.2* Function moved from `dnslib` module to `dnswire`
 * *0.0.1* Function also accepts compressed domains
 * *0.0.0* Function added
 
 == See also
 
-link:dnslib.domain_to_binary{ext-relative}[dnslib:domain_to_binary],
-link:dnslib{ext-relative}[dnslib]
+link:dnswire.domain_to_binary{ext-relative}[dnswire:domain_to_binary],
+link:dnswire{ext-relative}[dnswire]

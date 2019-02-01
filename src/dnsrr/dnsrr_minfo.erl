@@ -44,10 +44,10 @@ from_binary(Bin) ->
 from_binary([D2, D1], <<>>) ->
     {domains, [
         dnswire:from_binary_domain(D1, 0),
-        dnswire:from_binary_domain(D2, dnslib:domain_binary_length(D1))
+        dnswire:from_binary_domain(D2, dnswire:domain_binary_length(D1))
     ]};
 from_binary(Acc, Bin) when length(Acc) < 2 ->
-    case dnslib:binary_to_domain(Bin) of
+    case dnswire:binary_to_domain(Bin) of
         {error, _} -> {error, invalid_data};
         {_, Domain, Tail} -> from_binary([Domain|Acc], Tail)
     end.

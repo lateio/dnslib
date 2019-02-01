@@ -1,6 +1,6 @@
 = dnslib
 Lauri Moisio <l@arv.io>
-Version 0.0.2, 2019.01.31
+Version 0.0.2, 2019.02.01
 :ext-relative: {outfilesuffix}
 
 == Module
@@ -16,12 +16,9 @@ General DNS functionality.
 Domains:
 
 * link:dnslib.append_domain{ext-relative}[dnslib:append_domain] - Concatenate two or more domains
-* link:dnslib.binary_to_domain{ext-relative}[dnslib:binary_to_domain] - Transform a wire format binary into a domain
 * link:dnslib.codepoint_domain_to_domain{ext-relative}[dnslib:codepoint_domain_to_domain] - Transform a code point domain into a domain
 * link:dnslib.domain{ext-relative}[dnslib:domain] - Create a domain term
-* link:dnslib.domain_binary_length{ext-relative}[dnslib:domain_binary_length] - Get the `byte_size()` for wire encoding of a domain
 * link:dnslib.domain_in_zone{ext-relative}[dnslib:domain_in_zone] - Test if one domain is in the zone specified by another domain
-* link:dnslib.domain_to_binary{ext-relative}[dnslib:domain_to_binary] - Transform a domain into a wire format binary
 * link:dnslib.domain_to_codepoint_domain{ext-relative}[dnslib:domain_to_codepoint_domain] - Transform a domain into a code point domain
 * link:dnslib.domain_to_list{ext-relative}[dnslib:domain_to_list] - Transform a domain into a string
 * link:dnslib.is_subdomain{ext-relative}[dnslib:is_subdomain] - Test if one domain is a subdomain of another
@@ -186,6 +183,9 @@ The `return_code()` in a DNS message signifies whether the operation succeeded o
 
 == Changelog
 
+* *0.0.2*
+** Functions `binary_to_domain/1`, `domain_to_binary/1` and `domain_binary_length/1` were moved to `dnswire` module
+** New function `domain/1`
 * *0.0.1* `codepoint_domain()` type and other associated types added
 * *0.0.0* Module added
 

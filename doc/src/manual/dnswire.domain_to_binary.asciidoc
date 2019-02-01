@@ -1,11 +1,11 @@
-= dnslib:domain_to_binary
+= dnswire:domain_to_binary
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.02.01
 :ext-relative: {outfilesuffix}
 
 == Name
 
-dnslib:domain_to_binary - Transform a domain into a wire format binary
+dnswire:domain_to_binary - Transform a domain into a wire format binary
 
 == Description
 
@@ -57,12 +57,13 @@ When trying to handle a compressed domain, the offset the domain refers to look 
 
 [source,erlang]
 ----
-{ok, <<3, "ARV", 2, "io", 0>>} = dnslib:domain_to_binary([<<"ARV">>,<<"io">>]),
-{ok, <<3, "ARV", 2, "io", 3:2, 12:14>>} = dnslib:domain_to_binary({compressed, 12, [<<"io">>, <<"ARV">>]}).
+{ok, <<3, "ARV", 2, "io", 0>>} = dnswire:domain_to_binary([<<"ARV">>,<<"io">>]),
+{ok, <<3, "ARV", 2, "io", 3:2, 12:14>>} = dnswire:domain_to_binary({compressed, 12, [<<"io">>, <<"ARV">>]}).
 ----
 
 == Changelog
 
+* *0.0.2* Function moved from module `dnslib` to `dnswire`
 * *0.0.1*
 ** Added `domain_too_long` error
 ** Added `label_too_long` error
@@ -74,5 +75,5 @@ When trying to handle a compressed domain, the offset the domain refers to look 
 
 == See also
 
-link:dnslib.binary_to_domain{ext-relative}[dnslib:binary_to_domain],
-link:dnslib{ext-relative}[dnslib]
+link:dnswire.binary_to_domain{ext-relative}[dnswire:binary_to_domain],
+link:dnswire{ext-relative}[dnswire]

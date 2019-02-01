@@ -36,12 +36,12 @@ from_binary(Bin) ->
     from_binary(Bin, true).
 
 from_binary(Bin, true) ->
-    case dnslib:binary_to_domain(Bin) of
+    case dnswire:binary_to_domain(Bin) of
         {error, _} -> {error, invalid_data};
         {_, Domain, <<>>} -> {domains, [dnswire:from_binary_domain(Domain, 0)]}
     end;
 from_binary(Bin, false) ->
-    case dnslib:binary_to_domain(Bin) of
+    case dnswire:binary_to_domain(Bin) of
         {error, _} -> {error, invalid_data};
         {compressed, _, _} -> {errors, compressed_domain};
         {ok, Domain, <<>>} -> {domains, [dnswire:from_binary_domain(Domain, 0)]}

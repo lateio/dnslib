@@ -56,7 +56,7 @@ to_binary({Priority, Weight, Port, Domain}) ->
 
 
 from_binary(<<Priority:16, Weight:16, Port:16, Tail/binary>>) ->
-    case dnslib:binary_to_domain(Tail) of
+    case dnswire:binary_to_domain(Tail) of
         {error, _} -> {error, invalid_domain};
         {_, Domain, <<>>} ->
             {domains, [Priority, Weight, Port, dnswire:from_binary_domain(Domain, 6)]}

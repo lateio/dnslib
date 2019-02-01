@@ -1113,7 +1113,7 @@ resource_data_to_binary(Module, Data) ->
         {ok, BinData} -> iolist_to_binary(BinData);
         {domains, List} ->
             Fn = fun
-                ({domain, _, Domain}) -> {ok, Bin} = dnslib:domain_to_binary(Domain), Bin;
+                ({domain, _, Domain}) -> {ok, Bin} = dnswire:domain_to_binary(Domain), Bin;
                 (FunData) -> FunData
             end,
             iolist_to_binary([Fn(GenTuple) || GenTuple <- List])

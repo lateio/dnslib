@@ -24,6 +24,14 @@
 -export([
     consult/1,
     consult/2,
+    foldl/3,
+    foldl/4,
+    is_valid/1,
+    is_valid/2,
+    iterate_begin/1,
+    iterate_begin/2,
+    iterate_next/1,
+    iterate_end/1,
     parse_resource/1,
     write_resources/2,
     write_resources/3,
@@ -55,6 +63,7 @@
 
 -type line_part() :: string() | {string(), 'quoted'}.
 
+% Split static configuration fields from state?
 -record(state, {
     encoding=unicode :: unicode:encoding(),
     text_encoding=unicode :: unicode:encoding(),
@@ -71,7 +80,6 @@
     prevclass={assume, in} :: dnsclass:class() | {'assume', 'in'} | 'undefined',
     prevttl                :: dnslib:ttl()     | 'undefined',
     defttl                 :: dnslib:ttl()     | 'undefined',
-    records=[]             :: [dnslib:resource()],
     include_depth=3        :: non_neg_integer(),
     included_from=[]       :: [string()],
     punyencode=false       :: boolean(),
@@ -79,6 +87,8 @@
     allow_unknown_classes=false   :: boolean(),
     reverse_dns_pointer=false :: boolean() | 'inet' | 'inet6',
     'allow_@'=true :: boolean(),
+    mode=consult   :: 'consult' | 'foldl' | 'foreach',
+    mode_state=[]  :: term(), % Keep foldl acc&fun and/or consult resources here...
     directives=#{
         "origin"              => directive_origin,
         "ttl"                 => directive_ttl,
@@ -112,6 +122,9 @@ directive_error(File, LineNumber, Details) ->
 
 resource_record_error(File, LineNumber, Details) ->
     {resource_record_error, File, LineNumber, Details}.
+
+foldl_error(Class, Reason, Stacktrace) ->
+    {foldl_error, Class, Reason, Stacktrace}.
 
 
 -type prepare_data_error() ::
@@ -311,7 +324,7 @@ directive_include([], _) ->
     error(no_arguments).
 
 
-directive_include(Path0, Origin, OriginStr, State = #state{path=PrevPath,include_depth=Depth,records=Records,included_from=IncludedFrom}) ->
+directive_include(Path0, Origin, OriginStr, State = #state{path=PrevPath,include_depth=Depth,included_from=IncludedFrom,mode=Mode}) ->
     Path = resolve(Path0),
     File = case filename:pathtype(Path) of
         absolute -> Path;
@@ -327,11 +340,13 @@ directive_include(Path0, Origin, OriginStr, State = #state{path=PrevPath,include
         entry_parts=[[]],
         path=File,
         include_depth=Depth-1,
-        records=[],
         included_from=[PrevPath|IncludedFrom]
     },
     case consult_file(File, TmpState) of
-        {ok, NewRecords} -> {ok, State#state{records=lists:append(lists:reverse(NewRecords), Records)}};
+        {ok, NewRecords} when Mode =:= consult -> {ok, State#state{mode_state=lists:reverse(NewRecords)}};
+        {ok, NewAcc} when Mode =:= foldl ->
+            #state{mode_state={Fun, _}} = State,
+            {ok, State#state{mode_state={Fun, NewAcc}}};
         {error, Reason} -> error({include_error, Reason})
     end.
 
@@ -611,43 +626,46 @@ check_blacklist(Entry = {_, Type, _, _, _} , State = #state{startline=LineNumber
     end.
 
 
-check_type_class_compatibility(Entry = {Domain, Type, Class, Ttl, _}, State0 = #state{records=Records}) when is_integer(Type) ->
-    State1 = State0#state{records=[Entry|Records], prevdomain=Domain, prevclass=Class, prevttl=Ttl},
-    {ok, State1};
-check_type_class_compatibility(Entry = {Domain, Type, Class, Ttl, _}, State0 = #state{records=Records,startline=LineNumber,path=File}) ->
-    State1 = State0#state{records=[Entry|Records], prevdomain=Domain, prevclass=Class, prevttl=Ttl},
-    Module = dnsrr:from_to(Type, atom, module),
-    case
-        case erlang:function_exported(Module, class, 0) of
-            false -> ok;
-            true ->
-                case Module:class() of
-                    Class -> ok;
-                    List when is_list(List) ->
-                        case lists:member(Class, List) of
-                            true -> ok;
-                            false -> error
-                        end;
-                    _ -> error
-                end
-        end
-    of
-        %ok -> {ok, State1};
-        ok -> create_reverse_dns_pointer(Entry, State1);
-        error -> error(resource_record_error(File, LineNumber, invalid_class))
+check_type_class_compatibility(Entry = {_, Type, _, _, _}, State) when is_integer(Type) ->
+    entry_done(Entry, State);
+check_type_class_compatibility(Entry = {Domain, Type, Class, Ttl, _}, State = #state{startline=LineNumber,path=File}) ->
+    case dnsrr:class_valid_for_type(Class, Type) of
+        false -> error(resource_record_error(File, LineNumber, invalid_class));
+        true -> create_reverse_dns_pointer(Entry, State)
     end.
 
 
-create_reverse_dns_pointer(_, State = #state{reverse_dns_pointer=false}) ->
-    {ok, State};
-create_reverse_dns_pointer({Domain, a, _, Ttl, Address}, State = #state{reverse_dns_pointer=CreatePointer,records=Records})
-when CreatePointer =:= inet; CreatePointer =:= true ->
-    Pointer = {dnslib:reverse_dns_domain(Address), ptr, in, Ttl, Domain}, % A can only have class IN
-    {ok, State#state{records=[Pointer|Records]}};
-create_reverse_dns_pointer({Domain, aaaa, _, Ttl, Address}, State = #state{reverse_dns_pointer=CreatePointer,records=Records})
-when CreatePointer =:= inet6; CreatePointer =:= true ->
-    Pointer = {dnslib:reverse_dns_domain(Address), ptr, in, Ttl, Domain}, % AAAA can only have class IN
-    {ok, State#state{records=[Pointer|Records]}}.
+create_reverse_dns_pointer(Entry, State = #state{reverse_dns_pointer=false}) ->
+    entry_done(Entry, State).
+%create_reverse_dns_pointer({Domain, a, _, Ttl, Address}, State = #state{reverse_dns_pointer=CreatePointer,records=Records})
+%when CreatePointer =:= inet; CreatePointer =:= true ->
+%    Pointer = {dnslib:reverse_dns_domain(Address), ptr, in, Ttl, Domain}, % A can only have class IN
+%    {ok, State#state{records=[Pointer|Records]}};
+%create_reverse_dns_pointer({Domain, aaaa, _, Ttl, Address}, State = #state{reverse_dns_pointer=CreatePointer,records=Records})
+%when CreatePointer =:= inet6; CreatePointer =:= true ->
+%    Pointer = {dnslib:reverse_dns_domain(Address), ptr, in, Ttl, Domain}, % AAAA can only have class IN
+%    {ok, State#state{records=[Pointer|Records]}}.
+
+
+-ifdef(OTP_RELEASE).
+entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=consult, mode_state=Records}) ->
+    {ok, State0#state{mode_state=[Entry|Records], prevdomain=Domain, prevclass=Class, prevttl=Ttl}};
+entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=foldl, mode_state={Fun, Acc0}}) ->
+    try Fun(Entry, Acc0) of
+        Acc1 -> {ok, State0#state{mode_state={Fun, Acc1}, prevdomain=Domain, prevclass=Class, prevttl=Ttl}}
+    catch
+        CatchClass:Reason:Stacktrace -> error(foldl_error(CatchClass, Reason, Stacktrace))
+    end.
+-else.
+entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=consult, mode_state=Records}) ->
+    {ok, State0#state{mode_state=[Entry|Records], prevdomain=Domain, prevclass=Class, prevttl=Ttl}};
+entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=foldl, mode_state={Fun, Acc0}}) ->
+    try Fun(Entry, Acc0) of
+        Acc1 -> {ok, State0#state{mode_state={Fun, Acc1}, prevdomain=Domain, prevclass=Class, prevttl=Ttl}}
+    catch
+        CatchClass:Reason -> error(foldl_error(CatchClass, Reason, erlang:get_stacktrace()))
+    end.
+-endif.
 
 
 -type handle_entry_error() ::
@@ -809,8 +827,6 @@ line_start(Line, State) ->
     token(Line, State).
 
 
-%parse_resource_partition($)
-
 parse_resource(Line) ->
     parse_resource(Line, []).
 
@@ -829,7 +845,7 @@ parse_resource(Line, _Opts) when is_list(_Opts) ->
     try parse_entry(Line, State) of
         {complete, Parts, State1} ->
             try handle_entry(Parts, State1) of
-                {ok, #state{records=[Record]}} -> {ok, Record}
+                {ok, #state{mode_state=[Record]}} -> {ok, Record}
             catch
                 error:Reason -> {error, Reason}
             end;
@@ -852,9 +868,12 @@ parse_entry(Line, State = #state{fn=Fn}) ->
         {'unclosed_quote', integer()}                         |
         {'unclosed_parentheses', integer()}
     }.
-parse_file(Fd, State) ->
-    try get_line(Fd, State)
+parse_file(Fd, State0) ->
+    try get_line(Fd, State0) of
+        {eof, State1} -> {ok, parse_file_done(State1)};
+        {_, State1} -> parse_file(Fd, State1)
     catch
+        error:{foldl_error, Class, Reason, Stacktrace}          -> {error, {foldl_error, Class, Reason, Stacktrace}};
         error:{syntax_error,          File, LineNumber, Reason} -> {error, {syntax_error,          File, LineNumber, Reason}};
         error:{directive_error,       File, LineNumber, Reason} -> {error, {directive_error,       File, LineNumber, Reason}};
         error:{resource_record_error, File, LineNumber, Reason} -> {error, {resource_record_error, File, LineNumber, Reason}}
@@ -863,35 +882,38 @@ parse_file(Fd, State) ->
 
 get_line(Fd, State = #state{max_line_length=MaxLen, line=LineNumber, path=File}) ->
     case io:get_line(Fd, "") of
-        eof -> parse_line(eof, Fd, State);
         {error, _} -> error(error);
-        Line when length(Line) > MaxLen -> error(syntax_error(File, LineNumber, {too_long_line, length(Line), MaxLen}));
-        Line -> parse_line(Line, Fd, State)
+        Line when is_list(Line), length(Line) > MaxLen -> error(syntax_error(File, LineNumber, {too_long_line, length(Line), MaxLen}));
+        Line -> parse_line(Line, State)
     end.
 
 
-parse_line(eof, _, State = #state{startline=LineNumber, path=File}) ->
+parse_line(eof, State = #state{startline=LineNumber, path=File}) ->
     case parse_entry([], State) of
         {complete, Parts, State1} ->
-            {ok, #state{records=Records}} = handle_entry(Parts, State1),
-            {ok, lists:reverse(Records)};
-        {empty, #state{records=Records}} ->
-            {ok, lists:reverse(Records)};
+            {ok, State2} = handle_entry(Parts, State1),
+            {eof, State2};
+        {empty, State2} ->
+            {eof, State2};
         {partial, #state{parentheses=true}} ->
             error(syntax_error(File, LineNumber, unclosed_parentheses));
         {partial, #state{}} ->
             error(syntax_error(File, LineNumber, unclosed_quotes))
     end;
-parse_line(Line, Fd, State = #state{line=LineNumber}) ->
+parse_line(Line, State = #state{line=LineNumber}) ->
     case parse_entry(Line, State) of
+        {partial, State1} -> {partial, State1#state{line=LineNumber+1}};
+        {empty, State1} -> {empty, State1#state{line=LineNumber+1, startline=LineNumber+1}};
         {complete, Parts, State1} ->
             {ok, State2} = handle_entry(Parts, State1),
-            get_line(Fd, State2#state{line=LineNumber+1, startline=LineNumber+1});
-        {partial, State1} ->
-            get_line(Fd, State1#state{line=LineNumber+1});
-        {empty, State1} ->
-            get_line(Fd, State1#state{line=LineNumber+1, startline=LineNumber+1})
+            {complete, State2#state{line=LineNumber+1, startline=LineNumber+1}}
     end.
+
+
+parse_file_done(#state{mode=consult, mode_state=Records}) ->
+    lists:reverse(Records);
+parse_file_done(#state{mode=foldl, mode_state={_, Acc}}) ->
+    Acc.
 
 
 -spec consult(Filename :: string()) -> {'ok', Resources :: [dnslib:resource()]}.
@@ -981,6 +1003,77 @@ prepare_state(State = #state{}, [{text_encoding, Encoding}|Rest]) ->
 prepare_state(_, [{Key, _}|_]) ->
     {error, {unknown_opt, Key}}.
 
+
+foldl(Fun, Acc0, Path) -> foldl(Fun, Acc0, Path, []).
+
+foldl(Fun, Acc0, Path, Opts) ->
+    case prepare_state(#state{}, Opts) of
+        {ok, State} -> consult_file(Path, State#state{mode=foldl, mode_state={Fun, Acc0}});
+        {error, Reason} -> {error, {invalid_opt, Reason}}
+    end.
+
+
+is_valid(Path) -> is_valid(Path, []).
+
+is_valid(Path, Opts) ->
+    Fun = fun (_, _) -> nil end,
+    case foldl(Fun, nil, Path, Opts) of
+        {ok, nil} -> true;
+        _ -> false
+    end.
+
+
+iterate_begin(Path) -> iterate_begin(Path, []).
+
+iterate_begin(Path0, Opts) ->
+    case prepare_state(#state{}, Opts) of
+        {error, Reason} -> {error, {invalid_opt, Reason}};
+        {ok, State = #state{encoding=Encoding}} ->
+            Path = case filename:pathtype(Path0) of
+                absolute -> Path0;
+                _ -> filename:absname(Path0)
+            end,
+            case file:open(Path, [read, {encoding, Encoding}]) of
+                {ok, Fd} -> {ok, {State, Fd}};
+                {error, eacces} -> {error, {file_error, eacces, Path}};
+                {error, enoent} -> {error, {file_error, enoent, Path}};
+                {error, eisdir} -> {error, {file_error, eisdir, Path}}
+            end
+    end.
+
+
+iterate_next({State, eof}=Tuple) -> eof;
+iterate_next({State, Fd}) -> iterate_next(State, Fd).
+
+iterate_next(State0, Fd) ->
+    try get_line(Fd, State0) of
+        {eof, State1 = #state{mode_state=[Resource]}} ->
+            ok = file:close(Fd),
+            {ok, Resource, {State1#state{mode_state=[]}, eof}};
+        {eof, State1 = #state{mode_state=[]}} ->
+            ok = file:close(Fd),
+            eof;
+        {complete, State1 = #state{mode_state=[Resource]}} ->
+            {ok, Resource, {State1#state{mode_state=[]}, Fd}};
+        {_, State1} -> iterate_next(State1, Fd)
+    catch
+        error:{foldl_error, Class, Reason, Stacktrace}          ->
+            ok = file:close(Fd),
+            {error, {foldl_error, Class, Reason, Stacktrace}};
+        error:{syntax_error, File, LineNumber, Reason} ->
+            ok = file:close(Fd),
+            {error, {syntax_error, File, LineNumber, Reason}};
+        error:{directive_error, File, LineNumber, Reason} ->
+            ok = file:close(Fd),
+            {error, {directive_error, File, LineNumber, Reason}};
+        error:{resource_record_error, File, LineNumber, Reason} ->
+            ok = file:close(Fd),
+            {error, {resource_record_error, File, LineNumber, Reason}}
+    end.
+
+
+iterate_end({_, eof}) -> ok;
+iterate_end({_, Fd}) -> ok = file:close(Fd).
 
 %%
 %% Output

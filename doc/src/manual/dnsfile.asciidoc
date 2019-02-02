@@ -1,6 +1,6 @@
 = dnsfile
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.02.02
 :ext-relative: {outfilesuffix}
 
 == Module
@@ -84,6 +84,11 @@ Ttl fields can use the syntax accepted by link:dnslib.list_to_ttl{ext-relative}[
 Read files:
 
 * link:dnsfile.consult{ext-relative}[dnsfile:consult] - Read resource records from a file
+* link:dnsfile.foldl{ext-relative}[dnsfile:foldl] - Call a function on successive resources retrieved from a master file
+* link:dnsfile.is_valid{ext-relative}[dnsfile:is_valid] - Verify master file syntax and contents
+* link:dnsfile.iterate_begin{ext-relative}[dnsfile:iterate_begin] - Begin master file iteration
+* link:dnsfile.iterate_end{ext-relative}[dnsfile:iterate_end] - End master file iteration
+* link:dnsfile.iterate_next{ext-relative}[dnsfile:iterate_next] - Get next resource from an iterated master file
 
 Write files:
 
@@ -117,6 +122,10 @@ arv                       A  0.0.0.0  ; origin is appended to relative domains
 
 == Changelog
 
+* *0.0.2*
+** New function `foldl/3,4` added
+** New function `is_valid/1,2` added
+** New functions `iterate_begin/1,2`, `iterate_next/1` and `iterate_end/1` added
 * *0.0.0* Module added
 
 == See also

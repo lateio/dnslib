@@ -1,0 +1,57 @@
+= dnsfile:iterate_next
+Lauri Moisio <l@arv.io>
+Version 0.0.2, 2019.02.02
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsfile:iterate_next - Get next resource from an iterated master file
+
+== Description
+
+[source,erlang]
+----
+iterate_next(State0 :: term())
+    -> {'ok', Resource :: dnslib:resource(), State1 :: term()}
+     | 'eof'
+     | {'error'
+           {
+             consult_error_type(),
+             Filename :: string(),
+             Line :: pos_integer(),
+             Reason :: term()
+           }
+       }.
+----
+
+Get next resource from an iterated master file.
+
+== Arguments
+
+State0::
+
+State previously returned by link:dnsfile.iterate_next{ext-relative}[`dnsfile:iterate_begin`] or `dnsfile:iterate_next`
+
+== Return value
+
+If the file contained more resources, a tuple consisting of `'ok'` atom, a resource parsed from the file and a new state is returned.
+
+If iteration reached the end of the file, `'eof'` is returned. When `'eof'` is returned, it is *not* necessary to call link:dnsfile.iterate_end{ext-relative}[`dnsfile:iterate_end`] anymore.
+
+On error a tuple consisting of `'error'` atom and the error reason is returned.
+
+== Errors
+
+`{consult_error_type(), File $$::$$ string(), Line $$::$$ pos_integer(), Reason $$::$$ term()}`::
+
+This case covers a wide variety problems regarding file contents. In effort to be helpful, `File` and `Line`  are included to help guide debugging. `Reason` terms try to be informative.
+
+== Changelog
+
+* *0.0.2* Function added
+
+== See also
+
+link:dnsfile.iterate_begin{ext-relative}[dnsfile:iterate_begin],
+link:dnsfile.iterate_end{ext-relative}[dnsfile:iterate_end],
+link:dnsfile{ext-relative}[dnsfile]

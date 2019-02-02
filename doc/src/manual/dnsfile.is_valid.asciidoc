@@ -1,0 +1,51 @@
+= dnsfile:is_valid
+Lauri Moisio <l@arv.io>
+Version 0.0.2, 2019.02.02
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsfile:is_valid - Verify master file syntax and contents
+
+== Description
+
+[source,erlang]
+----
+is_valid(Path :: string())
+    -> is_valid(Path, [{allow_unknown_resources, true}, {allow_unknown_classes, true}]).
+
+is_valid(Path :: string(), Opts :: [consult_opt()])
+    -> boolean().
+----
+
+Verify master file syntax and contents.
+
+== Types
+
+See link:dnsfile.consult{ext-relative}[`dnsfile:consult`] for `consult_opt()`.
+
+== Arguments
+
+Path::
+
+Path of the master file
+
+Opts::
+
+Options to control certain aspects of master file handling. See link:dnsfile.consult{ext-relative}[`dnsfile:consult`].
+
+== Return value
+
+If the file had correct syntax and semantics (see notes), `'true'` is returned. Otherwise `'false'` is returned.
+
+== Notes
+
+In addition to checking the file syntax, `is_valid` also checks that in each resource the combination of class and resource type is allowed.
+
+== Changelog
+
+* *0.0.2* Function added
+
+== See also
+
+link:dnsfile{ext-relative}[dnsfile]

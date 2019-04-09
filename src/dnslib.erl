@@ -38,6 +38,7 @@
     append_domain/1,
     append_domain/2,
     domain/1,
+    question/1,
     question/2,
     question/3,
     resource/1,
@@ -82,12 +83,13 @@
 
 % Do return_code and opcode belong here?
 -type return_code() ::
-    'ok'              |
-    'format_error'    |
-    'server_error'    |
-    'name_error'      |
-    'not_implemented' |
-    'refused'.
+      'ok'
+    | 'format_error'
+    | 'server_error'
+    | 'name_error'
+    | 'not_implemented'
+    | 'refused'
+    | 'bad_version'.
 
 -type ttl() :: 0..16#7FFFFFFF.
 
@@ -224,6 +226,37 @@ domain(Domain) ->
     end.
 
 
+question(Str) ->
+    case question_split(Str, [], []) of
+        [Domain] -> question(Domain, a);
+        [Domain, Type0] ->
+            case dnsrr:from_to(Type0, masterfile_token, value) of
+                Type0 -> error(badarg);
+                Type -> question(Domain, Type)
+            end;
+        [Domain, Type0, Class0] ->
+            Type = case dnsrr:from_to(Type0, masterfile_token, value) of
+                Type0 -> error(badarg);
+                CaseType -> CaseType
+            end,
+            Class = case dnsclass:from_to(Class0, masterfile_token, value) of
+                Class0 -> error(badarg);
+                CaseClass -> CaseClass
+            end,
+            question(Domain, Type, Class)
+    end.
+
+question_split([], Cur, Acc) ->
+    lists:reverse([lists:reverse(Cur)|Acc]);
+question_split([$\\, C|Rest], Cur, Acc) ->
+    question_split(Rest, [C, $\\|Cur], Acc);
+question_split([$\\], _, _) ->
+    error(badarg);
+question_split([WS|Rest], Cur, Acc) when WS =:= $ ; WS =:= $\t ->
+    question_split(Rest, [], [lists:reverse(Cur)|Acc]);
+question_split([C|Rest], Cur, Acc) ->
+    question_split(Rest, [C|Cur], Acc).
+
 question(Domain, Type) ->
     question(Domain, Type, in).
 
@@ -244,20 +277,30 @@ question(Domain, Type0, Class0) ->
         true -> ok;
         _ -> error(badarg)
     end,
-    Type = case is_integer(Type0) of
-        true -> dnsrr:from_to(Type0, value, atom);
-        false ->
+    Type = if
+        is_integer(Type0) -> dnsrr:from_to(Type0, value, atom);
+        is_atom(Type0) ->
             case dnsrr:from_to(Type0, atom, value) of
                 Type0 -> error(badarg); % Should we throw?
                 _ -> Type0
+            end;
+        is_list(Type0) ->
+            case dnsrr:from_to(Type0, masterfile_token, atom) of
+                Type0 -> error(badarg); % Should we throw?
+                CaseType -> CaseType
             end
     end,
-    Class = case is_integer(Class0) of
-        true -> dnsclass:from_to(Class0, value, atom);
-        false ->
+    Class = if
+        is_integer(Class0) -> dnsclass:from_to(Class0, value, atom);
+        is_atom(Class0) ->
             case dnsclass:from_to(Class0, atom, value) of
                 Class0 -> error(badarg);  % Should we throw?
                 _ -> Class0
+            end;
+        is_list(Class0) ->
+            case dnsclass:from_to(Class0, masterfile_token, atom) of
+                Class0 -> error(badarg); % Should we throw?
+                CaseClass -> CaseClass
             end
     end,
     % Make sure that the type+class combination is allowed
@@ -286,71 +329,88 @@ resource(Domain, Type, Class, TtlStr, Data) when is_list(TtlStr) ->
     end;
 resource(_, _, _, Ttl, _) when not is_integer(Ttl) ->
     error(badarg);
-resource([Head|_] = DomainStr, Type, Class, Ttl, Data) when is_integer(Head) ->
+resource(DomainStr, Type, Class, Ttl, Data) when is_integer(hd(DomainStr)) ->
     case list_to_domain(DomainStr) of
         {ok, _, ['_'|Domain]} -> resource([<<"*">>|Domain], Type, Class, Ttl, Data);
         {ok, _, Domain} -> resource(Domain, Type, Class, Ttl, Data);
         _ -> error(badarg)
+    end;
+resource(Domain, Type0, Class, Ttl, Data) when is_list(Type0) ->
+    case dnsrr:from_to(Type0, masterfile_token, value) of
+        Type0 -> error(badarg);
+        Type -> resource(Domain, Type, Class, Ttl, Data)
+    end;
+resource(Domain, Type, Class0, Ttl, Data) when is_list(Class0) ->
+    case dnsclass:from_to(Class0, masterfile_token, value) of
+        Class0 -> error(badarg);
+        Class -> resource(Domain, Type, Class, Ttl, Data)
     end;
 resource(Domain, Type0, Class0, Ttl, Data0) ->
     case is_valid_domain(Domain) of
         true -> ok;
         _ -> error(badarg)
     end,
-    Class = case is_integer(Class0) of
-        true -> dnsclass:from_to(Class0, value, atom);
-        false ->
+    Class = if
+        is_integer(Class0) -> dnsclass:from_to(Class0, value, atom);
+        is_atom(Class0) ->
             case dnsclass:from_to(Class0, atom, value) of
                 Class0 -> error(badarg);  % Should we throw?
                 _ -> Class0
             end
     end,
-    {Type, Data} = case {is_integer(Type0), dnsrr:from_to(Type0, value, module), dnsrr:from_to(Type0, atom, module)} of
-        {true, Type0, _} when is_binary(Data0) -> {Type0, Data0};
-        %{true, Type0, _} when is_list(Data0) ->
-        % If data is string, it might be in generic format...
-        {true, Module, _} when Module =/= Type0 ->
-            {_, RecurseType, _, _, RecurseData} = resource(Domain, Module:atom(), Class, Ttl, Data0),
-            {RecurseType, RecurseData};
-        {false, _, Type0} -> error(badarg);
-        {false, _, Module} ->
-            case dnsrr:validate_data(Module:atom(), Data0) of
-                true -> {Module:atom(), Data0};
-                false when is_binary(Data0) ->
-                    case Module:from_binary(Data0) of
-                        {ok, TermData} -> {Module:atom(), TermData};
-                        {domains, DataList} ->
-                            case [GenTuple || GenTuple <- DataList, is_tuple(GenTuple), element(1, GenTuple) =:= compressed] of
-                                [] ->
-                                    Fn = fun
-                                        ({domain, FunDomain, _}) -> FunDomain;
-                                        (FunMember) -> FunMember
-                                    end,
-                                    Rdata = dnswire:finalize_resource_data([Fn(GenMember) || GenMember <- DataList], Module),
-                                    {Module:atom(), Rdata};
+    case
+        if
+            is_integer(Type0) -> {value, dnsrr:from_to(Type0, value, module)};
+            is_atom(Type0)    -> {atom, dnsrr:from_to(Type0, atom, module)}
+        end
+    of
+        {atom, Type0} -> error(badarg); % Throw because Type0 was an invalid atom
+        {value, Type0} when is_binary(Data0) -> {Domain, Type0, Class, Ttl, Data0}; % unknown resource type
+        {value, Type0} when is_list(Data0) -> % Unknown resource type with data in generic form
+            case dnsfile:generic_data_list_to_binary(Data0) of
+                {ok, Data} -> {Domain, Type0, Class, Ttl, Data};
+                _ -> error(badarg)
+            end;
+        {_, Module} -> % Known module
+            ClassAllowed = dnsrr:class_valid_for_type(Class, Module:atom()),
+            if
+                not ClassAllowed -> error(badarg);
+                ClassAllowed ->
+                    case dnsrr:validate_data(Module:atom(), Data0) of
+                        true -> {Domain, Module:atom(), Class, Ttl, Data0};
+                        false when is_binary(Data0) ->
+                            % Check if data was actually in valid binary format
+                            case Module:from_binary(Data0) of
+                                {ok, TermData} -> {Domain, Module:atom(), Class, Ttl, TermData};
+                                {domains, DataList} ->
+                                    case [GenTuple || GenTuple <- DataList, is_tuple(GenTuple), element(1, GenTuple) =:= compressed] of
+                                        [] ->
+                                            Fn = fun
+                                                ({domain, FunDomain, _}) -> FunDomain;
+                                                (FunMember) -> FunMember
+                                            end,
+                                            Rdata = dnswire:finalize_resource_data([Fn(GenMember) || GenMember <- DataList], Module),
+                                            {Domain, Module:atom(), Class, Ttl, Rdata};
+                                        _ -> error(badarg)
+                                    end;
                                 _ -> error(badarg)
                             end;
-                        % Should we have different error for compressed domains?
-                        _ -> error(badarg)
-                    end;
-                false when is_list(Data0) ->
-                    % Need to check if the module has from_masterfile
-                    Line = lists:append([
-                        ". in 0 ",
-                        Module:masterfile_token(),
-                        " ",
-                        Data0
-                    ]),
-                    case dnsfile:parse_resource(Line) of
-                        {ok, {_, _, _, _, ParsedData}} -> {Module:atom(), ParsedData};
-                        _ -> error(badarg)
-                    end;
-                false -> error(badarg)
+                        false when is_list(Data0) ->
+                            % Need to check if the module has from_masterfile...
+                            Line = lists:append([
+                                ". in 0 ",
+                                Module:masterfile_token(),
+                                " ",
+                                Data0
+                            ]),
+                            case dnsfile:parse_resource(Line) of
+                                {ok, {_, _, _, _, ParsedData}} -> {Domain, Module:atom(), Class, Ttl, ParsedData};
+                                _ -> error(badarg)
+                            end;
+                        false -> error(badarg)
+                    end
             end
-    end,
-    % Make sure that type can be a resource.
-    % Make sure that the type+class combination is allowed
-    {Domain, Type, Class, Ttl, Data}.
+    end.
 
 
 %% @doc Normalize ascii character case in domain labels.
@@ -638,6 +698,7 @@ is_valid_return_code(server_error)     -> true;
 is_valid_return_code(name_error)       -> true;
 is_valid_return_code(not_implemented)  -> true;
 is_valid_return_code(refused)          -> true;
+is_valid_return_code(bad_version)      -> true;
 is_valid_return_code(_)                -> false.
 
 

@@ -96,6 +96,7 @@ Write files:
 
 Misc:
 
+* link:dnsfile.generic_data_list_to_binary{ext-relative}[dnsfile:generic_data_list_to_binary] - Parse a generic string list to binary
 * link:dnsfile.parse_resource{ext-relative}[dnsfile:parse_resource] - Parse string as a resource
 
 == Examples
@@ -126,6 +127,7 @@ arv                       A  0.0.0.0  ; origin is appended to relative domains
 ** New function `foldl/3,4` added
 ** New function `is_valid/1,2` added
 ** New functions `iterate_begin/1,2`, `iterate_next/1` and `iterate_end/1` added
+** New function `generic_data_list_to_binary/1` added
 * *0.0.0* Module added
 
 == See also

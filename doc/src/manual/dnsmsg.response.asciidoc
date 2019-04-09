@@ -1,6 +1,6 @@
 = dnsmsg:response
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.02.15
 :ext-relative: {outfilesuffix}
 
 == Name
@@ -33,6 +33,7 @@ response_opts() = #{
     'checking_disabled'     => boolean(),
     'return_code'           => dnslib:return_code() | 0..16#FFF,
 
+    'edns'                  => boolean(),
     'edns_version'          => 0..16#FF,
     'edns_udp_payload_size' => 512..16#FFFF,
     'edns_dnssec_ok'        => boolean()
@@ -64,6 +65,10 @@ TBD. DNSSEC related.
 `'return_code'` (`'ok'`)::
 
 Set the return code for the new message.
+
+`'edns'` (`'false'`)::
+
+Controls if EDNS is included in responses to requests which did not contain EDNS.
 
 `'edns_version'` (`0`)::
 
@@ -98,6 +103,8 @@ The created response is returned.
 * `'Recursion_desired'`
 * `'Questions'`
 
+If a return code requiring edns is specified with the option disabling edns, an `'edns_required'` error is thrown.
+
 == Creating responses
 
 Although one might be tempted to use `dnsmsg:response` to create a response and then use `dnsmsg:add_answer` and other related functions to add resources to it, there is a better way. It is possible to only work with the original request, store response resources in it with `dnsmsg:add_response_answer` and other functions and then only lastly run `dnsmsg:response` to produce the response.
@@ -111,6 +118,7 @@ Response = dnsmsg:response(dnsmsg:new()).
 
 == Changelog
 
+* *0.0.2* 'edns' added to `new_opts()`
 * *0.0.0* Function added
 
 == See also

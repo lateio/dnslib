@@ -112,19 +112,19 @@
     'additional'.
 
 -type terminal_interpret_result() ::
-    {dnslib:question(), 'ok',         [dnslib:resource()]}                                            |
-    {dnslib:question(), 'nodata',     {Soa :: dnslib:resource(), CnameTrail :: [dnslib:resource()]}}  |
-    {dnslib:question(), 'name_error', {Soa :: dnslib:resource(), CnameTrail :: [dnslib:resource()]}}.
+      {dnslib:question(), 'ok',         [dnslib:resource()]}
+    | {dnslib:question(), 'nodata',     {Soa :: dnslib:resource(), CnameTrail :: [dnslib:resource()]}}
+    | {dnslib:question(), 'name_error', {Soa :: dnslib:resource(), CnameTrail :: [dnslib:resource()]}}.
 
 -type referral_interpret_result() ::
-    {dnslib:question(), 'addressless_referral', [dnslib:resource()]}            |
-    {dnslib:question(), 'missing_glue_referral', [dnslib:resource()]}           |
-    {dnslib:question(), 'referral', [{dnslib:resource(), [dnslib:resource()]}]}.
+      {dnslib:question(), 'addressless_referral', [dnslib:resource()]}
+    | {dnslib:question(), 'missing_glue_referral', [dnslib:resource()]}
+    | {dnslib:question(), 'referral', [{dnslib:resource(), [dnslib:resource()]}]}.
 
 -type cname_interpret_result() ::
-    {dnslib:question(), 'cname_loop', Cnames :: [dnslib:resource()]} |
-    {dnslib:question(), 'cname', {Cname :: dnslib:resource(cname), PreceedingCnames :: [dnslib:resource()]}} |
-    {dnslib:question(), 'cname_referral', {Cname :: dnslib:resource(), Referral :: referral_interpret_result(), PreceedingCnames :: [dnslib:resource()]}}.
+      {dnslib:question(), 'cname_loop', Cnames :: [dnslib:resource()]}
+    | {dnslib:question(), 'cname', {Cname :: dnslib:resource(cname), PreceedingCnames :: [dnslib:resource()]}}
+    | {dnslib:question(), 'cname_referral', {Cname :: dnslib:resource(), Referral :: referral_interpret_result(), PreceedingCnames :: [dnslib:resource()]}}.
 
 -type transfer_result_type() ::
       'complete'
@@ -172,9 +172,9 @@ new(Opts) ->
         CaseOp when is_atom(CaseOp) -> CaseOp;
         CaseOp when is_integer(CaseOp) -> dnswire:opcode(CaseOp)
     end,
-    ReturnCode = case maps:get(return_code, Opts, ok) of
-        CaseReturn when is_atom(CaseReturn) -> CaseReturn;
-        CaseReturn when is_integer(CaseReturn) -> dnswire:return_code(CaseReturn)
+    {ReturnCode, EDNSRequired} = case maps:get(return_code, Opts, ok) of
+        CaseReturn when is_atom(CaseReturn) -> {CaseReturn, dnswire:return_code(CaseReturn) > 16#0F};
+        CaseReturn when is_integer(CaseReturn) -> {dnswire:return_code(CaseReturn), CaseReturn > 16#0F}
     end,
     Req = #{
         % Basic header
@@ -202,6 +202,7 @@ new(Opts) ->
         }
     },
     case Opts of
+        #{edns := false} when EDNSRequired -> error(edns_required);
         #{edns := false} -> Req;
         #{} ->
             % edns
@@ -252,12 +253,12 @@ response(Req = #{'Is_response' := false}) ->
 -spec response(Req :: dnsmsg:message(), map()) -> dnsmsg:message().
 response(Request = #{'Is_response' := false, 'Response' := ProtoResponse}, Opts) ->
     MaxSize = application:get_env(dnslib, udp_payload_max_size, 512),
-    ReturnCode = case maps:get(return_code, Opts, maps:get('Return_code', ProtoResponse, ok)) of
-        CaseCode when is_atom(CaseCode) -> CaseCode;
+    {ReturnCode, EDNSRequired} = case maps:get(return_code, Opts, maps:get('Return_code', ProtoResponse, ok)) of
+        CaseCode when is_atom(CaseCode) -> {CaseCode, dnswire:return_code(CaseCode) > 16#0F};
         Value when is_integer(Value) ->
             case dnswire:return_code(Value) of
-                Value -> Value;
-                CaseCode -> CaseCode
+                Value -> {Value, Value > 16#0F};
+                CaseCode -> {CaseCode, Value > 16#0F}
             end
     end,
     Response = Request#{
@@ -276,15 +277,16 @@ response(Request = #{'Is_response' := false, 'Response' := ProtoResponse}, Opts)
         'Additional'  => maps:get('Additional', ProtoResponse, [])
     },
     maps:remove('Response',
-        case Request of
-            #{'EDNS' := _} ->
+        case maps:get(edns, Opts, maps:get('EDNS', Request, false)) =/= false of
+            true ->
                 Response#{
                     'EDNS_version'              => maps:get(edns_version, Opts, 0),
                     'EDNS_udp_payload_size'     => maps:get(edns_udp_payload_size, Opts, MaxSize),
                     'EDNS_dnssec_ok'            => maps:get(edns_dnssec_ok, Opts, false),
                     'EDNS'                      => #{} % edns key-value options
                 };
-            #{} -> Response
+            false when EDNSRequired -> error(edns_required);
+            false -> Response
         end
     ).
 

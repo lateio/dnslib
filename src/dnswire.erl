@@ -64,6 +64,8 @@ return_code(5) -> refused;         %% RFC1035
 %return_code(9)  -> notauth;  %% RFC2136
 %return_code(10) -> notzone;  %% RFC2136
 
+return_code(16) -> bad_version; %% RFC6891
+
 return_code(ok)              -> 0; %% RFC1035
 return_code(format_error)    -> 1; %% RFC1035
 return_code(server_error)    -> 2; %% RFC1035
@@ -76,6 +78,9 @@ return_code(refused)         -> 5; %% RFC1035
 %return_code(nxrrset)  ->  8; %% RFC2136
 %return_code(notauth)  ->  9; %% RFC2136
 %return_code(notzone)  -> 10; %% RFC2136
+
+return_code(bad_version) -> 16;  %% RFC6891
+
 return_code(Value) when is_integer(Value) -> Value.
 
 
@@ -543,18 +548,22 @@ from_binary_edns(Msg = #{'Additional' := Additional0, 'Return_code' := RCode}) -
             % Allow dnsopt key-value pairs to modify this map?
             % We could also just make maps:from_list and smush it to the current map...
             % Or smush the current map to that one.
-            try dnsopt:from_binary(Data) of
-                {ok, Map} ->
-                    {ok, Msg#{
-                            'EDNS_version' => Version,
-                            'EDNS_dnssec_ok' => boolean(DNSSecOK),
-                            'EDNS_udp_payload_size' => UDPSize,
-                            'Return_code' => return_code((RCodeHigh bsl 4) bor RCode),
-                            'EDNS' => Map,
-                            'Additional' => Additional1
-                    }}
-            catch
-                error:function_clause -> {error, invalid_data}
+            case Version of
+                0 ->
+                    try dnsopt:from_binary(Data) of
+                        {ok, Map} ->
+                            {ok, Msg#{
+                                'EDNS_version' => Version,
+                                'EDNS_dnssec_ok' => boolean(DNSSecOK),
+                                'EDNS_udp_payload_size' => UDPSize,
+                                'Return_code' => return_code((RCodeHigh bsl 4) bor RCode),
+                                'EDNS' => Map,
+                                'Additional' => Additional1
+                            }}
+                    catch
+                        error:function_clause -> {error, invalid_data}
+                    end;
+                _ -> {error, bad_version}
             end;
         {OptList, _} when length(OptList) > 1 -> {error, multiple_opts}
     end.
@@ -595,11 +604,12 @@ from_binary_header(?HEADER) ->
     'truncated_domain'                  |
     'truncated_message'.
 -type from_binary_error() ::
-    'too_short'                                             | % Message wasn't long enough to represent DNS header
-    {'format_error', from_binary_error_specific(), dnsmsg:message()}.% Otherwise valid, but contents were cut short
+      {'format_error', from_binary_error_specific()}
+    | {'edns_error', 'bad_version' | 'multiple_opts' | 'invalid_data'}.
 -spec from_binary(Bin :: binary() | [byte()]) ->
-    {'ok', Msg :: dnslib:message(), TrailingBytes :: binary()} |
-    {'error', from_binary_error()}. % Allow missing bytes and invalid_resources cases here
+      {'ok', Msg :: dnslib:message(), TrailingBytes :: binary()}
+    | {'error', 'too_short'} % Message wasn't long enough to represent DNS header
+    | {'error', from_binary_error(), Response :: dnsmsg:message()}.
 from_binary(Bin) ->
     from_binary(Bin, #{}).
 
@@ -607,7 +617,7 @@ from_binary(Bin) ->
 from_binary(BinList, Opts) when is_list(BinList) ->
     from_binary(list_to_binary(BinList), Opts);
 from_binary(MessageBin = <<BinHeader:4/binary,QuestionCount:16,AnswerCount:16,NameserverCount:16,AdditionalCount:16,BinData/binary>>, _Opts) ->
-    Msg0 = from_binary_header(BinHeader),
+    #{'Is_response' := IsResponse} = Msg0 = from_binary_header(BinHeader),
     Counts = [{question, QuestionCount}, {answer, AnswerCount}, {authority, NameserverCount}, {additional, AdditionalCount}],
     try from_binary_payload(BinData, Counts, #bin_state{message_bin=MessageBin}) of
         {ok, {Questions, Answers, Nameservers, Additional}, Tail, State} ->
@@ -629,11 +639,23 @@ from_binary(MessageBin = <<BinHeader:4/binary,QuestionCount:16,AnswerCount:16,Na
             case from_binary_edns(Msg1) of
                 {ok, Msg2} ->
                     case State of
-                        #bin_state{invalid_resources=0,invalid_questions=0} -> {ok, Msg2, Tail};
-                        #bin_state{invalid_resources=IQ,invalid_questions=IR} ->
-                            {error, {format_error, invalid_data, Msg1#{'Resource_errors' => IQ + IR}}}
+                        #bin_state{invalid_resources=0,invalid_questions=0} -> {ok, Msg2, Tail}
+                        %#bin_state{invalid_resources=IQ,invalid_questions=IR} ->
+                        %    {error, {format_error, invalid_data}, Msg1#{'Resource_errors' => IQ + IR}}
                     end;
-                {error, Reason} -> {error, {format_error, {edns_error, Reason}, Msg1}}
+                {error, Reason} ->
+                    ReturnMsg = if
+                        not IsResponse ->
+                            case Reason of
+                                bad_version -> dnsmsg:set_response_header(Msg0, [{return_code, bad_version}]);
+                                _ -> dnsmsg:set_response_header(Msg0, [{return_code, format_error}])
+                            end;
+                        IsResponse -> Msg0
+                    end,
+                    % Set return code as undefined, as the EDNS error causes us to not really know what is going on.
+                    % If a response is produced, that will include the return_code regardless of what we stick
+                    % in the returned message
+                    {error, {edns_error, Reason}, ReturnMsg#{'Return_code' => undefined}}
             end
     catch
         error:{truncated_message, State, Acc}                       -> from_binary_error_return(truncated_message, Counts, Acc, Msg0, State);
@@ -645,12 +667,19 @@ from_binary(MessageBin = <<BinHeader:4/binary,QuestionCount:16,AnswerCount:16,Na
         error:{invalid_section, Type, Section, State, Acc}          -> from_binary_error_return({invalid_section, Type, Section}, Counts, Acc, Msg0, State);
         error:{invalid_resource_data, Type, RData, State, Acc}      -> from_binary_error_return({invalid_resource_data, Type, RData}, Counts, Acc, Msg0, State)
     end;
-from_binary(_, _) ->
+from_binary(<<_/bits>>, _) ->
     {error, too_short}.
+%from_binary(_, _) ->
+%    {error, badarg}.
 
 
-from_binary_error_return(ErrSpec, Counts, Acc, Msg, State) ->
-    {error, {format_error, ErrSpec, prepare_error_msg_return(Counts, Acc, Msg, State)}}.
+from_binary_error_return(ErrSpec, Counts, Acc, Msg = #{'Is_response' := IsResponse}, State) ->
+    %{error, {format_error, ErrSpec}, prepare_error_msg_return(Counts, Acc, Msg, State)}.
+    ReturnMsg = if
+        not IsResponse -> dnsmsg:set_response_header(Msg, [{return_code, format_error}]);
+        IsResponse -> Msg
+    end,
+    {error, {format_error, ErrSpec}, ReturnMsg}.
 
 
 prepare_error_msg_return(Counts, Acc0, Msg, _) ->
@@ -719,7 +748,7 @@ to_binary_edns(Msg = #{'EDNS' := Map}, _) ->
     Mod = dnsrr:from_to(opt, atom, module),
     ReturnCode1 = return_code(ReturnCode0),
     % Had we other fields in the map (like DNS Cookie), we'd have to
-    % product a list of those for the entry data
+    % produce a list of those for the entry data
     <<Ttl:32>> = <<(ReturnCode1 bsr 4), Version, (boolean(DNSSecOK)):1, 0:15>>,
     {ok, Data} = dnsopt:to_binary(Map),
     {ok, DataIolist} = Mod:to_binary(Data),

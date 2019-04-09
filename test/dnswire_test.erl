@@ -4,8 +4,8 @@
 dnswire_from_binary_error_test() ->
     {ok, _, <<>>} = dnswire:from_binary(<<0:(12*8)>>),
     {ok, _, <<0>>} = dnswire:from_binary(<<0:(13*8)>>),
-    {error, {format_error, truncated_message, _}} = dnswire:from_binary(<<0:32, 1:16, 0:48>>),
-    {error, {format_error, truncated_message, _}} = dnswire:from_binary(<<0:32, 0:16, 1:16, 0:32>>).
+    {error, {format_error, truncated_message}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(<<0:32, 1:16, 0:48>>),
+    {error, {format_error, truncated_message}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(<<0:32, 0:16, 1:16, 0:32>>).
 
 
 encode_test() ->
@@ -120,7 +120,7 @@ forward_compression_test() ->
         3, "arv", 2, "io", 3:2, 12:14, 1:16, 1:16, 60:32, 4:16, 0:32,
         3, "arv", 2, "io", 3:2, 12:14, 2:16, 1:16, 60:32, 8:16, 3, "arv", 2, "io", 0
     >>,
-    {error, {format_error, _, _}} = dnswire:from_binary(Bin1),
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(Bin1),
     Bin2 = <<
         0:32, % Header
         0:16, % Question count
@@ -130,7 +130,7 @@ forward_compression_test() ->
         3:2, 12:14, 1:16, 1:16, 60:32, 4:16, 0:32,
         3, "arv", 2, "io", 3:2, 12:14, 2:16, 1:16, 60:32, 8:16, 3, "arv", 2, "io", 0
     >>,
-    {error, {format_error, _, _}} = dnswire:from_binary(Bin2).
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(Bin2).
 
 
 dnswire_encode_decode_test() ->
@@ -221,7 +221,7 @@ format_errors1_test() ->
         3, "arv", 2, "io", 0, 400:16, 1:16, 60:32, 17:16, 8, "compress", 3, "arv", 2, "io", 0,
         MaxDomainStart/binary, 3:2, 12:14, 2:16, 1:16, 60:32, 8:16, 3, "arv", 2, "io", 0
     >>,
-    {error, {format_error, _, _}} = dnswire:from_binary(Bin1),
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(Bin1),
     %
     %% Test max domain
     Bin2 = <<
@@ -263,7 +263,7 @@ format_errors1_test() ->
         0:16, % Additional count
         MaxDomainStart/binary, 2, "io", 0, 400:16, 1:16, 60:32, 17:16, 8, "compress", 3, "arv", 2, "io", 0
     >>,
-    {error, {format_error, _, _}} = dnswire:from_binary(Bin3).
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(Bin3).
 
 format_errors2_test() ->
     % Truncated messages
@@ -285,7 +285,7 @@ format_errors2_test() ->
         0:16, % Additional count
         0, 400:16, 1:16, 60:32, 17:16, 8, "compress", 3, "arv", 2, "io", 0
     >>,
-    {error, {format_error, _, _}} = dnswire:from_binary(Bin1),
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(Bin1),
     Bin2 = <<
         0:16, % ID
         0:1,  % Is response
@@ -303,7 +303,7 @@ format_errors2_test() ->
         0:16, % Authority count
         0:16 % Additional count
     >>,
-    {error, {format_error, _, _}} = dnswire:from_binary(Bin2),
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(Bin2),
     Bin3 = <<
         0:16, % ID
         0:1,  % Is response
@@ -344,8 +344,8 @@ format_errors3_test() ->
         0:16, % Additional count
         0
     >>,
-    {error, {format_error, _, _}} = dnswire:from_binary(Bin1),
-    {error, {format_error, _, _}} = dnswire:from_binary(<<Bin1/binary, 1:16>>),
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(Bin1),
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(<<Bin1/binary, 1:16>>),
     {ok, _, <<>>} = dnswire:from_binary(<<Bin1/binary, 1:16, 1:16>>),
     Bin2 = <<
         0:16, % ID
@@ -365,15 +365,15 @@ format_errors3_test() ->
         0:16, % Additional count
         0
     >>,
-    {error, {format_error, _, _}} = dnswire:from_binary(Bin1),
-    {error, {format_error, _, _}} = dnswire:from_binary(<<Bin1/binary, 1:16>>),
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(Bin1),
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(<<Bin1/binary, 1:16>>),
     {ok, _, <<>>} = dnswire:from_binary(<<Bin1/binary, 1:16, 1:16>>),
-    {error, {format_error, _, _}} = dnswire:from_binary(<<Bin2/binary, 1:16, 1:16, 60:32>>),
-    {error, {format_error, _, _}} = dnswire:from_binary(<<Bin2/binary, 1:16, 1:16, 60:32, 0>>),
-    {error, {format_error, _, _}} = dnswire:from_binary(<<Bin2/binary, 1:16, 1:16, 60:32, 0, 4>>),
-    {error, {format_error, _, _}} = dnswire:from_binary(<<Bin2/binary, 1:16, 1:16, 60:32, 0, 4, 0>>),
-    {error, {format_error, _, _}} = dnswire:from_binary(<<Bin2/binary, 1:16, 1:16, 60:32, 0, 4, 0, 0>>),
-    {error, {format_error, _, _}} = dnswire:from_binary(<<Bin2/binary, 1:16, 1:16, 60:32, 0, 4, 0, 0, 0>>),
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(<<Bin2/binary, 1:16, 1:16, 60:32>>),
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(<<Bin2/binary, 1:16, 1:16, 60:32, 0>>),
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(<<Bin2/binary, 1:16, 1:16, 60:32, 0, 4>>),
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(<<Bin2/binary, 1:16, 1:16, 60:32, 0, 4, 0>>),
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(<<Bin2/binary, 1:16, 1:16, 60:32, 0, 4, 0, 0>>),
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(<<Bin2/binary, 1:16, 1:16, 60:32, 0, 4, 0, 0, 0>>),
     {ok, _, <<>>} = dnswire:from_binary(<<Bin2/binary, 1:16, 1:16, 60:32, 0, 4, 0, 0, 0, 0>>).
 
 format_errors4_test() ->
@@ -397,7 +397,45 @@ format_errors4_test() ->
         0, 41:16, 512:16, 0, 0, 0, 0, 0:16,
         0, 41:16, 512:16, 0, 0, 0, 0, 0:16
     >>,
-    {error, {format_error, _, _}} = dnswire:from_binary(Bin1).
+    {error, {edns_error, multiple_opts}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(Bin1),
+    Bin2 = <<
+        0:16, % ID
+        0:1,  % Is response
+        0:4,  % Opcode
+        0:1,  % Authoritative
+        0:1,  % Truncated
+        0:1,  % Recursion desired
+        0:1,  % Recursion available
+        0:1,  % Reserved
+        0:1,  % Authorized data
+        0:1,  % Checking disabled
+        0:4,  % Return code
+        0:16, % Question count
+        0:16, % Answer count
+        0:16, % Authority count
+        1:16, % Additional count
+        0, 41:16, 512:16, 0, 1, 0, 0, 0:16
+    >>,
+    {error, {edns_error, bad_version}, #{'Response' := #{'Return_code' := bad_version}}} = dnswire:from_binary(Bin2),
+    Bin3 = <<
+        0:16, % ID
+        1:1,  % Is response
+        0:4,  % Opcode
+        0:1,  % Authoritative
+        0:1,  % Truncated
+        0:1,  % Recursion desired
+        0:1,  % Recursion available
+        0:1,  % Reserved
+        0:1,  % Authorized data
+        0:1,  % Checking disabled
+        0:4,  % Return code
+        0:16, % Question count
+        0:16, % Answer count
+        0:16, % Authority count
+        1:16, % Additional count
+        0, 41:16, 512:16, 0, 1, 0, 0, 0:16
+    >>,
+    {error, {edns_error, bad_version}, #{'Return_code' := undefined}} = dnswire:from_binary(Bin3).
 
 format_errors5_test() ->
     % AAAA record with an invalid class
@@ -419,7 +457,7 @@ format_errors5_test() ->
         0:16, % Additional count
         0, 28:16, 2:16, 0, 0, 0, 0, 4:16, 0,0,0,0
     >>,
-    {error, {format_error, _, _}} = dnswire:from_binary(Bin1).
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(Bin1).
 
 format_errors6_test() ->
     % Try to use a QTYPE in a resource
@@ -441,7 +479,7 @@ format_errors6_test() ->
         0:16, % Additional count
         0, 28:16, 2:16, 0, 0, 0, 0, 4:16, 0,0,0,0
     >>,
-    {error, {format_error, _, _}} = dnswire:from_binary(Bin1),
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(Bin1),
     %
     %% Opt not in additional
     Bin2 = <<
@@ -462,7 +500,7 @@ format_errors6_test() ->
         0:16, % Additional count
         0, 41:16, 512:16, 0, 0, 0, 0, 0:16
     >>,
-    {error, {format_error, _, _}} = dnswire:from_binary(Bin2).
+    {error, {format_error, _}, #{'Response' := #{'Return_code' := format_error}}} = dnswire:from_binary(Bin2).
 
 
 binary_to_domain_test() ->

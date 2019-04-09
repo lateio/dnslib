@@ -1,6 +1,6 @@
 = dnswire:from_binary
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.02.15
 :ext-relative: {outfilesuffix}
 
 == Name
@@ -14,30 +14,29 @@ dnswire:from_binary - Parse message from wire format
 from_binary(Bin :: binary()) -> from_binary(Msg, []).
 
 from_binary(Bin :: binary(), list())
-    -> {ok, Msg :: dnslib:message(), Trailing :: binary()}
-     | {error,
-           'too_short'
-         | {'format_error', format_error_type(), dnsmsg:message()}.
-       }.
+    -> {'ok', Msg :: dnslib:message(), Trailing :: binary()}
+     | {'error', 'too_short'}
+     | {'error', error_type(), HeaderMsg :: dnsmsg:message()}.
 ----
 
 Transform message to wire format.
 
 == Types
 
-=== format_error_type()
+=== error_type()
 
 [source,erlang]
 ----
-format_error_type() =
-      {'invalid_domain', Reason :: term()}
-    | 'truncated_message'
-    | 'truncated_domain'
-    | {'invalid_question_class', Type :: dnsrr:type(), Class   :: dnsclass:class()}
-    | {'invalid_resource_class', Type :: dnsrr:type(), Class   :: dnsclass:class()}
-    | {'invalid_section',        Type :: dnsrr:type(), Section :: dnsmsg:message_section()}
-    | {'invalid_resource_data',  Type :: dnsrr:type(), Data    :: binary()}
-    | 'truncated_resource_data'.
+error_type() =
+      {'format_error', {'invalid_domain', Reason :: term()}}
+    | {'format_error', 'truncated_message'}
+    | {'format_error', 'truncated_domain'}
+    | {'format_error', {'invalid_question_class', Type :: dnsrr:type(), Class   :: dnsclass:class()}}
+    | {'format_error', {'invalid_resource_class', Type :: dnsrr:type(), Class   :: dnsclass:class()}}
+    | {'format_error', {'invalid_section',        Type :: dnsrr:type(), Section :: dnsmsg:message_section()}}
+    | {'format_error', {'invalid_resource_data',  Type :: dnsrr:type(), Data    :: binary()}}
+    | {'format_error', 'truncated_resource_data'}
+    | {'edns_error',   'bad_version' | term()}.
 ----
 
 == Arguments
@@ -50,51 +49,55 @@ Binary which represents the message
 
 If the message could be parsed without errors, a tuple consisting of `'ok'`, the produced message and any trailing bytes in the binary is returned.
 
-If there was an error in the message, a tuple consisting of `'error'` and the error reason is returned. If the error reason was not `'too_short'`, a message consisting of the contents of the message header is also returned. This is done so that it is possible -- when a server receives a malformed request -- to send a response with return code `'format_error'` to the client.
+If there was an error in the message, a tuple consisting of `'error'` and the error reason is returned. If the error reason was not `'too_short'`, a message with the correct return code set is also included in the returned tuple. If the parsed message was a request, A DNS server can then produce the response with `dnsmsg:response` and send the resulting response to the client. The returned message includes only information from the message header. Ie. it does not contain any questions or resources from the message, even if the contents of the message were partially valid.
 
 == Errors
 
-`'too_short'`::
+`{'error', 'too_short'}`::
 
 Message was shorter than a DNS message header (12 bytes).
 
-`{'format_error', format_error_type(), dnsmsg:message()}`::
+`{'error', error_type(), Msg $$::$$ dnsmsg:message()}`::
 
-An error was encountered in the message. Last member of the tuple is a `dnsmsg:message()` which is constructed from only the DNS header. It contains no questions or resources.
+An error was encountered in the message. `Msg` is a `dnsmsg:message()` message which is constructed from only the DNS header. It contains no questions or resources from the parsed message. If the parsed message was a request, `dnsmsg:response` can be used to produce a response with the correct return code.
 
-== Format errors
+== Error types
 
-`{'invalid_domain', Reason $$::$$ term()}`::
+`{'format_error', {'invalid_domain', Reason $$::$$ term()}}`::
 
-A domain in the message was invalid -- invalid label length, too long etc.
+A domain in the message was invalid -- invalid label length, too long etc. `HeaderMsg` response return code is set to `'format_error'`.
 
-`'truncated_message'`::
+`{'format_error', 'truncated_message'}`::
 
-Message was cut short before all expected contents were successfully retrieved.
+Message was cut short before all expected contents were successfully retrieved. `HeaderMsg` response return code is set to `'format_error'`.
 
-`'truncated_domain'`::
+`{'format_error', 'truncated_domain'}`::
 
-Message was cut short before a valid domain termination was reached.  Basically a variant of `'truncated_message'`.
+Message was cut short before a valid domain termination was reached.  Basically a variant of `'truncated_message'`. `HeaderMsg` response return code is set to `'format_error'`.
 
-`{'invalid_question_class', Type $$::$$ dnsrr:type(), Class $$::$$ dnsclass:class()}`::
+`{'format_error', {'invalid_question_class', Type $$::$$ dnsrr:type(), Class $$::$$ dnsclass:class()}}`::
 
-A question contained an invalid combination of class and type. Tuple contains the invalid combination.
+A question contained an invalid combination of class and type. Tuple contains the invalid combination. `HeaderMsg` response return code is set to `'format_error'`.
 
-`{'invalid_resource_class', Type $$::$$ dnsrr:type(), Class $$::$$ dnsclass:class()}`::
+`{'format_error', {'invalid_resource_class', Type $$::$$ dnsrr:type(), Class $$::$$ dnsclass:class()}}`::
 
-A resource contained an invalid combination of class and type. Tuple contains the invalid combination.
+A resource contained an invalid combination of class and type. Tuple contains the invalid combination. `HeaderMsg` response return code is set to `'format_error'`.
 
-`{'invalid_section', Type $$::$$ dnsrr:type(), Section $$::$$ dnsmsg:message_section()}`::
+`{'format_error', {'invalid_section', Type $$::$$ dnsrr:type(), Section $$::$$ dnsmsg:message_section()}}`::
 
-A resource type was encountered in a section in which it is not allowed. Ie. `ALL` in resources or `OPT` anywhere other than in additional.
+A resource type was encountered in a section in which it is not allowed. Ie. `ALL` in resources or `OPT` anywhere other than in additional. `HeaderMsg` response return code is set to `'format_error'`.
 
-`{'invalid_resource_data', Type $$::$$ dnsrr:type(), Data $$::$$ binary()}`::
+`{'format_error', {'invalid_resource_data', Type $$::$$ dnsrr:type(), Data $$::$$ binary()}}`::
 
-The data for a resource was invalid. Tuple contains the type and binary which produced the error.
+The data for a resource was invalid. Tuple contains the type and binary which produced the error. `HeaderMsg` response return code is set to `'format_error'`.
 
-`'truncated_resource_data'`::
+`{'format_error', 'truncated_resource_data'}`::
 
-Message was cut short before all resource data could be retrieved. Basically a variant of `'truncated_message'`.
+Message was cut short before all resource data could be retrieved. Basically a variant of `'truncated_message'`. `HeaderMsg` response return code is set to `'format_error'`.
+
+`{'edns_error', 'bad_version' | 'multiple_opts' | 'invalid_data'}`::
+
+There was an EDNS error in the message. `'bad_version'` means that the EDNS version was invalid, `'multiple_opts'` means that the message contained multiple `'opt'` resources and `'invalid_data'` means that one or more of the fields in the `'opt'` record were invalid. On `'bad_version'` error, `HeaderMsg` response return code is set to `'bad_version'`. Otherwise it is `'format_error'`.
 
 == Examples
 
@@ -105,6 +108,10 @@ Message was cut short before all resource data could be retrieved. Basically a v
 
 == Changelog
 
+* *0.0.2*
+** Error format for errors other than `'too_short'` changed
+** On errors (other than `'too_short'`), a response `dnsmsg:message()` with the correct return code set is now returned
+** Add `{'edns_error', term()}` error type
 * *0.0.0* Function added
 
 == See also

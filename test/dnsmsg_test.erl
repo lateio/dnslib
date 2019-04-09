@@ -219,3 +219,8 @@ wrong_section_test() ->
     Resource = {[], opt, 512, 0, nil}, % Invalid term, doesn't matter
     Msg = dnsmsg:new(),
     {'EXIT', {{badmatch, _}, _}} = (catch dnsmsg:add_answer(Msg, Resource)).
+
+
+edns_required_test() ->
+    {'EXIT', {edns_required, _}} = (catch dnsmsg:new(#{edns => false, return_code => bad_version})),
+    {'EXIT', {edns_required, _}} = (catch dnsmsg:response(dnsmsg:new(), #{edns => false, return_code => bad_version})).

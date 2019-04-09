@@ -24,6 +24,10 @@
     minimum/1
 ]).
 
+-ifdef(EUNIT).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 -include_lib("dnslib/include/dnslib.hrl").
 
 -define(FIX_TTL(Ttl), (Ttl band ?MAX_TTL)).
@@ -118,43 +122,62 @@ normalize_data({Nameserv, Admin, Id, Refresh, Retry, Expire, Minimum}) ->
     }.
 
 
-nameserver(Resource = {_, _, _, _, _}) ->
-    element(1, element(5, Resource));
 nameserver(Data = {_, _, _, _, _, _, _}) ->
-    element(1, Data).
+    element(1, Data);
+nameserver(Resource) when ?IS_RESOURCE(Resource) ->
+    nameserver(?RESOURCE_DATA(Resource)).
 
 
-contact(Resource = {_, _, _, _, _}) ->
-    element(2, element(5, Resource));
 contact(Data = {_, _, _, _, _, _, _}) ->
-    element(2, Data).
+    element(2, Data);
+contact(Resource) when ?IS_RESOURCE(Resource) ->
+    contact(?RESOURCE_DATA(Resource)).
 
 
-serial(Resource = {_, _, _, _, _}) ->
-    element(3, element(5, Resource));
 serial(Data = {_, _, _, _, _, _, _}) ->
-    element(3, Data).
+    element(3, Data);
+serial(Resource) when ?IS_RESOURCE(Resource) ->
+    serial(?RESOURCE_DATA(Resource)).
 
 
-refresh(Resource = {_, _, _, _, _}) ->
-    element(4, element(5, Resource));
 refresh(Data = {_, _, _, _, _, _, _}) ->
-    element(4, Data).
+    element(4, Data);
+refresh(Resource) when ?IS_RESOURCE(Resource) ->
+    refresh(?RESOURCE_DATA(Resource)).
 
 
-retry(Resource = {_, _, _, _, _}) ->
-    element(5, element(5, Resource));
 retry(Data = {_, _, _, _, _, _, _}) ->
-    element(5, Data).
+    element(5, Data);
+retry(Resource) when ?IS_RESOURCE(Resource) ->
+    retry(?RESOURCE_DATA(Resource)).
 
 
-expire(Resource = {_, _, _, _, _}) ->
-    element(6, element(5, Resource));
 expire(Data = {_, _, _, _, _, _, _}) ->
-    element(6, Data).
+    element(6, Data);
+expire(Resource) when ?IS_RESOURCE(Resource) ->
+    expire(?RESOURCE_DATA(Resource)).
 
 
-minimum(Resource = {_, _, _, _, _}) ->
-    element(7, element(5, Resource));
 minimum(Data = {_, _, _, _, _, _, _}) ->
-    element(7, Data).
+    element(7, Data);
+minimum(Resource) when ?IS_RESOURCE(Resource) ->
+    minimum(?RESOURCE_DATA(Resource)).
+
+
+-ifdef(EUNIT).
+convenience_fn_test() ->
+    Ns = dnslib:domain("test"),
+    Contact = dnslib:domain("contact"),
+    Soa = {Ns, Contact, 0, 1, 2, 3, 4},
+    Rr = {nil, nil, nil, nil, Soa},
+    Tests = [
+        {Ns,      fun nameserver/1},
+        {Contact, fun contact/1},
+        {0,       fun serial/1},
+        {1,       fun refresh/1},
+        {2,       fun retry/1},
+        {3,       fun expire/1},
+        {4,       fun minimum/1}
+    ],
+    true = lists:all(fun ({Expect, Fn}) -> Expect = Fn(Rr), Expect = Fn(Soa), true end, Tests).
+-endif.

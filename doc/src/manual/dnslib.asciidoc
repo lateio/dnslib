@@ -1,6 +1,6 @@
 = dnslib
 Lauri Moisio <l@arv.io>
-Version 0.0.2, 2019.02.01
+Version 0.0.2, 2019.02.15
 :ext-relative: {outfilesuffix}
 
 == Module
@@ -173,6 +173,7 @@ return_code() =
     | 'name_error'
     | 'not_implemented'
     | 'refused'
+    | 'bad_version'
     | 0..16#FFF.
 
 The `return_code()` in a DNS message signifies whether the operation succeeded or encountered an error.
@@ -185,6 +186,7 @@ The `return_code()` in a DNS message signifies whether the operation succeeded o
 
 * *0.0.2*
 ** Functions `binary_to_domain/1`, `domain_to_binary/1` and `domain_binary_length/1` were moved to `dnswire` module
+** Add `'return_code()'` `'bad_version'`
 ** New function `domain/1`
 * *0.0.1* `codepoint_domain()` type and other associated types added
 * *0.0.0* Module added

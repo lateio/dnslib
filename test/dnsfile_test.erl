@@ -94,3 +94,15 @@ iterate_helper(State0, Acc) ->
             iterate_helper(State1, [Resource|Acc]);
         eof -> lists:reverse(Acc)
     end.
+
+
+generic_data_list_to_binary_test() ->
+    {ok, <<0,0,0,0>>} = dnsfile:generic_data_list_to_binary("\\# 4 00 0000 00"),
+    {ok, <<0,0,0,0>>} = dnsfile:generic_data_list_to_binary("\\# 4 ( 00 0000 00 )"),
+    {ok, <<>>} = dnsfile:generic_data_list_to_binary("\\# 0"),
+    {ok, <<>>} = dnsfile:generic_data_list_to_binary("\\# 0          "),
+    {error, empty_string} = dnsfile:generic_data_list_to_binary(""),
+    {error, invalid_syntax} = dnsfile:generic_data_list_to_binary("\\# 4 0 0 0 0"),
+    {error, {bad_data_length, "-4"}} = dnsfile:generic_data_list_to_binary("\\# -4 00 00 00 00"),
+    {error, {bad_data_length, "foo"}} = dnsfile:generic_data_list_to_binary("\\# foo 00 00 00 00"),
+    {error, invalid_syntax} = dnsfile:generic_data_list_to_binary("\\# 4 gh ijklm op").

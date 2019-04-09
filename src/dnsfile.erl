@@ -18,7 +18,7 @@
 %
 % ------------------------------------------------------------------------------
 %
-% This this file implements reading and parsing of DNS files.
+% This this file implements the reading, parsing and writing of DNS master files.
 -module(dnsfile).
 
 -export([
@@ -41,7 +41,8 @@
     directive_reverse_dns_pointer/2,
     directive_ttl/2,
     to_masterfile_escape_text/1,
-    indicate_domain/1
+    indicate_domain/1,
+    generic_data_list_to_binary/1
 ]).
 
 -include_lib("dnslib/include/dnslib.hrl").
@@ -397,28 +398,32 @@ directive_reverse_dns_pointer(_, _) ->
     error({reverse_dns_pointer, invalid_number_of_arguments}).
 
 
-
-handle_unknown_resource_data([]) ->
-    {error, no_data};
-handle_unknown_resource_data([[$\\, $#], BytesList|HexValues]) ->
-    try list_to_integer(BytesList) of
-        Bytes when Bytes >= 0, Bytes =< 16#FFFF ->
-            case lists:all(fun (FunStr) -> length(FunStr) rem 2 =:= 0 end, HexValues) of
-                false -> {error, invalid_resource_data};
+generic_data_list_to_binary([]) ->
+    {error, empty_string};
+generic_data_list_to_binary(String) when is_integer(hd(String)) ->
+    % Need to split the string into components.
+    case parse_entry(String, #state{}) of
+        {complete, ["\\#"|_]=Parts, _} -> generic_data_list_to_binary(Parts);
+        _ -> {error, invalid_syntax}
+    end;
+generic_data_list_to_binary(["\\#", BytesLenStr|Rest]) ->
+    try list_to_integer(BytesLenStr) of
+        BytesLen when BytesLen > 16#FFFF -> {error, data_too_long};
+        BytesLen when BytesLen < 0 -> {error, {bad_data_length, BytesLenStr}};
+        BytesLen ->
+            case lists:all(fun (FunStr) -> length(FunStr) rem 2 =:= 0 end, Rest) of
+                false -> {error, invalid_syntax};
                 true ->
-                    try transform_unknown_resource_data(lists:append(HexValues), Bytes, <<>>) of
+                    try transform_unknown_resource_data(lists:append(Rest), BytesLen, <<>>) of
                         {ok, _}=Tuple -> Tuple;
                         {error, _}=Tuple -> Tuple
                     catch
-                        error:function_clause -> {error, invalid_resource_data}
+                        error:function_clause -> {error, invalid_syntax} % Catch cases where the hex might be invalid
                     end
-            end;
-        Bytes -> {error, {data_too_long, Bytes}}
+            end
     catch
-        error:badarg -> {error, {bad_data_length, BytesList}}
-    end;
-handle_unknown_resource_data([Token|_]) ->
-    {error, {invalid_unknown_resource_start_token, Token}}.
+        error:badarg -> {error, {bad_data_length, BytesLenStr}}
+    end.
 
 
 transform_unknown_resource_data([], 0, Acc) ->
@@ -457,18 +462,6 @@ compile_entry(Entry = {_, undefined, _, _, _}, [Type0|Parts], State) ->
     try_type(Entry, [Type1|Parts], State).
 
 
-try_class({Domain, Type, undefined, Ttl, Data}=Entry, Parts = [[$c,$l,$a,$s,$s|ClassNumber]|Rest], State = #state{startline=LineNumber,path=File,allow_unknown_classes=AllowUnknown}) ->
-    try list_to_integer(ClassNumber) of
-        Value when Value >= 0, Value < 16#FFFF ->
-            case dnsclass:from_to(Value, value, atom) of
-                Value when AllowUnknown -> compile_entry({Domain, Type, Value, Ttl, Data}, Rest, State);
-                Value -> error(syntax_error(File, LineNumber, {unknown_class, Value}));
-                Atom -> compile_entry({Domain, Type, Atom, Ttl, Data}, Rest, State)
-            end;
-        Value -> error(syntax_error(File, LineNumber, {class_out_of_range, Value}))
-    catch
-        error:badarg -> try_ttl(Entry, Parts, State)
-    end;
 try_class({Domain, Type, undefined, Ttl, Data}=Entry, Parts = [Token|Rest], State) ->
     case dnsclass:from_to(Token, masterfile_token, atom) of
         Token -> try_ttl(Entry, Parts, State);
@@ -487,59 +480,14 @@ try_ttl(Entry, Parts, State) ->
     try_type(Entry, Parts, State).
 
 
-% Why is try_type here twice?
-try_type({Domain, undefined, Class, Ttl, undefined}=Tuple, [[$t,$y,$p,$e|TypeValue]|Rest], State = #state{startline=LineNumber,path=File,allow_unknown_resources=AllowUnknown}) ->
-    try list_to_integer(TypeValue) of
-        Type when Type >= 0, Type < 16#FFFF ->
-            case dnsrr:from_to(Type, value, module) of
-                Type when AllowUnknown ->
-                    case handle_unknown_resource_data(Rest) of
-                        {ok, Data} -> {ok, {Domain, Type, Class, Ttl, Data}};
-                        {error, Reason} -> error(syntax_error(File, LineNumber, {invalid_unknown_resource, Reason}))
-                    end;
-                Type -> error(syntax_error(File, LineNumber, {unknown_resource_type, Type}));
-                Module when is_atom(Module) ->
-                    % If we know that resource, use Module:from_binary to produce internal resource representation
-                    % If the data contains domain compressions, produce error
-                    Atom = dnsrr:from_to(Module, module, atom),
-                    case Rest of
-                        [[$\\, $#]|_] ->
-                            case handle_unknown_resource_data(Rest) of
-                                {ok, Data} ->
-                                    try Module:from_binary(Data) of
-                                        {ok, Rdata} -> {ok, {Domain, Atom, Class, Ttl, Rdata}};
-                                        {error, Reason} -> error(resource_record_error(File, LineNumber, Reason));
-                                        {domains, DataList} ->
-                                            case [GenTuple || GenTuple <- DataList, is_tuple(GenTuple), element(1, GenTuple) =:= compressed] of
-                                                [] ->
-                                                    Fn = fun
-                                                        ({domain, FunDomain, _}) -> FunDomain;
-                                                        (FunMember) -> FunMember
-                                                    end,
-                                                    Rdata = dnswire:finalize_resource_data([Fn(GenMember) || GenMember <- DataList], Module),
-                                                    {ok, {Domain, Atom, Class, Ttl, Rdata}};
-                                                _ -> error(resource_record_error(File, LineNumber, resource_contains_domain_compressions))
-                                            end
-                                    catch
-                                        error:function_clause -> error(resource_record_error(File, LineNumber, invalid_data))
-                                    end;
-                                {error, Reason} -> error(syntax_error(File, LineNumber, {invalid_unknown_resource, Reason}))
-                            end;
-                        _ -> try_type(Tuple, [Module:masterfile_token()|Rest], State)
-                    end
-            end;
-        Type -> error(syntax_error(File, LineNumber, {type_value_out_of_range, Type}))
-    catch
-        error:badarg -> error(syntax_error(File, LineNumber, {invalid_type_value, TypeValue}))
-    end;
 try_type({Domain, undefined, Class, Ttl, undefined}, [Type0|Rest], State = #state{startline=LineNumber,path=File}) ->
     case dnsrr:from_to(Type0, masterfile_token, module) of
         Type0 -> error(resource_record_error(File, LineNumber, {invalid_token, Type0}));
         Module ->
             Atom = dnsrr:from_to(Module, module, atom),
             case Rest of
-                [[$\\, $#]|_] ->
-                    case handle_unknown_resource_data(Rest) of
+                ["\\#"|_] ->
+                    case generic_data_list_to_binary(Rest) of
                         {ok, Data} ->
                             try Module:from_binary(Data) of
                                 {ok, Rdata} -> {ok, {Domain, Atom, Class, Ttl, Rdata}};
@@ -1162,11 +1110,15 @@ write_resource([{iodata, Line}|Rest], Fd, Opts = #{linebreak := Linebreak}) ->
     write_resource(Rest, Fd, Opts);
 write_resource([{Domain, Type, Class0, Ttl, Data}|Rest], Fd, Opts = #{linebreak := Linebreak, whitespace := Whitespace, generic := Generic}) ->
     % This allows us to write files with multiple classes
-    Class = case dnsclass:from_to(Class0, atom, masterfile_token) of
-        _ when Generic, is_atom(Class0) -> lists:append("class", integer_to_list(dnsclass:from_to(Class0, atom, value)));
-        Class0 when is_integer(Class0) -> lists:append("class", integer_to_list(Class0));
-        CaseClass when is_list(CaseClass) -> CaseClass
+    From = if
+        is_integer(Class0) -> value;
+        true -> atom
     end,
+    To = if
+        Generic -> masterfile_token_generic;
+        true -> masterfile_token
+    end,
+    Class = dnsclass:from_to(Class0, From, To),
     Iodata = [
         dnslib:domain_to_list(Domain),
         Whitespace,
@@ -1184,7 +1136,7 @@ resource_specific(Type, Data, Opts = #{whitespace := Whitespace, generic := Gene
     case dnsrr:from_to(Type, atom, module) of
         Type when is_integer(Type), is_binary(Data) ->
             [
-                string:to_upper(lists:append("type", integer_to_list(Type))),
+                string:to_upper(dnsrr:from_to(Type, value, masterfile_token_generic)),
                 Whitespace,
                 resource_data_to_io(Type, Data, Opts)
             ];

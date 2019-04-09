@@ -1,6 +1,6 @@
 = dnslib:question
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.04.08
 :ext-relative: {outfilesuffix}
 
 == Name
@@ -11,10 +11,16 @@ dnslib:question - Create a question term
 
 [source,erlang]
 ----
-question(Domain :: dnslib:domain() | string(), Type :: dnsrr:type())
+question(DomainOrResourceLike :: dnslib:domain() | string())
+    -> dnslib:question().
+
+question(Domain :: dnslib:domain() | string(), Type :: dnsrr:type() | string())
     -> question(Domain, Type, in).
 
-question(Domain :: dnslib:domain() | string(), Type :: dnsrr:type(), Class :: dnsclass:class())
+question(
+  Domain :: dnslib:domain()  | string(),
+  Type   :: dnsrr:type()     | string(),
+  Class  :: dnsclass:class() | string())
     -> dnslib:question().
 ----
 
@@ -22,17 +28,21 @@ Create a question term.
 
 == Arguments
 
+DomainOrResourceLike::
+
+Resource -like syntax for a question or the domain to be used in the question. Can include only the domain or everything from domain to class.
+
 Domain::
 
 Domain to be used in the question. Can be given as a string.
 
 Type::
 
-Type to be used. Can be an atom or a an integer.
+Type to be used. Can be an atom, a string or an integer.
 
 Class::
 
-Class to be used. Can be an atom or an integer.
+Class to be used. Can be an atom, a string or an integer.
 
 == Return value
 
@@ -44,6 +54,7 @@ This function can throw `error:badarg` in the following cases:
 * `dnslib:is_valid_domain` error when `Domain` is not a string
 * An unknown atom is passed as `Type` or `Class`
 * An integer outside the range `0..16#FFFF` is passed as `Type` or `Class`
+* An unknown or invalid string is passed as `Type` or `Class`
 
 == Examples
 
@@ -51,8 +62,15 @@ This function can throw `error:badarg` in the following cases:
 ----
 {[], ns, in} = dnslib:question("", ns, in),
 Question1 = {[<<"arv">>,<<"io">>], a, in} = dnslib:question("arv.io", a, in),
+Question1 = dnslib:question("arv.io."),
+Question1 = dnslib:question("arv.io.", a),
 Question1 = dnslib:question("arv.io.", a, in),
 Question1 = dnslib:question("arv.io", 1, 1), % Value of A type and IN class are both 1
+Question1 = dnslib:question("arv.io", "A", in),
+Question1 = dnslib:question("arv.io", "A", "IN"),
+Question1 = dnslib:question("arv.io", "TYPE1", "CLASS1"),
+Question1 = dnslib:question("arv.io A IN"),
+Question1 = dnslib:question("arv.io. A IN"),
 
 % wildcard_domains() are not allowed
 {[<<"*">>], a, in} = dnslib:question("*", a, in).
@@ -67,11 +85,16 @@ Question1 = dnslib:question("arv.io", 1, 1), % Value of A type and IN class are 
 {'EXIT', {badarg, _}} = (catch dnslib:question([], 1, 16#FFFF+1)), % out of range class
 {'EXIT', {badarg, _}} = (catch dnslib:question("väinämöinen", 1, 1)), % non-ASCII error
 {'EXIT', {badarg, _}} = (catch dnslib:question([], not_a_type, 1)), % unknown type atom
-{'EXIT', {badarg, _}} = (catch dnslib:question([], 1, not_a_class)). % unknown class atom
+{'EXIT', {badarg, _}} = (catch dnslib:question([], 1, not_a_class)), % unknown class atom
+{'EXIT', {badarg, _}} = (catch dnslib:question([], "TYPE", 1)), % invalid type error
+{'EXIT', {badarg, _}} = (catch dnslib:question([], 1, "CLASS")). % invalid class error
 ----
 
 == Changelog
 
+* *0.0.2*
+** New variant `question/1`, allowing DNS master file -like syntax
+** Allow `Type` and `Class` to be given as strings in `question/2,3`
 * *0.0.1* Function added
 
 == See also

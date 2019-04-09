@@ -146,7 +146,15 @@ reverse_dns_question_test() ->
 
 question_test() ->
     Question1 = {[<<"arv">>,<<"io">>], a, in} = dnslib:question("arv.io", a, in),
+    Question1 = dnslib:question("arv.io."),
+    Question1 = dnslib:question("arv.io.", a),
+    Question1 = dnslib:question("arv.io.", a, in),
     Question1 = dnslib:question("arv.io", 1, 1),
+    Question1 = dnslib:question("arv.io", "A", in),
+    Question1 = dnslib:question("arv.io", "A", "IN"),
+    Question1 = dnslib:question("arv.io", "TYPE1", "CLASS1"),
+    Question1 = dnslib:question("arv.io A IN"),
+    Question1 = dnslib:question("arv.io. A IN"),
 
     {'EXIT', {badarg, _}} = (catch dnslib:question([], -1, 1)), % out of range type
     {'EXIT', {badarg, _}} = (catch dnslib:question([], 16#FFFF+1, 1)), % out of range type
@@ -154,15 +162,29 @@ question_test() ->
     {'EXIT', {badarg, _}} = (catch dnslib:question([], 1, 16#FFFF+1)), % out of range class
     {'EXIT', {badarg, _}} = (catch dnslib:question("väinämöinen", 1, 1)), % non-ASCII error
     {'EXIT', {badarg, _}} = (catch dnslib:question([], not_a_type, 1)), % unknown type atom
-    {'EXIT', {badarg, _}} = (catch dnslib:question([], 1, not_a_class)). % unknown class atom
+    {'EXIT', {badarg, _}} = (catch dnslib:question([], 1, not_a_class)), % unknown class atom
+    {'EXIT', {badarg, _}} = (catch dnslib:question([], "TYPE", 1)), % invalid type error
+    {'EXIT', {badarg, _}} = (catch dnslib:question([], 1, "CLASS")). % invalid class error
 
 
 resource_test() ->
-    Resource1 = {[<<"arv">>,<<"io">>], a, in, 0, {0,0,0,0}} = dnslib:resource("arv.io", a, in, 0, {0,0,0,0}),
-    Resource1 = dnslib:resource("arv.io", 1, 1, 0, {0,0,0,0}),
-    Resource1 = dnslib:resource("arv.io", 1, 1, 0, <<0:32>>),
-    Resource1 = dnslib:resource("arv.io", 1, 1, 0, "0.0.0.0"),
-    Resource1 = dnslib:resource("arv.io   IN  0  A 0.0.0.0"),
+    Resource1 = {[<<"arv">>,<<"io">>], a, in, 1800, {0,0,0,0}} = dnslib:resource("arv.io", a, in, 1800, {0,0,0,0}),
+    Resource1 = dnslib:resource("arv.io", 1, 1, 1800, {0,0,0,0}),
+    Resource1 = dnslib:resource("arv.io", 1, 1, 1800, <<0:32>>),
+    Resource1 = dnslib:resource("arv.io", a, 1, 1800, <<0:32>>),
+    Resource1 = dnslib:resource("arv.io", "A", 1, 1800, <<0:32>>),
+    Resource1 = dnslib:resource("arv.io", "TYPE1", 1, 1800, <<0:32>>),
+    Resource1 = dnslib:resource("arv.io", 1, 1, 1800, "\\# 4 00 00 00 00"),
+    Resource1 = dnslib:resource("arv.io", a, 1, 1800, "\\# 4 00 00 00 00"),
+    Resource1 = dnslib:resource("arv.io", "A", 1, 1800, "\\# 4 00 00 00 00"),
+    Resource1 = dnslib:resource("arv.io", 1, 1, 1800, "0.0.0.0"),
+    Resource1 = dnslib:resource("arv.io", "A", 1, 1800, "0.0.0.0"),
+    Resource1 = dnslib:resource("arv.io", "A", "IN", 1800, "0.0.0.0"),
+    Resource1 = dnslib:resource("arv.io", 1, "IN", 1800, "0.0.0.0"),
+    Resource1 = dnslib:resource("arv.io", 1, "CLASS1", 1800, "0.0.0.0"),
+    Resource1 = dnslib:resource("arv.io", "A", "IN", "30min", "0.0.0.0"),
+    Resource1 = dnslib:resource("arv.io   IN  30min  A 0.0.0.0"),
+    Resource1 = dnslib:resource("arv.io   IN  30min  A 0.0.0.0"),
 
     Resource2 = {[], a, in, 0, {0,0,0,0}} = dnslib:resource(". IN 0 A 0.0.0.0"),
     Resource2 = dnslib:resource(". IN 0 A \\# 4 00 00 00 00"),
@@ -190,7 +212,35 @@ resource_test() ->
     {'EXIT', {badarg, _}} = (catch dnslib:resource([], 1, 1, 16#7FFFFFFF+1, nil)),
     {'EXIT', {badarg, _}} = (catch dnslib:resource([], 1, 1, not_a_ttl, nil)),
     {'EXIT', {badarg, _}} = (catch dnslib:resource([], 1, 1, "foobar", nil)),
-    {'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, in, 60, {0,0,0,0})).
+    {'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, in, 60, {0,0,0,0})),
+    {'EXIT', {badarg, _}} = (catch dnslib:resource([], "TYPE", in, 60, {0,0,0,0})),
+    {'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, "CLASS", 60, {0,0,0,0})),
+    {'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, "CLASS1", 60, "\\# -4 00")),
+    {'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, "CLASS1", 60, "\\# 4 0")).
+
+
+resource_doc_test() ->
+    RRLine = ".    IN    30min    A  0.0.0.0",
+    {[], a, in, 1800, {0,0,0,0}} = Resource1 = dnslib:resource(RRLine),
+    Resource1 = dnslib:resource(". IN 30min A \\# 4 00 00 00 00"),
+    Resource1 = dnslib:resource(". CLASS1 30min TYPE1 \\# 4 00 00 00 00"),
+    Resource1 = dnslib:resource(". CLASS1 30min A \\# 4 00 00 00 00"),
+    Resource1 = dnslib:resource(".", a, in, "30min", {0,0,0,0}),
+    Resource1 = dnslib:resource(".", "A", "IN", "30min", {0,0,0,0}),
+    Resource1 = dnslib:resource(".", "TYPE1", "CLASS1", "30min", {0,0,0,0}),
+    Resource1 = dnslib:resource(".", "TYPE1", "CLASS1", "30min", <<0:32>>),
+    Resource1 = dnslib:resource(".", "TYPE1", "CLASS1", "30min", "\\# 4 00000000"),
+    Resource1 = dnslib:resource([], 1, 1, 1800, <<0:32>>),
+    Resource1 = dnslib:resource(".", a, in, 1800, "0.0.0.0"),
+    Resource1 = dnslib:resource(".", a, in, 1800, "\\# 4 00 00 00 00"),
+
+    {[<<"arv">>,<<"io">>], a, in, 0, {0,0,0,0}} = dnslib:resource("arv.io IN 0 A 0.0.0.0"),
+
+    Resource2 = {[<<"_spf">>,<<"arv">>,<<"io">>], txt, in, 0, [<<"v=spf1 mx -all">>]},
+    Resource2 = dnslib:resource("_spf.arv.io", txt, in, 0, "\"v=spf1 mx -all\""),
+
+    Resource3 = {[], a, in, 3600, {0,0,0,0}} = dnslib:resource([], a, in, "60min", "0.0.0.0"),
+    {[], a, in, 1892160000, {0,0,0,0}} = dnslib:resource([], a, in, "60 years", "0.0.0.0").
 
 
 normalize_resource_test() ->

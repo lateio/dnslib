@@ -49,7 +49,7 @@ Binary which represents the message
 
 If the message could be parsed without errors, a tuple consisting of `'ok'`, the produced message and any trailing bytes in the binary is returned.
 
-If there was an error in the message, a tuple consisting of `'error'` and the error reason is returned. If the error reason was not `'too_short'`, a message with the correct return code set is also included in the returned tuple. If the parsed message was a request, A DNS server can then produce the response with `dnsmsg:response` and send the resulting response to the client. The returned message includes only information from the message header. Ie. it does not contain any questions or resources from the message, even if the contents of the message were partially valid.
+If there was an error in the message, a tuple consisting of `'error'` and the error reason is returned. If the error reason was not `'too_short'`, a message is also included in the returned tuple. If the parsed message was a request, A DNS server can then produce the response with `dnsmsg:response` and send the resulting response to the client. The returned message includes only information from the message header. Ie. it does not contain any questions or resources from the message, even if the contents of the message were partially valid.
 
 == Errors
 

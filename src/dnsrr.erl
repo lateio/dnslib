@@ -39,9 +39,9 @@
 -type type() :: atom() | 0..16#FFFF.
 -type masterfile_format_type() ::
     'token'           | % String escaped, no further processing is done. Quoted strings are rejected
-    'text'            | % String is escaped, and verified to be under 255 bytes. Quoted strings are accepted
+    'text'            | % String is escaped, and verified to be at most 255 bytes long. Quoted strings are accepted
     'text_unlimited'  | % String is escaped. No limit on length. Quoted strings are accepted
-    'qtext'           | % String is escaped, and verified to be under 255 bytes. Only quoted strings are accepted
+    'qtext'           | % String is escaped, and verified to be at most 255 bytes long. Only quoted strings are accepted
     'qtext_unlimited' | % String is escaped. No limit on length. Only quoted strings are accepted
     'uint16'          | % String is escaped and transformed to integer. Verified to fall into range 0..16#FFFF
     'uint32'          | % String is escaped and transformed to integer. Verified to fall into range 0..16#FFFFFFFF

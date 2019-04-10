@@ -1,0 +1,94 @@
+= dnszone:is_valid_file
+Lauri Moisio <l@arv.io>
+Version 0.0.2, 2019.04.10
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnszone:is_valid_file - Check if a file forms a valid zone
+
+== Description
+
+[source,erlang]
+----
+is_valid_file(Filename :: string()) -> is_valid_file(Filename, []).
+
+is_valid_file(Filename :: string(), Opts :: []) ->
+      'true'
+    | {'false',
+          'missing_soa'
+        | {'multiple_soas', Soas :: [dnslib:domain()]}
+        | 'wildcard_soa'
+        | {'missing_glue', dnslib:domain()}
+        | {'other_than_glue_past_edges', dnslib:domain()}
+        | {'not_under_soa', dnslib:domain()}
+        | {'non_exclusive_cname', dnslib:domain()}
+        | {'cname_to_cname_loop', dnslib:domain()}
+        | {'cname_loop', dnslib:domain()}.
+      }.
+----
+
+Check if a file forms a valid zone.
+
+== Arguments
+
+Filename::
+
+File to check
+
+Opts::
+
+To change how the file is handled. See link:dnsfile.foldl{ext-relative}[dnsfile:foldl] for details.
+
+== Return value
+
+If file `Filename` contained a valid zone, `'true'` is returned.
+
+On error a tuple consisting of `'false'` and the error reason is returned.
+
+== Errors
+
+`'missing_soa'`::
+
+There was no `SOA` record in file `Filename`.
+
+`{'multiple_soas', Soas $$::$$ [dnslib:domain()]}`::
+
+There were multiple `SOA` records in file `Filename`. `Soas` contains the domain names for additional `SOA` records.
+
+`'wildcard_soa'`::
+
+The `SOA` record has a wildcard domain.
+
+`{missing_glue, Domain $$::$$ dnslib:domain()}`::
+
+File `Filename` did not contain glue address record(s) for records past `NS` records. `Domain` is the domain for the record missing glue records.
+
+`{'other_than_glue_past_edges', Domain $$::$$ dnslib:domain()}`::
+
+There were resources other than address records past `NS` records. `Domain` is the domain from the problem record.
+
+`{not_under_soa, Domain $$::$$ dnslib:domain()}`::
+
+A record was not under the `SOA`. `Domain` is the domain of the problem record.
+
+`{'non_exclusive_cname', Domain $$::$$ dnslib:domain()}`::
+
+For some domain, there were both a `CNAME` record and additionally a record of some other type. `Domain` is the domain of the problem record.
+
+`{'cname_to_cname_loop', Domain $$::$$ dnslib:domain()}`::
+
+There was an anomalous `CNAME` record `{Domain, _, _, _, Domain}` in `Resources`.
+
+`{'cname_loop', Domain $$::$$ dnslib:domain()}`::
+
+There was a `CNAME` loop in file `Filename`. `Domain` is the starting point of the loop.
+
+== Changelog
+
+* *0.0.2* Function added
+
+== See also
+
+link:dnszone.is_valid{ext-relative}[dnszone:is_valid],
+link:dnszone{ext-relative}[dnszone]

@@ -1,25 +1,28 @@
 -module(dnszone_test).
 -include_lib("eunit/include/eunit.hrl").
 
-valid_test() ->
+file(Filename) ->
+    filename:absname(filename:join(["test", "sample_files", Filename])).
+
+is_valid_test() ->
     Resources1 = [
         dnslib:resource(". in 60 SOA ns1 hostmaster 0 60 60 60 0"),
         dnslib:resource("alias2 in 60 cname alias1"),
         dnslib:resource("ALIAS1 in 60 cname ALIAS2")
     ],
-    {false, {cname_loop, [<<"alias2">>]}} = dnszone:valid(Resources1),
+    {false, {cname_loop, [<<"alias2">>]}} = dnszone:is_valid(Resources1),
     Resources2 = [
         dnslib:resource(". in 60 SOA ns1 hostmaster 0 60 60 60 0"),
         dnslib:resource("alias1 in 60 cname alias2"),
         dnslib:resource("alias2 in 60 cname alias1")
     ],
-    {false, {cname_loop, [<<"alias1">>]}} = dnszone:valid(Resources2),
+    {false, {cname_loop, [<<"alias1">>]}} = dnszone:is_valid(Resources2),
     Resources3 = [
         dnslib:resource(". in 60 SOA ns1 hostmaster 0 60 60 60 0"),
         dnslib:resource("alias1 in 60 cname alias2"),
         dnslib:resource("alias1 in 60 cname alias3")
     ],
-    {false, {non_exclusive_cname, _}} = dnszone:valid(Resources3).
+    {false, {non_exclusive_cname, _}} = dnszone:is_valid(Resources3).
 
 o() -> #{is_response => true}.
 
@@ -118,3 +121,7 @@ transfer_incremental_test() ->
         {{OldSoa, [Answer1]}, {NewSoa, [Answer2]}},
         {{OldSoa, [Answer1]}, {NewSoa, [Answer2]}}
     ]}} = dnszone:continue_transfer(EmptyLastMsg, Transfer2).
+
+
+is_valid_file_test() ->
+    true = dnszone:is_valid_file(file("all_rrs.zone")).

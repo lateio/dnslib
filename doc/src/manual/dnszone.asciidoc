@@ -1,6 +1,6 @@
 = dnszone
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.04.10
 :ext-relative: {outfilesuffix}
 
 == Module
@@ -15,7 +15,7 @@ Functionality related to DNS zones.
 
 Zone validity:
 
-* link:dnszone.valid{ext-relative}[dnszone:valid] - Check if resource records form a valid zone
+* link:dnszone.is_valid{ext-relative}[dnszone:is_valid] - Check if resource records form a valid zone
 
 Zone transfers:
 
@@ -24,6 +24,9 @@ Zone transfers:
 
 == Changelog
 
+* *0.0.2*
+** `valid/1` renamed to `is_valid/1`
+** New function `is_valid_file/1,2`
 * *0.0.0* Module added
 
 == See also

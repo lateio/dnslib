@@ -1,17 +1,17 @@
-= dnszone:valid
+= dnszone:is_valid
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.04.10
 :ext-relative: {outfilesuffix}
 
 == Name
 
-dnszone:valid - Check if resource records form a valid zone
+dnszone:is_valid - Check if resource records form a valid zone
 
 == Description
 
 [source,erlang]
 ----
-valid(Resources :: [dnslib:resource()]) ->
+is_valid(Resources :: [dnslib:resource()]) ->
       'true'
     | {'false',
           'missing_soa'
@@ -80,9 +80,11 @@ There was a `CNAME` loop in `Resources`. `Domain` is the starting point of the l
 
 == Changelog
 
+* *0.0.2* Renamed from `valid/1` to `is_valid/1`
 * *0.0.1* `cname_loop` error added
 * *0.0.0* Function added
 
 == See also
 
+link:dnszone.is_valid_file{ext-relative}[dnszone:is_valid_file],
 link:dnszone{ext-relative}[dnszone]

@@ -1,4 +1,5 @@
 -module(dnsfile_test).
+-include_lib("dnslib/include/dnsfile.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -define(ALL_RESOURCES, [
@@ -25,7 +26,7 @@
 ]).
 
 file(Filename) ->
-    filename:join(["test", "sample_files", Filename]).
+    filename:absname(filename:join(["test", "sample_files", Filename])).
 
 
 all_types_test() ->
@@ -106,3 +107,51 @@ generic_data_list_to_binary_test() ->
     {error, {bad_data_length, "-4"}} = dnsfile:generic_data_list_to_binary("\\# -4 00 00 00 00"),
     {error, {bad_data_length, "foo"}} = dnsfile:generic_data_list_to_binary("\\# foo 00 00 00 00"),
     {error, invalid_syntax} = dnsfile:generic_data_list_to_binary("\\# 4 gh ijklm op").
+
+
+read_file_test() ->
+    DnsFile = #dnsfile{
+        path=file("all_rrs.zone"),
+        resources=?ALL_RESOURCES,
+        included_from=undefined
+    },
+    {ok, [DnsFile]} = dnsfile:read_file(file("all_rrs.zone")),
+    RootHead = #dnsfile{
+        path=file("root.zone"),
+        resources=[
+            dnslib:resource("root IN 30d SOA ns1.root hostmaster.root 100 1h 1h 1h 1h"),
+            {[<<"ns1">>,<<"root">>], a, in, 36000, {10,140,96,1}},
+            dnslib:resource([<<"www">>,<<"root">>], a, in, "10h", "10.140.85.1")
+        ],
+        included_from=undefined
+    },
+    Include1 = #dnsfile{
+        path=file("include.zone"),
+        resources=[
+            dnslib:resource("alias1.included.root", cname, in, "10min", "included.root"),
+            dnslib:resource("included.root", txt, in, "10min", "included.root.")
+        ],
+        included_from=file("root.zone")
+    },
+    Include2 = #dnsfile{
+        path=file("include.zone"),
+        resources=[
+            dnslib:resource("alias1.root", cname, in, "10min", "root"),
+            dnslib:resource("root", txt, in, "10min","root.")
+        ],
+        included_from=file("root.zone")
+    },
+    RootTail = #dnsfile{
+        path=file("root.zone"),
+        resources=[
+            dnslib:resource([<<"www">>,<<"root">>], aaaa, in, "1h", "::1"),
+            dnslib:resource("Tail.root", txt, in, "2h", [<<>>,<<>>])
+        ],
+        included_from=undefined
+    },
+    {ok, [RootHead, Include1, Include2, RootTail]} = dnsfile:read_file(file("root.zone")).
+
+
+include_loop_test() ->
+    {error, _} = dnsfile:consult(file("include_loop")),
+    {error, _} = dnsfile:consult(file("include_loop_step1")).

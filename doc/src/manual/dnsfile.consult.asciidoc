@@ -11,7 +11,7 @@ dnsfile:consult - Read resource records from a file
 
 [source,erlang]
 ----
--type consult_error_type() ::
+-type read_file_error_type() ::
       'syntax_error'
     | 'directive_error'
     | 'resource_record_error'.
@@ -19,12 +19,12 @@ dnsfile:consult - Read resource records from a file
 consult(Path :: string())
     -> consult(Path, []).
 
-consult(Path :: string(), Opts :: [consult_opt()])
+consult(Path :: string(), Opts :: [read_file_opt()])
     -> {'ok', [dnslib:resource()]}
      | {'error'
            {'file_error', 'eacces' | 'enoent' | 'eisdir', Filename :: string()}
          | {
-             consult_error_type(),
+             read_file_error_type(),
              Filename :: string(),
              Line :: pos_integer(),
              Reason :: term()
@@ -36,70 +36,9 @@ Read resource records from a file. Analogous to `file:consult/1`.
 
 == Types
 
-=== consult_opt()
+=== read_file_opt()
 
-[source,erlang]
-consult_opt() =
-    {'line_break', string()}
-  | {'class', dnsrr:class() | 'explicit'}
-  | {'type_blacklist', dnsrr:type() | [dnsrr:type()]}
-  | {'domain', dnslib:domain()}
-  | {'origin', dnslib:domain()}
-  | {'ttl', dnslib:ttl()}
-  | {'max_line_length', pos_integer()}
-  | {'allow_unknown_resources', boolean()}
-  | {'allow_unknown_classes', boolean()}
-  | {'encoding', unicode:encoding()}
-  | {'text_encoding', unicode:encoding()}.
-
-The default value for each option -- when one exists -- is given in parentheses next to the option.
-
-`{'line_break', string()}` (`"\n"`)::
-
-When a line break is encountered in a quoted string, it is replaced with with this string. This option does not have any effect on what constitutes a line while the file is parsed.
-
-`{'class', dnsrr:class() | 'explicit'}`::
-
-When this option is provided, resources in the consulted file have to match the specified class, or a syntax error is returned. Alternatively, if the resources in the master file contain no explicit classes, the class specified in this option is used for all of them. Specifying `'explicit'` disables the default behavior of assuming that a master file without explicit classes is actually class `IN` but discarding with this assumption if the first resource record has an explicit class.
-
-[NOTE]
-Although the original DNS specification requires that the class of a master file be explicit, dnslib takes the position that master files with classes other than `IN` are rare enough that `IN` can be made the implicit class of master files. Other classes can still be used normally according to the original specification.
-
-`{'type_blacklist', [dnsrr:type()]}`::
-
-With this option, resource types can be blacklisted. If a blacklisted entry is encountered while parsing a file, an error is returned.
-
-`{'domain', dnslib:domain()}`::
-
-According to DNS master file syntax, if a resource record entry specifies no domain, the previous domain is used instead. This option sets that initial "previous domain". If a domain is encountered while handling a file, that new domain overrides this option.
-
-`{'origin', dnslib:domain()}`::
-
-Domains in master files can be either absolute or relative. An origin domain is appended to relative domains. Origin can be set with `$ORIGIN` directive in a master file or with this option. `$ORIGIN` directives in master files override this option.
-
-`{'ttl', dnslib:ttl()}`::
-
-If a resource record has no explicit time-to-live (ttl) field, the default ttl is used. This default ttl can be set with `$TTL` directive in a master file or with this option. `$TTL` directives in master files override this option.
-
-`{'max_line_length', pos_integer()}` (`1024`)::
-
-This option allows the maximum number of character per line to be adjusted. A line which exceeds the length limit will result in an error.
-
-`{'allow_unknown_resources', boolean()}` (`'false'`)::
-
-link:https://tools.ietf.org/rfc/rfc3597.txt[RFC3597] specifies a special syntax for unknown resource types. It allows, for example, an unknown resource type identified by integer value `10000` to be encoded in the master file as `"TYPE10000"` and allows the resource data to be stored as an opaque binary blob. This option controls whether or not these unknown resource types are allowed in a master file. If unknown resource types are not allowed and one is encountered, an error will be returned.
-
-`{'allow_unknown_classes', boolean()}` (`'false'`)::
-
-link:https://tools.ietf.org/rfc/rfc3597.txt[RFC3597] specifies a special syntax for unknown resource classes. It allows, for example, an unknown class identified by integer value `10000` to be encoded in the master file as `"CLASS10000"`. This option controls whether or not these unknown classes are allowed in a master file. If unknown classes are not allowed and one is encountered, an error will be returned.
-
-`{'encoding', unicode:encoding()}` (`'unicode'`)::
-
-`consult` accesses files via the standard Erlang `file` and `io` modules. This means that it is possible for `consult` to transparently handle a variety of character encodings. While most DNS master files will consist of 8-bit ASCII text, this option allows for the exceptions to handled when necessary. Use `'latin1'` in `'encoding'` and `'text_encoding'` for byte-to-byte passthrough.
-
-`{'text_encoding', unicode:encoding()}` (`'unicode'`)::
-
-`consult` accesses files via the standard Erlang `file` and `io` modules. This means that it is possible for `consult` to transparently handle a variety of character encodings. This option determines the encoding of the bytelist (`[byte()]`) which is passed to resource record modules requesting text data. See xref:dnsfile{ext-relative}#encoding[dnsfile - encoding] for further discussion. Use `'latin1'` in `'encoding'` and `'text_encoding'` for byte-to-byte passthrough.
+See link:dnsfile.read_file{ext-relative}[dnsfile:read_file] for details
 
 == Arguments
 
@@ -123,7 +62,7 @@ On error a tuple consisting of `'error'` atom and the error reason is returned.
 
 `'file_error'` indicates problems with accessing the file -- insufficient permissions, file not actually existing, etc.
 
-`{consult_error_type(), File $$::$$ string(), Line $$::$$ pos_integer(), Reason $$::$$ term()}`::
+`{read_file_error_type(), File $$::$$ string(), Line $$::$$ pos_integer(), Reason $$::$$ term()}`::
 
 This case covers a wide variety problems regarding file contents. In effort to be helpful, `File` and `Line`  are included to help guide debugging. `Reason` terms try to be informative.
 
@@ -141,6 +80,7 @@ Currently `consult` will not allow multiple classes to be present in a single ma
 
 == Changelog
 
+* *0.0.2* `consult/1,2` is now based on `dnsfile:read_file/1,2`
 * *0.0.1*
 ** A better sense of how to handle text encodings
 ** Can now handle unknown types and classes as per link:https://tools.ietf.org/rfc/rfc3597.txt[RFC3597]
@@ -160,5 +100,6 @@ Currently `consult` will not allow multiple classes to be present in a single ma
 
 == See also
 
+link:dnsfile.read_file{ext-relative}[dnsfile:read_file],
 link:dnsfile.write_resources{ext-relative}[dnsfile:write_resources],
 link:dnsfile{ext-relative}[dnsfile]

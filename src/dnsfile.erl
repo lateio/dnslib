@@ -24,6 +24,8 @@
 -export([
     consult/1,
     consult/2,
+    read_file/1,
+    read_file/2,
     foldl/3,
     foldl/4,
     is_valid/1,
@@ -46,6 +48,7 @@
 ]).
 
 -include_lib("dnslib/include/dnslib.hrl").
+-include_lib("dnslib/include/dnsfile.hrl").
 
 -ifdef(EUNIT).
 -include_lib("eunit/include/eunit.hrl").
@@ -82,14 +85,14 @@
     prevttl                :: dnslib:ttl()     | 'undefined',
     defttl                 :: dnslib:ttl()     | 'undefined',
     include_depth=3        :: non_neg_integer(),
-    included_from=[]       :: [string()],
+    included_from=[undefined] :: [string() | 'undefined'],
     punyencode=false       :: boolean(),
     allow_unknown_resources=false :: boolean(),
     allow_unknown_classes=false   :: boolean(),
     reverse_dns_pointer=false :: boolean() | 'inet' | 'inet6',
     'allow_@'=true :: boolean(),
-    mode=consult   :: 'consult' | 'foldl' | 'foreach',
-    mode_state=[]  :: term(), % Keep foldl acc&fun and/or consult resources here...
+    mode=read_file :: 'read_file' | 'foldl' | 'foreach',
+    mode_state={[], []}  :: term(), % Keep foldl acc&fun and/or consult resources here...
     directives=#{
         "origin"              => directive_origin,
         "ttl"                 => directive_ttl,
@@ -331,24 +334,38 @@ directive_include(Path0, Origin, OriginStr, State = #state{path=PrevPath,include
         absolute -> Path;
         _ -> filename:join(filename:dirname(PrevPath), Path)
     end,
-    TmpState = State#state{
-        origin=Origin,
-        origin_str=OriginStr,
-        line=1,
-        startline=1,
-        fn=fun line_start/2,
-        parentheses=false,
-        entry_parts=[[]],
-        path=File,
-        include_depth=Depth-1,
-        included_from=[PrevPath|IncludedFrom]
-    },
-    case consult_file(File, TmpState) of
-        {ok, NewRecords} when Mode =:= consult -> {ok, State#state{mode_state=lists:reverse(NewRecords)}};
-        {ok, NewAcc} when Mode =:= foldl ->
-            #state{mode_state={Fun, _}} = State,
-            {ok, State#state{mode_state={Fun, NewAcc}}};
-        {error, Reason} -> error({include_error, Reason})
+    Loop = File =:= PrevPath orelse lists:member(File, IncludedFrom), % lists:member is not evaluated if the first expression matches.
+    if
+        Loop -> {error, include_loop};
+        true ->
+            TmpState0 = State#state{
+                origin=Origin,
+                origin_str=OriginStr,
+                line=1,
+                startline=1,
+                fn=fun line_start/2,
+                parentheses=false,
+                entry_parts=[[]],
+                path=File,
+                include_depth=Depth-1,
+                included_from=[PrevPath|IncludedFrom]
+            },
+            TmpState = case Mode of
+                read_file -> TmpState0#state{mode_state={[], []}};
+                _ -> TmpState0
+            end,
+            case handle_file(File, TmpState) of
+                {ok, NewFiles} when Mode =:= read_file ->
+                    PrevFiles = case State of
+                        #state{mode_state={[], Files}} -> lists:reverse(Files);
+                        _ -> parse_file_done(State)
+                    end,
+                    {ok, State#state{mode_state={[], lists:append(lists:reverse(NewFiles), lists:reverse(PrevFiles))}}};
+                {ok, NewAcc} when Mode =:= foldl ->
+                    #state{mode_state={Fun, _}} = State,
+                    {ok, State#state{mode_state={Fun, NewAcc}}};
+                {error, Reason} -> error({include_error, Reason})
+            end
     end.
 
 
@@ -596,8 +613,8 @@ create_reverse_dns_pointer(Entry, State = #state{reverse_dns_pointer=false}) ->
 
 
 -ifdef(OTP_RELEASE).
-entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=consult, mode_state=Records}) ->
-    {ok, State0#state{mode_state=[Entry|Records], prevdomain=Domain, prevclass=Class, prevttl=Ttl}};
+entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=read_file, mode_state={Records, Files}}) ->
+    {ok, State0#state{mode_state={[Entry|Records], Files}, prevdomain=Domain, prevclass=Class, prevttl=Ttl}};
 entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=foldl, mode_state={Fun, Acc0}}) ->
     try Fun(Entry, Acc0) of
         Acc1 -> {ok, State0#state{mode_state={Fun, Acc1}, prevdomain=Domain, prevclass=Class, prevttl=Ttl}}
@@ -605,8 +622,8 @@ entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=foldl, mode_
         CatchClass:Reason:Stacktrace -> error(foldl_error(CatchClass, Reason, Stacktrace))
     end.
 -else.
-entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=consult, mode_state=Records}) ->
-    {ok, State0#state{mode_state=[Entry|Records], prevdomain=Domain, prevclass=Class, prevttl=Ttl}};
+entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=read_file, mode_state={Records, Files}}) ->
+    {ok, State0#state{mode_state={[Entry|Records], Files}, prevdomain=Domain, prevclass=Class, prevttl=Ttl}};
 entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=foldl, mode_state={Fun, Acc0}}) ->
     try Fun(Entry, Acc0) of
         Acc1 -> {ok, State0#state{mode_state={Fun, Acc1}, prevdomain=Domain, prevclass=Class, prevttl=Ttl}}
@@ -639,12 +656,12 @@ handle_entry([Cur = [$$|Directive0]|Rest], State = #state{directives=Directives,
                     Tmp = lists:reverse(A),
                     {M, F, lists:reverse([State, Rest|Tmp])}
             end,
-            Result = try
-                apply(Module, Func, Args)
+            try apply(Module, Func, Args) of
+                {ok, _}=Result -> Result;
+                {error, DirectiveError} -> error(directive_error(File, LineNumber, DirectiveError))
             catch
                 error:DirectiveError -> error(directive_error(File, LineNumber, DirectiveError))
-            end,
-            {ok, _} = Result
+            end
     end;
 handle_entry([""|_], #state{prevdomain=undefined,path=File,startline=LineNumber}) ->
     error(syntax_error(File, LineNumber, no_previous_domain));
@@ -758,7 +775,7 @@ whitespace([$"|Rest], State) ->
 whitespace([$\n|Rest], State) ->
     whitespace(Rest, State);
 whitespace([$(|Rest], State) ->
-    token(Rest, State#state{parentheses=true});
+    whitespace(Rest, State#state{parentheses=true});
 whitespace([$)|Rest], State) ->
     token(Rest, State#state{parentheses=false});
 whitespace([$;|_], State) ->
@@ -793,7 +810,7 @@ parse_resource(Line, _Opts) when is_list(_Opts) ->
     try parse_entry(Line, State) of
         {complete, Parts, State1} ->
             try handle_entry(Parts, State1) of
-                {ok, #state{mode_state=[Record]}} -> {ok, Record}
+                {ok, #state{mode_state={[Record], _}}} -> {ok, Record}
             catch
                 error:Reason -> {error, Reason}
             end;
@@ -858,16 +875,37 @@ parse_line(Line, State = #state{line=LineNumber}) ->
     end.
 
 
-parse_file_done(#state{mode=consult, mode_state=Records}) ->
-    lists:reverse(Records);
+parse_file_done(#state{mode=read_file, mode_state={Records, Files}, path=Path, included_from=IncFrom}) ->
+    lists:reverse([#dnsfile{
+        resources=lists:reverse(Records),
+        path=Path,
+        included_from=hd(IncFrom)
+    }|Files]);
 parse_file_done(#state{mode=foldl, mode_state={_, Acc}}) ->
     Acc.
 
 
--spec consult(Filename :: string()) -> {'ok', Resources :: [dnslib:resource()]}.
+-spec read_file(Filename :: string())
+    -> {'ok', FileInfo :: [#dnsfile{}]}
+     | {'error', Reason :: term()}.
+read_file(Filename) ->
+    read_file(Filename, []).
+
+-spec read_file(Filename :: string(), Opts :: [term()])
+    -> {'ok', FileInfo :: [#dnsfile{}]}
+     | {'error', Reason :: term()}.
+read_file(Filename, Opts) ->
+    case prepare_state(#state{}, Opts) of
+        {ok, State} -> handle_file(Filename, State);
+        {error, Reason} -> {error, {invalid_opt, Reason}}
+    end.
+
+
+-spec consult(Filename :: string())
+    -> {'ok', Resources :: [dnslib:resource()]}
+     | {'error', Reason :: term()}.
 consult(Filename) ->
     consult(Filename, []).
-
 
 -type consult_opt() ::
       {'line_break', string()}
@@ -885,24 +923,24 @@ consult(Filename) ->
     -> {'ok', Resources :: [dnslib:resource()]}
      | {'error', ErrorSpec :: term()}.
 consult(Filename, Opts) when is_list(Opts) ->
-    case prepare_state(#state{}, Opts) of
-        {ok, State} -> consult_file(Filename, State);
-        {error, Reason} -> {error, {invalid_opt, Reason}}
+    case read_file(Filename, Opts) of
+        {ok, Files} -> {ok, lists:foldl(fun consult_fold/2, [], Files)};
+        Result -> Result
     end.
 
-consult_file(Filename, State = #state{encoding=Encoding}) ->
-    case filename:pathtype(Filename) of
-        absolute ->
-            case file:open(Filename, [read, {encoding, Encoding}]) of
-                {ok, Fd} ->
-                    Result = parse_file(Fd, State#state{path=Filename}),
-                    ok = file:close(Fd),
-                    Result;
-                {error, eacces} -> {error, {file_error, eacces, Filename}};
-                {error, enoent} -> {error, {file_error, enoent, Filename}};
-                {error, eisdir} -> {error, {file_error, eisdir, Filename}}
-            end;
-        _ -> consult_file(filename:absname(Filename), State)
+consult_fold(#dnsfile{resources=Records}, Acc) -> lists:append(Acc, Records).
+
+
+handle_file(Filename0, State = #state{encoding=Encoding}) ->
+    Filename = filename:absname(Filename0),
+    case file:open(Filename, [read, {encoding, Encoding}]) of
+        {ok, Fd} ->
+            Result = parse_file(Fd, State#state{path=Filename}),
+            ok = file:close(Fd),
+            Result;
+        {error, eacces} -> {error, {file_error, eacces, Filename}};
+        {error, enoent} -> {error, {file_error, enoent, Filename}};
+        {error, eisdir} -> {error, {file_error, eisdir, Filename}}
     end.
 
 
@@ -956,7 +994,7 @@ foldl(Fun, Acc0, Path) -> foldl(Fun, Acc0, Path, []).
 
 foldl(Fun, Acc0, Path, Opts) ->
     case prepare_state(#state{}, Opts) of
-        {ok, State} -> consult_file(Path, State#state{mode=foldl, mode_state={Fun, Acc0}});
+        {ok, State} -> handle_file(Path, State#state{mode=foldl, mode_state={Fun, Acc0}});
         {error, Reason} -> {error, {invalid_opt, Reason}}
     end.
 
@@ -995,14 +1033,14 @@ iterate_next({State, Fd}) -> iterate_next(State, Fd).
 
 iterate_next(State0, Fd) ->
     try get_line(Fd, State0) of
-        {eof, State1 = #state{mode_state=[Resource]}} ->
+        {eof, State1 = #state{mode_state={[Resource], _}}} ->
             ok = file:close(Fd),
-            {ok, Resource, {State1#state{mode_state=[]}, eof}};
-        {eof, State1 = #state{mode_state=[]}} ->
+            {ok, Resource, {State1#state{mode_state={[], []}}, eof}};
+        {eof, State1 = #state{mode_state={[], _}}} ->
             ok = file:close(Fd),
             eof;
-        {complete, State1 = #state{mode_state=[Resource]}} ->
-            {ok, Resource, {State1#state{mode_state=[]}, Fd}};
+        {complete, State1 = #state{mode_state={[Resource], _}}} ->
+            {ok, Resource, {State1#state{mode_state={[], []}}, Fd}};
         {_, State1} -> iterate_next(State1, Fd)
     catch
         error:{foldl_error, Class, Reason, Stacktrace}          ->

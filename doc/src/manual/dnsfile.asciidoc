@@ -89,6 +89,7 @@ Read files:
 * link:dnsfile.iterate_begin{ext-relative}[dnsfile:iterate_begin] - Begin master file iteration
 * link:dnsfile.iterate_end{ext-relative}[dnsfile:iterate_end] - End master file iteration
 * link:dnsfile.iterate_next{ext-relative}[dnsfile:iterate_next] - Get next resource from an iterated master file
+* link:dnsfile.read_file{ext-relative}[dnsfile:read_file] - Read resource records and other info from a file
 
 Write files:
 
@@ -128,6 +129,7 @@ arv                       A  0.0.0.0  ; origin is appended to relative domains
 ** New function `is_valid/1,2` added
 ** New functions `iterate_begin/1,2`, `iterate_next/1` and `iterate_end/1` added
 ** New function `generic_data_list_to_binary/1` added
+** New function `read_file/1,2` added
 * *0.0.0* Module added
 
 == See also

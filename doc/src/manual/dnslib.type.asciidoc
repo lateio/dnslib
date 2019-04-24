@@ -1,0 +1,69 @@
+= dnslib:type
+Lauri Moisio <l@arv.io>
+Version 0.0.2, 2019.04.12
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnslib:type - Create a type term
+
+== Description
+
+[source,erlang]
+----
+type(Input :: string() | 0..16#FFFF | atom()) -> dnsrr:type().
+----
+
+Create a type term.
+
+== Arguments
+
+Input::
+
+Can be an integer, a string or an atom representation of a type.
+
+== Return value
+
+On success the type is returned as its correct internal representation.
+
+This function can throw `error:badarg` in the following cases:
+
+* `Input` is an unknown string
+* `Input` is an unknown atom
+* `Input` is an integer value outside the allowed range
+
+
+== Examples
+
+[source,erlang]
+----
+a = dnslib:type("A"),
+a = dnslib:type("TYPE1"),
+a = dnslib:type(1),
+a = dnslib:type(a),
+a = dnslib:type(dnsrr_a), % Module responsible for the type
+
+% An unknown type
+2000 = dnslib:type("TYPE2000"),
+2000 = dnslib:type(2000).
+----
+
+.Errors
+[source,erlang]
+----
+{'EXIT', {badarg, _}} = (catch dnslib:type(-1)), % Invalid value
+{'EXIT', {badarg, _}} = (catch dnslib:type("TYPEKIT")), % Invalid string
+{'EXIT', {badarg, _}} = (catch dnslib:type(unknown_atom)). % Unknown atom
+----
+
+== Changelog
+
+* *0.0.2* Function added
+
+== See also
+
+link:dnslib.domain{ext-relative}[dnslib:domain],
+link:dnslib.class{ext-relative}[dnslib:class],
+link:dnslib.question{ext-relative}[dnslib:question],
+link:dnslib.resource{ext-relative}[dnslib:resource],
+link:dnslib{ext-relative}[dnslib]

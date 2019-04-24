@@ -515,7 +515,7 @@ binary_to_domain_test() ->
     LastLabel = << <<$a>> || _ <- lists:seq(1,61)>>,
     MaxBinary = <<63, BinLabel/binary, 63, BinLabel/binary, 63, BinLabel/binary, 61, LastLabel/binary, 0>>,
     {ok, _, <<>>} = dnswire:binary_to_domain(MaxBinary),
-    {error, {invalid_length, 0, 1}} = dnswire:binary_to_domain(<<0:1, 1:1, 0:6>>).
+    {error, {unknown_extended_label_type,0}} = dnswire:binary_to_domain(<<0:1, 1:1, 0:6>>).
 
 
 domain_to_binary_test() ->

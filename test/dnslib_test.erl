@@ -275,7 +275,43 @@ deduplicate_test() ->
 
 
 domain_test() ->
+    [<<"arv">>,<<"io">>] = dnslib:domain("arv.io"),
+    [<<"arv">>,<<"io">>] = dnslib:domain([<<"arv">>,<<"io">>]),
+    [<<"arv">>,<<"io">>] = dnslib:domain(<<3, "arv", 2, "io", 0>>),
     {'EXIT', {badarg, _}} = (catch dnslib:domain("väinämöinen.com")), % Non-ASCII
     Long = [$a || _ <- lists:seq(1,64)],
     {'EXIT', {badarg, _}} = (catch dnslib:domain(Long)), % Too long label
-    {'EXIT', {badarg, _}} = (catch dnslib:domain("abc..com")). % Empty label
+    {'EXIT', {badarg, _}} = (catch dnslib:domain("abc..com")), % Empty label
+    {'EXIT', {badarg, _}} = (catch dnslib:domain(<<3, "arv", 2, "io", 0, 0>>)). % Trailing byte(s)
+
+
+type_test() ->
+    a = dnslib:type("A"),
+    a = dnslib:type("TYPE1"),
+    a = dnslib:type(1),
+    a = dnslib:type(a),
+    a = dnslib:type(dnsrr_a), % Module responsible for the type
+
+    % An unknown type
+    2000 = dnslib:type("TYPE2000"),
+    2000 = dnslib:type(2000),
+
+    {'EXIT', {badarg, _}} = (catch dnslib:type(-1)), % Invalid value
+    {'EXIT', {badarg, _}} = (catch dnslib:type("TYPEKIT")), % Invalid string
+    {'EXIT', {badarg, _}} = (catch dnslib:type(unknown_atom)). % Unknown atom
+
+
+class_test() ->
+    in = dnslib:class("IN"),
+    in = dnslib:class("CLASS1"),
+    in = dnslib:class(1),
+    in = dnslib:class(in),
+    in = dnslib:class(dnsclass_in), % Module responsible for the class
+
+    % An unknown type
+    2000 = dnslib:class("CLASS2000"),
+    2000 = dnslib:class(2000),
+
+    {'EXIT', {badarg, _}} = (catch dnslib:class(-1)), % Invalid value
+    {'EXIT', {badarg, _}} = (catch dnslib:class("CLASSROOM")), % Invalid string
+    {'EXIT', {badarg, _}} = (catch dnslib:class(unknown_atom)). % Unknown atom

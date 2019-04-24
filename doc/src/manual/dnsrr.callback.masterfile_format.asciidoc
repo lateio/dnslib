@@ -39,7 +39,7 @@ Each format type is passed to the module as a certain type. This is given in par
 
 `'token'` (`string()`)::
 
-Any non-quoted string of characters. For example, `0.0.0.0`.
+Any non-quoted string of characters. For example, `0.0.0.0` or `Hello\ world`.
 
 `'text'` (`[byte()]`)::
 

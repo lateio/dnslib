@@ -103,7 +103,7 @@ opcode(Value) when is_integer(Value) -> Value.
 -define(HEADER,
 <<
 	Id:16,
-	IsResponse:1, OpCode:4, Authoritative:1, Truncated:1, RecursionDesired:1, RecursionAvailable:1, Reserved:1, AuthData:1, CheckingDisabled:1, ResponseCode:4
+	IsResponse:1, OpCode:4, Authoritative:1, Truncated:1, RecursionDesired:1, RecursionAvailable:1, Reserved:1/bits, AuthData:1, CheckingDisabled:1, ResponseCode:4
 >>).
 
 % Matches RDATA portion after name
@@ -147,9 +147,9 @@ opcode(Value) when is_integer(Value) -> Value.
 %    {extended, Type, Rest};
 binary_to_domain(<<>>) ->
     {error, empty_binary};
-binary_to_domain(<<Bin/binary>>) ->
+binary_to_domain(Bin) when is_binary(Bin) ->
     binary_to_domain(Bin, [], 0);
-binary_to_domain(_) ->
+binary_to_domain(Bits) when is_bitstring(Bits) ->
     {error, truncated_domain}.
 
 binary_to_domain(<<_/binary>>, _, BytesUsed) when BytesUsed >= ?DOMAIN_MAX_OCTETS ->
@@ -158,6 +158,21 @@ binary_to_domain(<<0, Tail/binary>>, Acc, _) ->
     {ok, lists:reverse(Acc), Tail};
 binary_to_domain(<<1:1, 1:1, Ref:14, Tail/binary>>, Acc, _) ->
     {compressed, {compressed, Ref, Acc}, Tail};
+binary_to_domain(<<0:1, 1:1, 1:6, Tail0/binary>>, Acc, BytesUsed) -> % Binary label (RFC2673)
+    case Tail0 of
+        <<0, Label:256, Tail1/binary>> -> binary_to_domain(Tail1, [{binary, <<Label:256>>}|Acc], BytesUsed + 2 + 32);
+        <<Bits, Label:Bits, Tail1/binary>> when Bits rem 8 =:= 0 -> binary_to_domain(Tail1, [{binary, <<Label:Bits>>}|Acc], BytesUsed + 2 + Bits div 8);
+        <<Bits, Label:Bits, _Padding:7, Tail1/binary>> when Bits rem 8 =:= 1 -> binary_to_domain(Tail1, [{binary, <<Label:Bits>>}|Acc], BytesUsed + 3 + Bits div 8);
+        <<Bits, Label:Bits, _Padding:6, Tail1/binary>> when Bits rem 8 =:= 2 -> binary_to_domain(Tail1, [{binary, <<Label:Bits>>}|Acc], BytesUsed + 3 + Bits div 8);
+        <<Bits, Label:Bits, _Padding:5, Tail1/binary>> when Bits rem 8 =:= 3 -> binary_to_domain(Tail1, [{binary, <<Label:Bits>>}|Acc], BytesUsed + 3 + Bits div 8);
+        <<Bits, Label:Bits, _Padding:4, Tail1/binary>> when Bits rem 8 =:= 4 -> binary_to_domain(Tail1, [{binary, <<Label:Bits>>}|Acc], BytesUsed + 3 + Bits div 8);
+        <<Bits, Label:Bits, _Padding:3, Tail1/binary>> when Bits rem 8 =:= 5 -> binary_to_domain(Tail1, [{binary, <<Label:Bits>>}|Acc], BytesUsed + 3 + Bits div 8);
+        <<Bits, Label:Bits, _Padding:2, Tail1/binary>> when Bits rem 8 =:= 6 -> binary_to_domain(Tail1, [{binary, <<Label:Bits>>}|Acc], BytesUsed + 3 + Bits div 8);
+        <<Bits, Label:Bits, _Padding:1, Tail1/binary>> when Bits rem 8 =:= 7 -> binary_to_domain(Tail1, [{binary, <<Label:Bits>>}|Acc], BytesUsed + 3 + Bits div 8);
+        _ -> {error, truncated_domain}
+    end;
+binary_to_domain(<<0:1, 1:1, ELT:6, _/binary>>, Acc, BytesUsed) ->
+    {error, {unknown_extended_label_type, ELT}};
 binary_to_domain(<<0:1, 0:1, Rest/bits>>, Acc, BytesUsed) ->
     case Rest of
         <<Len:6, Label:Len/binary, Tail/binary>> -> binary_to_domain(Tail, [Label|Acc], BytesUsed+1+Len);
@@ -165,7 +180,8 @@ binary_to_domain(<<0:1, 0:1, Rest/bits>>, Acc, BytesUsed) ->
     end;
 binary_to_domain(<<B1:1, B2:1, _:6, _/binary>>, _, _) ->
     {error, {invalid_length, B1, B2}};
-binary_to_domain(_, _, _) ->
+binary_to_domain(Bin, _, _) ->
+    io:format("~p~n", [Bin]),
     {error, truncated_domain}.
 
 
@@ -205,6 +221,12 @@ domain_to_binary([Label|_], _) when byte_size(Label) > 63 ->
     {error, label_too_long};
 domain_to_binary([<<>>|_], _) ->
     {error, empty_label};
+domain_to_binary([{binary, Label}|Rest], Acc) when is_bitstring(Label), bit_size(Label) > 0 ->
+    Bitsize = bit_size(Label),
+    if
+        Bitsize =:= 256 -> domain_to_binary(Rest, <<Acc/binary, 0:1, 1:1, 1:6, 0, Label/bits>>);
+        Bitsize < 256 -> domain_to_binary(Rest, <<Acc/binary, 0:1, 1:1, 1:6, (bit_size(Label)), Label/bits, 0:(8-(bit_size(Label) rem 8))>>)
+    end;
 domain_to_binary([Label|Rest], Acc) ->
     domain_to_binary(Rest, <<Acc/binary, (byte_size(Label)), Label/binary>>).
 
@@ -922,7 +944,7 @@ to_bin_opts_to_state(State = #bin_state{}, [{truncate, Boolean}|Rest]) when Bool
 
 
 -spec to_bin_header(Msg :: dnsmsg:message()) -> {'ok', binary()}.
-to_bin_header(Msg) ->
+to_bin_header(Msg = #{'Reserved' := Reserved}) when bit_size(Reserved) =:= 1 ->
     #{
         'ID'                  := Id,
         'Is_response'         := IsResponse,
@@ -944,7 +966,7 @@ to_bin_header(Msg) ->
         (boolean(Truncated)):1,
         (boolean(RecursionDesired)):1,
         (boolean(RecursionAvailable)):1,
-        Reserved:1,
+        Reserved/bits,
         (boolean(AuthData)):1,
         (boolean(CheckingDisabled)):1,
         ReturnCode:4

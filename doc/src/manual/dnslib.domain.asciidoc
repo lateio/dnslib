@@ -1,6 +1,6 @@
 = dnslib:domain
 Lauri Moisio <l@arv.io>
-Version 0.0.2, 2019.01.31
+Version 0.0.2, 2019.04.12
 :ext-relative: {outfilesuffix}
 
 == Name
@@ -11,16 +11,16 @@ dnslib:domain - Create a domain term
 
 [source,erlang]
 ----
-question(StringDomain :: string() | dnslib:domain()) -> dnslib:domain().
+question(Domain :: string() | dnslib:domain() | binary()) -> dnslib:domain().
 ----
 
 Create a domain term.
 
 == Arguments
 
-StringDomain::
+Domain::
 
-Either a string representation of a domain -- which can contain escapes -- or a `dnslib:domain()` term
+Either a string representation of a domain -- which can contain escapes -- or a `dnslib:domain()` term or a `binary()` encoding a domain in wire format.
 
 == Return value
 
@@ -30,13 +30,15 @@ This function can throw `error:badarg` in the following cases:
 
 * link:dnslib.list_to_domain{ext-relative}[`dnslib:list_to_domain`] error when `Domain` is a string
 * link:dnslib.is_valid_domain{ext-relative}[`dnslib:is_valid_domain`] error when `Domain` is not a string
+* If `Domain` was a binary and contained a domain compression or trailing bytes
 
 == Examples
 
 [source,erlang]
 ----
 [<<"arv">>,<<"io">>] = dnslib:domain("arv.io"),
-[<<"arv">>,<<"io">>] = dnslib:domain([<<"arv">>,<<"io">>]).
+[<<"arv">>,<<"io">>] = dnslib:domain([<<"arv">>,<<"io">>]),
+[<<"arv">>,<<"io">>] = dnslib:domain(<<3, "arv", 2, "io", 0>>).
 ----
 
 .Errors
@@ -45,7 +47,8 @@ This function can throw `error:badarg` in the following cases:
 {'EXIT', {badarg, _}} = (catch dnslib:domain("väinämöinen.com")), % Non-ASCII
 Long = [$a || _ <- lists:seq(1,64)],
 {'EXIT', {badarg, _}} = (catch dnslib:domain(Long)), % Too long label
-{'EXIT', {badarg, _}} = (catch dnslib:domain("abc..com")). % Empty label
+{'EXIT', {badarg, _}} = (catch dnslib:domain("abc..com")), % Empty label
+{'EXIT', {badarg, _}} = (catch dnslib:domain(<<3, "arv", 2, "io", 0, 0>>)). % Trailing byte(s)
 ----
 
 == Changelog

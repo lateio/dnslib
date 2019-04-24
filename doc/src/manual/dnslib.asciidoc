@@ -1,6 +1,6 @@
 = dnslib
 Lauri Moisio <l@arv.io>
-Version 0.0.2, 2019.02.15
+Version 0.0.2, 2019.04.12
 :ext-relative: {outfilesuffix}
 
 == Module
@@ -41,17 +41,28 @@ Resources:
 
 Misc:
 
+* link:dnslib.class{ext-relative}[dnslib:class] - Create a class term
 * link:dnslib.deduplicate{ext-relative}[dnslib:deduplicate] - Deduplicate a list of questions or resources
 * link:dnslib.list_to_ttl{ext-relative}[dnslib:list_to_ttl] - Parse a string as a time-to-live (TTL) field
+* link:dnslib.type{ext-relative}[dnslib:type] - Create a type term
 
 == Types
+
+=== binary_label()
+
+[source,erlang]
+binary_label() = <<_:1, _:_>>.
+
+RFC2673 describes extended label type "Binary label". `binary_label()` type represents these labels.
 
 === domain_label()
 
 [source,erlang]
-domain_label() = <<_:8, _:_*8>>.
+domain_label() =
+      <<_:8, _:_*8>>
+    | binary_label().
 
-A domain label is a `1..63` octets long binary.
+A basic domain label is a `1..63` octets long binary.
 
 63 octets is the upper limit due to how domain labels are encoded in wire format and because of the reservations made by the original DNS spec.
 
@@ -98,10 +109,19 @@ compressed_domain() =
 
 `Ref` is the offset for the rest of the domain from the start of the current message. `Domain` contains the domains labels so far, in reverse order -- first label is the last member of the list.
 
+== codepoint_label()
+
+[source,erlang]
+codepoint_label() =
+      string()
+    | binary_label().
+
+In `codepoint_label()` type, basic DNS labels are represented as strings instead of binaries.
+
 === non_wildcard_codepoint_domain()
 
 [source,erlang]
-non_wildcard_codepoint_domain() = [string()].
+non_wildcard_codepoint_domain() = [codepoint_label()].
 
 `non_wildcard_codepoint_domain()` is an intermediary domain form. It is mainly useful for bridging the gap between Erlang strings and `dnslib:domain()` type.
 
@@ -110,7 +130,7 @@ Unlike in `non_wildcard_domain()` terms where each label is a `binary()` made up
 === wildcard_codepoint_domain()
 
 [source,erlang]
-wildcard_codepoint_domain() = ['_'|string()].
+wildcard_codepoint_domain() = ['_'|codepoint_label()].
 
 `wildcard_codepoint_domain()` is to `non_wildcard_codepoint_domain()` what `wildcard_domain()` is to `non_wildcard_domain()`.
 
@@ -188,6 +208,7 @@ The `return_code()` in a DNS message signifies whether the operation succeeded o
 ** Functions `binary_to_domain/1`, `domain_to_binary/1` and `domain_binary_length/1` were moved to `dnswire` module
 ** Add `'return_code()'` `'bad_version'`
 ** New function `domain/1`
+** New functions `type/1` and `class/1`
 * *0.0.1* `codepoint_domain()` type and other associated types added
 * *0.0.0* Module added
 

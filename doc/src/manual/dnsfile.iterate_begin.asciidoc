@@ -1,6 +1,6 @@
 = dnsfile:iterate_begin
 Lauri Moisio <l@arv.io>
-Version 0.0.2, 2019.02.02
+Version 0.0.2, 2019.04.13
 :ext-relative: {outfilesuffix}
 
 == Name
@@ -13,7 +13,7 @@ dnsfile:iterate_begin - Begin master file iteration
 ----
 iterate_begin(Path :: string()) -> iterate_begin(Path, []).
 
-iterate_begin(Path :: string(), Opts :: [consult_opt()])
+iterate_begin(Path :: string(), Opts :: [read_file_opt()])
     -> {'ok', State :: term()}
      | {'error' {'file_error', 'eacces' | 'enoent' | 'eisdir', Filename :: string()}}.
 ----
@@ -22,7 +22,7 @@ Begin master file iteration.
 
 == Types
 
-See link:dnsfile.consult{ext-relative}[`dnsfile:consult`] for `consult_opt()`.
+See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`] for `read_file_opt()`.
 
 == Arguments
 
@@ -32,7 +32,7 @@ Path of the master file
 
 Opts::
 
-Options to control certain aspects of master file handling. See link:dnsfile.consult{ext-relative}[`dnsfile:consult`].
+Options to control certain aspects of master file handling. See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file`].
 
 == Return value
 

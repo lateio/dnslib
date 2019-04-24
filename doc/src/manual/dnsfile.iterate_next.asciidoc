@@ -1,6 +1,6 @@
 = dnsfile:iterate_next
 Lauri Moisio <l@arv.io>
-Version 0.0.2, 2019.02.02
+Version 0.0.2, 2019.04.13
 :ext-relative: {outfilesuffix}
 
 == Name
@@ -16,7 +16,7 @@ iterate_next(State0 :: term())
      | 'eof'
      | {'error'
            {
-             consult_error_type(),
+             read_file_error_type(),
              Filename :: string(),
              Line :: pos_integer(),
              Reason :: term()
@@ -42,7 +42,7 @@ On error a tuple consisting of `'error'` atom and the error reason is returned.
 
 == Errors
 
-`{consult_error_type(), File $$::$$ string(), Line $$::$$ pos_integer(), Reason $$::$$ term()}`::
+`{read_file_error_type(), File $$::$$ string(), Line $$::$$ pos_integer(), Reason $$::$$ term()}`::
 
 This case covers a wide variety problems regarding file contents. In effort to be helpful, `File` and `Line`  are included to help guide debugging. `Reason` terms try to be informative.
 

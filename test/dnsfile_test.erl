@@ -53,7 +53,7 @@ write_consult_test() ->
     Path = file("write_consult_test"),
     ok = dnsfile:write_resources(Path, ?ALL_RESOURCES),
     {ok, ?ALL_RESOURCES} = dnsfile:consult(Path),
-    ok = dnsfile:write_resources(Path, ?ALL_RESOURCES, [{generic, true}]),
+    ok = dnsfile:write_resources(Path, ?ALL_RESOURCES, [generic]),
     {ok, ?ALL_RESOURCES} = dnsfile:consult(Path).
 
 
@@ -152,6 +152,23 @@ read_file_test() ->
     {ok, [RootHead, Include1, Include2, RootTail]} = dnsfile:read_file(file("root.zone")).
 
 
-include_loop_test() ->
+include_test() ->
     {error, _} = dnsfile:consult(file("include_loop")),
-    {error, _} = dnsfile:consult(file("include_loop_step1")).
+    {error, _} = dnsfile:consult(file("include_loop_step1")),
+    {ok, Prev} = file:get_cwd(),
+    ok = file:set_cwd(file("jail")),
+    {error, _} = dnsfile:consult("sneaky_include"),
+    ok = file:set_cwd(Prev).
+
+
+read_file_includes_test() ->
+    Path1 = file("all_rrs.zone"),
+    {ok, Files1} = dnsfile:read_file_includes(Path1),
+    true = lists:member(#dnsfile{path=Path1, included_from=undefined, resources=[]}, Files1),
+    Path2 = file("root.zone"),
+    Path3 = file("include.zone"),
+    {ok, Files2} = dnsfile:read_file_includes(Path2),
+    true = lists:all(fun (Entry) -> lists:member(Entry, Files2) end, [
+        #dnsfile{path=Path2, included_from=undefined, resources=[]},
+        #dnsfile{path=Path3, included_from=Path2, resources=[]}
+    ]).

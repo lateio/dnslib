@@ -1,6 +1,6 @@
 = dnsfile
 Lauri Moisio <l@arv.io>
-Version 0.0.2, 2019.02.02
+Version 0.0.2, 2019.04.24
 :ext-relative: {outfilesuffix}
 
 == Module
@@ -18,7 +18,7 @@ Back when the original DNS specification was drafted, a strict byte-to-character
 
 ==== Non-ASCII whitespace
 
-Only space and tab are considered whitespace in master files.
+Only space (`16#20`, `32`) and tab (`16#09`, `9`) are considered whitespace in master files.
 
 For distinguishing lines, dnslib relies on `io:get_line/2` of the standard library.
 
@@ -35,7 +35,7 @@ IMPORTANT: *Don't do it*.
 
 Although domains are technically just arrays of arrays of octets, and thus capable of representing non-ASCII characters, for example in UTF-8, a number of requirements complicate the situation. For one, the original DNS specification adopted a number of previous guidelines on what a domain could and could not consist of. Thus existing systems might enforce these older restrictions on domains. This inertia, combined with the complicated nature of character casing and normalization in Unicode, makes it impractical to update the DNS specification to allow, for example, UTF-8 representations of non-ASCII characters in domains.
 
-The adopted solution was to create a system for representing non-ASCII characters while still adhering to the previously laid out rules. link:https://www.ietf.org/rfc/rfc3492.txt[RFC3492] describes this technical solution. The subject of non-ASCII in domain names -- internationalized domain names (IDNA) -- is, however, too complicated to go into detail here.
+The adopted solution was to create a system for representing non-ASCII characters while still adhering to the previously laid out rules. link:https://www.ietf.org/rfc/rfc3492.txt[RFC3492] describes this technical solution. The subject of non-ASCII in domain names -- internationalized domain names (IDN) -- is, however, too complicated to go into detail here.
 
 dnslib *does not* currently properly support non-ASCII characters in domains, so they should not be used.
 
@@ -90,6 +90,7 @@ Read files:
 * link:dnsfile.iterate_end{ext-relative}[dnsfile:iterate_end] - End master file iteration
 * link:dnsfile.iterate_next{ext-relative}[dnsfile:iterate_next] - Get next resource from an iterated master file
 * link:dnsfile.read_file{ext-relative}[dnsfile:read_file] - Read resource records and other info from a file
+* link:dnsfile.read_file_includes{ext-relative}[dnsfile:read_file_includes] - Read include structure from a file
 
 Write files:
 
@@ -130,6 +131,7 @@ arv                       A  0.0.0.0  ; origin is appended to relative domains
 ** New functions `iterate_begin/1,2`, `iterate_next/1` and `iterate_end/1` added
 ** New function `generic_data_list_to_binary/1` added
 ** New function `read_file/1,2` added
+** New function `read_file_includes/1,2` added
 * *0.0.0* Module added
 
 == See also

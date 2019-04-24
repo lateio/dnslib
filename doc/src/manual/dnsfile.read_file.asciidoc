@@ -154,7 +154,7 @@ Currently `read_file` will not allow multiple classes to be present in a single 
         included_from=undefined,
         path="/BleepBloop/treasures"
     }
-]} = dnsfile:consult("/BleepBloop/treasures"),
+]} = dnsfile:read_file("/BleepBloop/treasures"),
 
 {ok, [
     #dnsfile{
@@ -172,7 +172,7 @@ Currently `read_file` will not allow multiple classes to be present in a single 
         included_from=undefined,
         path="/BleepBloop/root"
     }
-]} = dnsfile:consult("/BleepBloop/root"),
+]} = dnsfile:read_file("/BleepBloop/root").
 ----
 
 == Changelog

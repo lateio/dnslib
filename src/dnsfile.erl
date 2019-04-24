@@ -26,6 +26,8 @@
     consult/2,
     read_file/1,
     read_file/2,
+    read_file_includes/1,
+    read_file_includes/2,
     foldl/3,
     foldl/4,
     is_valid/1,
@@ -91,7 +93,7 @@
     allow_unknown_classes=false   :: boolean(),
     reverse_dns_pointer=false :: boolean() | 'inet' | 'inet6',
     'allow_@'=true :: boolean(),
-    mode=read_file :: 'read_file' | 'foldl' | 'foreach',
+    mode=read_file :: 'read_file' | 'read_file_includes' | 'foldl' | 'foreach',
     mode_state={[], []}  :: term(), % Keep foldl acc&fun and/or consult resources here...
     directives=#{
         "origin"              => directive_origin,
@@ -329,15 +331,21 @@ directive_include([], _) ->
 
 
 directive_include(Path0, Origin, OriginStr, State = #state{path=PrevPath,include_depth=Depth,included_from=IncludedFrom,mode=Mode}) ->
-    Path = resolve(Path0),
-    File = case filename:pathtype(Path) of
-        absolute -> Path;
-        _ -> filename:join(filename:dirname(PrevPath), Path)
+    Path1 = resolve(Path0),
+    File = case filename:pathtype(Path1) of
+        absolute -> error({include_error, {absolute_include_path, Path1}});
+        _ ->
+            case filename:safe_relative_path(Path1) of
+                unsafe -> error({include_error, {unsafe_relative_include, Path1}});
+                Path2 -> filename:join(filename:dirname(PrevPath), Path2)
+            end
     end,
+    % We need to check that we're not escaping beoynd the initial directory
+
     Loop = File =:= PrevPath orelse lists:member(File, IncludedFrom), % lists:member is not evaluated if the first expression matches.
     if
         Loop -> {error, include_loop};
-        true ->
+        not Loop ->
             TmpState0 = State#state{
                 origin=Origin,
                 origin_str=OriginStr,
@@ -352,10 +360,17 @@ directive_include(Path0, Origin, OriginStr, State = #state{path=PrevPath,include
             },
             TmpState = case Mode of
                 read_file -> TmpState0#state{mode_state={[], []}};
+                read_file_includes -> TmpState0#state{mode_state={[], []}};
                 _ -> TmpState0
             end,
             case handle_file(File, TmpState) of
                 {ok, NewFiles} when Mode =:= read_file ->
+                    PrevFiles = case State of
+                        #state{mode_state={[], Files}} -> lists:reverse(Files);
+                        _ -> parse_file_done(State)
+                    end,
+                    {ok, State#state{mode_state={[], lists:append(lists:reverse(NewFiles), lists:reverse(PrevFiles))}}};
+                {ok, NewFiles} when Mode =:= read_file_includes ->
                     PrevFiles = case State of
                         #state{mode_state={[], Files}} -> lists:reverse(Files);
                         _ -> parse_file_done(State)
@@ -615,6 +630,8 @@ create_reverse_dns_pointer(Entry, State = #state{reverse_dns_pointer=false}) ->
 -ifdef(OTP_RELEASE).
 entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=read_file, mode_state={Records, Files}}) ->
     {ok, State0#state{mode_state={[Entry|Records], Files}, prevdomain=Domain, prevclass=Class, prevttl=Ttl}};
+entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=read_file_includes}) ->
+    {ok, State0#state{prevdomain=Domain, prevclass=Class, prevttl=Ttl}};
 entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=foldl, mode_state={Fun, Acc0}}) ->
     try Fun(Entry, Acc0) of
         Acc1 -> {ok, State0#state{mode_state={Fun, Acc1}, prevdomain=Domain, prevclass=Class, prevttl=Ttl}}
@@ -624,6 +641,8 @@ entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=foldl, mode_
 -else.
 entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=read_file, mode_state={Records, Files}}) ->
     {ok, State0#state{mode_state={[Entry|Records], Files}, prevdomain=Domain, prevclass=Class, prevttl=Ttl}};
+entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=read_file_includes}) ->
+    {ok, State0#state{prevdomain=Domain, prevclass=Class, prevttl=Ttl}};
 entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=foldl, mode_state={Fun, Acc0}}) ->
     try Fun(Entry, Acc0) of
         Acc1 -> {ok, State0#state{mode_state={Fun, Acc1}, prevdomain=Domain, prevclass=Class, prevttl=Ttl}}
@@ -881,13 +900,19 @@ parse_file_done(#state{mode=read_file, mode_state={Records, Files}, path=Path, i
         path=Path,
         included_from=hd(IncFrom)
     }|Files]);
+parse_file_done(#state{mode=read_file_includes, mode_state={_, Files}, path=Path, included_from=IncFrom}) ->
+    lists:usort([#dnsfile{
+        path=Path,
+        included_from=hd(IncFrom)
+    }|Files]);
 parse_file_done(#state{mode=foldl, mode_state={_, Acc}}) ->
     Acc.
 
 
 -spec read_file(Filename :: string())
     -> {'ok', FileInfo :: [#dnsfile{}]}
-     | {'error', Reason :: term()}.
+     | {'error', Reason :: term()}
+     | {'error_list', [#dnsfile{}]}. % (IDEA) Provide an option where info about all files (even with errors) is provided
 read_file(Filename) ->
     read_file(Filename, []).
 
@@ -897,6 +922,22 @@ read_file(Filename) ->
 read_file(Filename, Opts) ->
     case prepare_state(#state{}, Opts) of
         {ok, State} -> handle_file(Filename, State);
+        {error, Reason} -> {error, {invalid_opt, Reason}}
+    end.
+
+
+-spec read_file_includes(Filename :: string())
+    -> {'ok', FileInfo :: [#dnsfile{}]}
+     | {'error', Reason :: term()}.
+read_file_includes(Filename) ->
+    read_file_includes(Filename, []).
+
+-spec read_file_includes(Filename :: string(), Opts :: [term()])
+    -> {'ok', FileInfo :: [#dnsfile{}]}
+     | {'error', Reason :: term()}.
+read_file_includes(Filename, Opts) ->
+    case prepare_state(#state{}, Opts) of
+        {ok, State} -> handle_file(Filename, State#state{mode=read_file_includes});
         {error, Reason} -> {error, {invalid_opt, Reason}}
     end.
 
@@ -1061,6 +1102,7 @@ iterate_next(State0, Fd) ->
 iterate_end({_, eof}) -> ok;
 iterate_end({_, Fd}) -> ok = file:close(Fd).
 
+
 %%
 %% Output
 %%
@@ -1135,8 +1177,8 @@ handle_write_resources_opts(Opts) ->
 
 handle_write_resources_opts([], Opts) ->
     Opts;
-handle_write_resources_opts([{generic, Boolean}|Rest], Opts) when Boolean =:= true; Boolean =:= false ->
-    handle_write_resources_opts(Rest, Opts#{generic => Boolean});
+handle_write_resources_opts([generic|Rest], Opts) ->
+    handle_write_resources_opts(Rest, Opts#{generic => true});
 handle_write_resources_opts([append|Rest], Opts) ->
     handle_write_resources_opts(Rest, Opts).
 

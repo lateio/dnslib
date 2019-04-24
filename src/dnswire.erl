@@ -171,7 +171,7 @@ binary_to_domain(<<0:1, 1:1, 1:6, Tail0/binary>>, Acc, BytesUsed) -> % Binary la
         <<Bits, Label:Bits, _Padding:1, Tail1/binary>> when Bits rem 8 =:= 7 -> binary_to_domain(Tail1, [{binary, <<Label:Bits>>}|Acc], BytesUsed + 3 + Bits div 8);
         _ -> {error, truncated_domain}
     end;
-binary_to_domain(<<0:1, 1:1, ELT:6, _/binary>>, Acc, BytesUsed) ->
+binary_to_domain(<<0:1, 1:1, ELT:6, _/binary>>, _, _) ->
     {error, {unknown_extended_label_type, ELT}};
 binary_to_domain(<<0:1, 0:1, Rest/bits>>, Acc, BytesUsed) ->
     case Rest of
@@ -180,7 +180,7 @@ binary_to_domain(<<0:1, 0:1, Rest/bits>>, Acc, BytesUsed) ->
     end;
 binary_to_domain(<<B1:1, B2:1, _:6, _/binary>>, _, _) ->
     {error, {invalid_length, B1, B2}};
-binary_to_domain(Bin, _, _) ->
+binary_to_domain(_, _, _) ->
     {error, truncated_domain}.
 
 
@@ -694,31 +694,13 @@ from_binary(<<_/bits>>, _) ->
 %    {error, badarg}.
 
 
-from_binary_error_return(ErrSpec, Counts, Acc, Msg = #{'Is_response' := IsResponse}, State) ->
+from_binary_error_return(ErrSpec, _, _, Msg = #{'Is_response' := IsResponse}, _) ->
     %{error, {format_error, ErrSpec}, prepare_error_msg_return(Counts, Acc, Msg, State)}.
     ReturnMsg = if
         not IsResponse -> dnsmsg:set_response_header(Msg, [{return_code, format_error}]);
         IsResponse -> Msg
     end,
     {error, {format_error, ErrSpec}, ReturnMsg}.
-
-
-prepare_error_msg_return(Counts, Acc0, Msg, _) ->
-    % Collect sections from acc based on Counts
-    Acc = lists:reverse(Acc0),
-    Fn = fun
-        (Count, FunList) when length(FunList) > Count -> lists:split(Count, FunList);
-        (_, []) -> {[], []};
-        (_, FunList) -> {FunList, []}
-    end,
-    {Entries0, []} = lists:mapfoldl(Fn, Acc, Counts),
-    [Questions, Answers, Nameservers, Additional] = lists:map(fun (EntryList) -> [Tuple || Tuple <- lists:reverse(EntryList), Tuple =/= undefined] end, Entries0),
-    Msg#{
-        'Questions'   => Questions,
-        'Answers'     => Answers,
-        'Nameservers' => Nameservers,
-        'Additional'  => Additional
-    }.
 
 
 to_bin_questions([], Acc, State) ->

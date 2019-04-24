@@ -915,7 +915,7 @@ list_to_binary_label(Rest) ->
 
 list_to_binary_label([], Bin, _) ->
     {ok, {binary, Bin}};
-list_to_binary_label([$/|LengthStr], Acc, Type) ->
+list_to_binary_label([$/|LengthStr], Acc, _) ->
     try list_to_integer(LengthStr) of
         Length when Length >= 1, Length =< 256 ->
             Padding = 256 - bit_size(Acc),
@@ -1031,7 +1031,7 @@ binary_label_to_list_hex(<<N:4, Tail/bits>>, TotalBits, Acc) ->
         N >= 10 -> N + ($a - 10)
     end,
     binary_label_to_list_hex(Tail, TotalBits, [C|Acc]);
-binary_label_to_list_hex(<<>>, TotalBits, Acc) ->
+binary_label_to_list_hex(<<>>, _, Acc) ->
     lists:reverse(Acc) ++ "]";
 binary_label_to_list_hex(Tail, TotalBits, Acc) ->
     Bits = bit_size(Tail),
@@ -1267,7 +1267,7 @@ punyencode_value(Value) ->
     Value + ($0 - 26).
 
 
-punydecode([<<"xn--", Encoded/binary>> = Label0|Rest], Acc) ->
+punydecode([<<"xn--", Encoded/binary>>|Rest], Acc) ->
     case punydecode_label(Encoded) of
         {ok, Label1} -> punydecode(Rest, [Label1|Acc])
     end;

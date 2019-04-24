@@ -608,7 +608,7 @@ check_blacklist(Entry = {_, Type, _, _, _} , State = #state{startline=LineNumber
 
 check_type_class_compatibility(Entry = {_, Type, _, _, _}, State) when is_integer(Type) ->
     entry_done(Entry, State);
-check_type_class_compatibility(Entry = {Domain, Type, Class, Ttl, _}, State = #state{startline=LineNumber,path=File}) ->
+check_type_class_compatibility(Entry = {_, Type, Class, _, _}, State = #state{startline=LineNumber,path=File}) ->
     case dnsrr:class_valid_for_type(Class, Type) of
         false -> error(resource_record_error(File, LineNumber, invalid_class));
         true -> create_reverse_dns_pointer(Entry, State)
@@ -630,7 +630,7 @@ create_reverse_dns_pointer(Entry, State = #state{reverse_dns_pointer=false}) ->
 -ifdef(OTP_RELEASE).
 entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=read_file, mode_state={Records, Files}}) ->
     {ok, State0#state{mode_state={[Entry|Records], Files}, prevdomain=Domain, prevclass=Class, prevttl=Ttl}};
-entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=read_file_includes}) ->
+entry_done({Domain, _, Class, Ttl, _}, State0 = #state{mode=read_file_includes}) ->
     {ok, State0#state{prevdomain=Domain, prevclass=Class, prevttl=Ttl}};
 entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=foldl, mode_state={Fun, Acc0}}) ->
     try Fun(Entry, Acc0) of
@@ -844,14 +844,14 @@ parse_entry(Line, State = #state{fn=Fn}) ->
     Fn(Line, State).
 
 
--spec parse_file(Fd :: file:io_device(), State :: #state{}) ->
-    {'ok', [dnslib:resource()]} |
-    {'error',
-        {'invalid_resource', integer(), handle_entry_error()} |
-        {'parse_error', integer(), parse_entry_error()}       |
-        {'unclosed_quote', integer()}                         |
-        {'unclosed_parentheses', integer()}
-    }.
+-spec parse_file(Fd :: file:io_device(), State :: #state{})
+    -> {'ok', [dnslib:resource()] | term()}
+     | {'error',
+             {'invalid_resource', integer(), handle_entry_error()}
+           | {'parse_error', integer(), parse_entry_error()}
+           | {'unclosed_quote', integer()}
+           | {'unclosed_parentheses', integer()}
+       }.
 parse_file(Fd, State0) ->
     try get_line(Fd, State0) of
         {eof, State1} -> {ok, parse_file_done(State1)};
@@ -972,6 +972,9 @@ consult(Filename, Opts) when is_list(Opts) ->
 consult_fold(#dnsfile{resources=Records}, Acc) -> lists:append(Acc, Records).
 
 
+-spec handle_file(string(), #state{})
+    -> {'ok', term()}
+     | {'error', ErrorSpec :: term()}.
 handle_file(Filename0, State = #state{encoding=Encoding}) ->
     Filename = filename:absname(Filename0),
     case file:open(Filename, [read, {encoding, Encoding}]) of
@@ -1031,8 +1034,14 @@ prepare_state(_, [{Key, _}|_]) ->
     {error, {unknown_opt, Key}}.
 
 
+-spec foldl(fun((dnslib:resource(), term()) -> term()), term(), string())
+    -> {'ok', term()}
+     | {'error', ErrorSpec :: term()}.
 foldl(Fun, Acc0, Path) -> foldl(Fun, Acc0, Path, []).
 
+-spec foldl(fun((dnslib:resource(), term()) -> term()), term(), string(), [consult_opt()])
+    -> {'ok', term()}
+     | {'error', ErrorSpec :: term()}.
 foldl(Fun, Acc0, Path, Opts) ->
     case prepare_state(#state{}, Opts) of
         {ok, State} -> handle_file(Path, State#state{mode=foldl, mode_state={Fun, Acc0}});
@@ -1069,7 +1078,7 @@ iterate_begin(Path0, Opts) ->
     end.
 
 
-iterate_next({State, eof}=Tuple) -> eof;
+iterate_next({_, eof}) -> eof;
 iterate_next({State, Fd}) -> iterate_next(State, Fd).
 
 iterate_next(State0, Fd) ->
@@ -1077,7 +1086,7 @@ iterate_next(State0, Fd) ->
         {eof, State1 = #state{mode_state={[Resource], _}}} ->
             ok = file:close(Fd),
             {ok, Resource, {State1#state{mode_state={[], []}}, eof}};
-        {eof, State1 = #state{mode_state={[], _}}} ->
+        {eof, #state{mode_state={[], _}}} ->
             ok = file:close(Fd),
             eof;
         {complete, State1 = #state{mode_state={[Resource], _}}} ->

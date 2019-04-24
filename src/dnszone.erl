@@ -61,11 +61,11 @@
         dnstrie:trie(),
         Ns     :: [dnslib:resource()],
         Cnames :: [dnslib:resource()],
-        Soa    :: dnslib:resource()
+        Soa    :: dnslib:resource() | 'nil'
     }.
 
 
--export_type([zone/0,zone_transfer/0]).
+-export_type([zone/0,zone_transfer/0,zone_validation/0]).
 
 % Provide some functions to query a zone in Rrs form?
 % Instead of just adding Rrs, use interpretation form?
@@ -185,7 +185,7 @@ continue_transfer_answer({_, zone_transfer, {_, AnswerType, NewResources}}, {_, 
         middle -> {more, setelement(4, Tuple, lists:append(PrevResources, NewResources))};
         _ -> {error, unexpected_answer_type}
     end;
-continue_transfer_answer({_, zone_transfer, {_, last, []}}, {_, change_sets, NewSoa, Resources}=Tuple) ->
+continue_transfer_answer({_, zone_transfer, {_, last, []}}, {_, change_sets, NewSoa, Resources}) ->
     {ok, {change_sets, NewSoa, Resources}};
 continue_transfer_answer({_, incremental_zone_transfer, {_, AnswerType, NewResources}}, {_, change_sets, NewSoa, PrevResources}=Tuple) ->
     case AnswerType of
@@ -236,7 +236,9 @@ is_valid_file(Path, Opts0) ->
     ReturnSoa = lists:member(return_soa, Opts),
     FoldReturn = dnsfile:foldl(fun valid_file_fold/2, {dnstrie:new(), [], [], nil}, Path, DnsfileOpts),
     case is_valid_fold(FoldReturn) of
-        true when ReturnSoa -> {true, element(4, element(2, FoldReturn))};
+        true when ReturnSoa ->
+            {ok, {_, _, _, Soa}} = FoldReturn,
+            {true, Soa};
         true -> true;
         Tuple -> Tuple
     end.
@@ -390,7 +392,7 @@ is_valid(Rrs) ->
 
 is_valid_fold({ok, {_, _, _, nil}}) ->
     {false, missing_soa};
-is_valid_fold({ok, {Trie, Ns, Cnames, Soa}}) ->
+is_valid_fold({ok, {Trie, Ns, Cnames, _}}) ->
     % Check for Cname loops
     case check_cname_loop(Cnames) of
         false ->
@@ -452,11 +454,11 @@ check_cname_loop(Domain, Cnames) ->
 
 check_cname_loop(_, [], []) ->
     false;
-check_cname_loop(Domain, [], [Next|Cnames]) ->
+check_cname_loop(_, [], [Next|Cnames]) ->
     check_cname_loop(?RESOURCE_DATA(Next), Cnames, Cnames);
-check_cname_loop(Domain, [{Domain, _, _, _, _}|Rest], Cnames) ->
+check_cname_loop(Domain, [{Domain, _, _, _, _}|_], _) ->
     {true, {cname_loop, Domain}};
-check_cname_loop(_, [{Domain, _, _, _, Domain}|Rest], Cnames) ->
+check_cname_loop(_, [{Domain, _, _, _, Domain}|_], _) ->
     {true, {cname_to_cname_loop, Domain}};
 check_cname_loop(Domain, [_|Rest], Cnames) ->
     check_cname_loop(Domain, Rest, Cnames).

@@ -1,7 +1,3 @@
-after success:
-    codecov
-install:
-    pip install codecov
 language: erlang
 notifications:
   email: l@arv.io

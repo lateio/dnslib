@@ -1,0 +1,123 @@
+= dnsfile:read_file_includes
+Lauri Moisio <l@arv.io>
+Version 0.0.2, 2019.04.12
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsfile:read_file_includes - Read include structure from a file
+
+== Description
+
+[source,erlang]
+----
+-type read_file_error_type() ::
+      'syntax_error'
+    | 'directive_error'
+    | 'resource_record_error'.
+
+read_file(Path :: string())
+    -> read_file(Path, []).
+
+read_file(Path :: string(), Opts :: [read_file_opt()])
+    -> {'ok', [dnsfile()]}
+     | {'error'
+           {'file_error', 'eacces' | 'enoent' | 'eisdir', Filename :: string()}
+         | {
+             read_file_error_type(),
+             Filename :: string(),
+             Line :: pos_integer(),
+             Reason :: term()
+           }
+       }.
+----
+
+Read include structure from a file. Like link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`], but does not return resources.
+
+== Types
+
+=== dnsfile()
+
+[source,erlang]
+----
+-include_lib("dnslib/include/dnsfile.hrl").
+
+dnsfile() = #dnsfile{
+    resources     = [dnslib:resource()],
+    path          = string(),
+    included_from = string() | 'undefined'
+}
+----
+
+=== read_file_opt()
+
+See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`] for details.
+
+== Arguments
+
+Path::
+
+Path of the master file
+
+Opts::
+
+Options to control certain aspects of master file handling
+
+== Return value
+
+On success a tuple consisting of `'ok'` atom and a list of records containing file details are returned. Record order is not meaningful. Only `'path'` and `'included_from'` fields in records have meaningful values.
+
+On error a tuple consisting of `'error'` atom and the error reason is returned.
+
+== Errors
+
+`{'file_error', Reason, Filename $$::$$ string()}`::
+
+`'file_error'` indicates problems with accessing the file -- insufficient permissions, file not actually existing, etc.
+
+`{read_file_error_type(), File $$::$$ string(), Line $$::$$ pos_integer(), Reason $$::$$ term()}`::
+
+This case covers a wide variety problems regarding file contents. In effort to be helpful, `File` and `Line`  are included to help guide debugging. `Reason` terms try to be informative.
+
+== Notes
+
+Currently `read_file_includes` will not allow multiple classes to be present in a single master file.
+
+== Examples
+
+[source,erlang]
+----
+{ok, [
+    #dnsfile{
+        resources=[],
+        included_from=undefined,
+        path="/BleepBloop/treasures"
+    }
+]} = dnsfile:read_file_includes("/BleepBloop/treasures"),
+
+{ok, Files} = dnsfile:read_file_includes("/BleepBloop/root"),
+true = lists:member(
+    #dnsfile{
+        resources=[],
+        included_from=undefined,
+        path="/BleepBloop/root"
+    },
+    Files
+),
+true = lists:member(
+    #dnsfile{
+        resources=[],
+        included_from="/BleepBloop/root",
+        path="/BleepBloop/include"
+    },
+    Files
+).
+----
+
+== Changelog
+
+* *0.0.2* Function added
+
+== See also
+
+link:dnsfile{ext-relative}[dnsfile]

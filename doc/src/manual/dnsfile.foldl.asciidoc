@@ -1,6 +1,6 @@
 = dnsfile:foldl
 Lauri Moisio <l@arv.io>
-Version 0.0.2, 2019.02.02
+Version 0.0.2, 2019.04.13
 :ext-relative: {outfilesuffix}
 
 == Name
@@ -14,12 +14,12 @@ dnsfile:foldl - Call a function on successive resources retrieved from a master 
 foldl(Fun :: fun(), Acc0 :: term(), Path :: string())
     -> foldl(Fun, Acc0, Path, []).
 
-foldl(Fun :: fun(), Acc0 :: term(), Path :: string(), Opts :: [consult_opt()])
+foldl(Fun :: fun(), Acc0 :: term(), Path :: string(), Opts :: [read_file_opt()])
     -> {'ok', AccFinal :: term()}
      | {'error'
            {'file_error', 'eacces' | 'enoent' | 'eisdir', Filename :: string()}
          | {
-             consult_error_type(),
+             read_file_error_type(),
              Filename :: string(),
              Line :: pos_integer(),
              Reason :: term()
@@ -35,7 +35,7 @@ Call a function on successive resources retrieved from a master file. Analogous 
 [source,erlang]
 Fun = fun((Resource :: dnslib:resource(), AccIn :: term()) -> AccOut)
 
-See link:dnsfile.consult{ext-relative}[`dnsfile:consult`] for `consult_opt()`.
+See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`] for `read_file_opt()`.
 
 == Arguments
 
@@ -53,7 +53,7 @@ Path of the master file
 
 Opts::
 
-Options to control certain aspects of master file handling. See link:dnsfile.consult{ext-relative}[`dnsfile:consult`].
+Options to control certain aspects of master file handling. See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file`].
 
 == Return value
 
@@ -67,7 +67,7 @@ On error a tuple consisting of `'error'` atom and the error reason is returned.
 
 `'file_error'` indicates problems with accessing the file -- insufficient permissions, file not actually existing, etc.
 
-`{consult_error_type(), File $$::$$ string(), Line $$::$$ pos_integer(), Reason $$::$$ term()}`::
+`{read_file_error_type(), File $$::$$ string(), Line $$::$$ pos_integer(), Reason $$::$$ term()}`::
 
 This case covers a wide variety problems regarding file contents. In effort to be helpful, `File` and `Line`  are included to help guide debugging. `Reason` terms try to be informative.
 

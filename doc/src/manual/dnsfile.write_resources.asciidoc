@@ -26,14 +26,14 @@ Write resource records to a file. Inverse of link:dnsfile.consult{ext-relative}[
 
 [source,erlang]
 write_resources_opt() =
-      {'generic', boolean()}
+      'generic',
     | 'append'.
 
 The default value for each option -- when one exists -- is given in parentheses next to the option.
 
-`{'generic', boolean()}` (`'false'`)::
+`'generic'`::
 
-link:https://tools.ietf.org/rfc/rfc3597.txt[RFC3597] specifies a generic syntax for representing unknown resource types and classes in DNS master files. Setting this option to `'true'` causes all resources -- known and unknown alike -- to be written in the aforementioned generic form.
+link:https://tools.ietf.org/rfc/rfc3597.txt[RFC3597] specifies a generic syntax for representing unknown resource types and classes in DNS master files. Setting this option causes all resources -- known and unknown alike -- to be written in the aforementioned generic form.
 
 `'append'`::
 
@@ -71,10 +71,13 @@ ok = dnsfile:write_resources("/tmp/test.zone", [Resource]).
 
 == Changelog
 
-* *0.0.2* `'append'` option added
+* *0.0.2*
+** Option `'append'` added
+** Option `{'generic', boolean()}` replaced with `'generic'`. *Incompatible change*
 * *0.0.1* Function added
 
 == See also
 
 link:dnsfile.consult{ext-relative}[dnsfile:consult],
+link:dnsfile.read_file{ext-relative}[dnsfile:read_file],
 link:dnsfile{ext-relative}[dnsfile]

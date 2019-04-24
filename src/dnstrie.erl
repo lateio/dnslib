@@ -150,11 +150,7 @@ walk(Fn, State0, Path, [{Key, Child}|Rest]) when Key =/= '' ->
         {keep_going, State1} -> walk(Fn, State1, Path, Rest);
         {stop, _}=Tuple -> Tuple
     end;
-walk(Fn, State0, Path, [Data0|Rest]) ->
-    Data = if
-        Data0 =:= nodata -> nodata;
-        true -> element(2, Data0)
-    end,
+walk(Fn, State0, Path, [{'', Data}|Rest]) ->
     case Fn(Path, Data, State0) of
         {keep_going, State1} -> walk(Fn, State1, Path, Rest);
         keep_going -> walk(Fn, State0, Path, Rest);
@@ -165,9 +161,11 @@ walk(_, State, _, []) ->
     {keep_going, State};
 walk(Fn, State, Path, Trie) when is_map(Trie) ->
     case lists:partition(fun walk_partition/1, maps:to_list(Trie)) of
-        {[], Children} -> walk(Fn, State, Path, [nodata|Children]);
-        {Value, Children} -> walk(Fn, State, Path, Value ++ Children)
+        {[], Children} -> walk(Fn, State, Path, [{'', nodata}|lists:sort(fun walk_sort/2, Children)]);
+        {Value, Children} -> walk(Fn, State, Path, Value ++ lists:sort(fun walk_sort/2, Children))
     end.
 
 walk_partition({Val, _}) -> Val =:= '';
 walk_partition(_) -> false.
+
+walk_sort({Key1, _}, {Key2, _}) -> Key1 < Key2.

@@ -29,7 +29,11 @@
     query/2,
     to_zone/1,
     new_transfer/1,
-    continue_transfer/2
+    continue_transfer/2,
+    get_transfer_resources/1,
+    new_validate/0,
+    continue_validate/2,
+    end_validate/1
 %    diff/2
 ]).
 
@@ -44,13 +48,22 @@
         minimum   => 0..16#7FFFFFFF
     }.
 
--type zone_transfer() ::
+-opaque zone_transfer() ::
     {
         Question :: dnslib:question(),
         TransferType :: 'zone' | 'change_sets' | 'nil',
         NewSoa :: dnslib:resource() | 'nil',
         Resources :: [dnslib:resource()] | [dnsmsg:incremental_transfer_change_set()]
     }.
+
+-opaque zone_validation() ::
+    {
+        dnstrie:trie(),
+        Ns     :: [dnslib:resource()],
+        Cnames :: [dnslib:resource()],
+        Soa    :: dnslib:resource()
+    }.
+
 
 -export_type([zone/0,zone_transfer/0]).
 
@@ -108,9 +121,10 @@ to_zone(Rrs) ->
 
 -spec new_transfer(dnsmsg:question()) -> zone_transfer().
 % Add Mode argument, to allow transfer to be either 'accumulating' or validating...
+new_transfer(Question) when ?QUESTION_TYPE(Question) =:= axfr ->
+    {Question, zone, nil, []};
 new_transfer(Question) ->
     {Question, nil, nil, []}.
-
 
 -spec continue_transfer(dnsmsg:message(), zone_transfer())
     -> {'ok', {'zone' | 'change_sets', NewSoa :: dnslib:resource(), Resources :: [dnslib:resource()] | [dnsmsg:transfer_interpret_result()]}}
@@ -118,16 +132,21 @@ new_transfer(Question) ->
      | {'error',
            'unexpected_transfer_type'
          | 'unexpected_answer_type'
+         | 'refused'
        }.
 
 continue_transfer(Msg, Transfer) ->
-    {ok, [Answer]} = dnsmsg:interpret_response(
-        case dnsmsg:questions(Msg) of
-            [] -> dnsmsg:add_question(Msg, element(1, Transfer));
-            _ -> Msg
-        end
-    ),
-    continue_transfer_answer(Answer, Transfer).
+    case
+        dnsmsg:interpret_response(
+            case dnsmsg:questions(Msg) of
+                [] -> dnsmsg:add_question(Msg, element(1, Transfer));
+                _ -> Msg
+            end
+        )
+    of
+        {ok, [Answer]} -> continue_transfer_answer(Answer, Transfer)
+        %{ok, Answers} when length(Answers) > 1 -> {}
+    end.
 
 
 -spec continue_transfer_answer(dnsmsg:transfer_interpret_result(), zone_transfer())
@@ -136,22 +155,28 @@ continue_transfer(Msg, Transfer) ->
      | {'error',
            'unexpected_transfer_type'
          | 'unexpected_answer_type'
+         | 'refused'
        }.
-continue_transfer_answer({_, TransferType0, {NewSoa, AnswerType, Resources}}, {Question, nil, nil, []}) ->
-    TransferType = case TransferType0 of
-        zone_transfer -> zone;
-        incremental_zone_transfer -> change_sets
-    end,
-    case AnswerType of
-        complete -> {ok, {TransferType, NewSoa, Resources}};
-        first ->
-            Transfer = {
-                Question,
-                TransferType,
-                NewSoa,
-                Resources
-            },
-            {more, Transfer};
+continue_transfer_answer({_, TransferType0, {NewSoa, AnswerType, Resources}}, {Question, TupleTransferType, nil, []}) ->
+    case
+        case TransferType0 of
+            zone_transfer -> zone;
+            incremental_zone_transfer -> change_sets
+        end
+    of
+        TransferType when TupleTransferType =:= nil orelse TransferType =:= TupleTransferType ->
+            case AnswerType of
+                complete -> {ok, {TransferType, NewSoa, Resources}};
+                first ->
+                    Transfer = {
+                        Question,
+                        TransferType,
+                        NewSoa,
+                        Resources
+                    },
+                    {more, Transfer};
+                _ -> {error, unexpected_answer_type}
+            end;
         _ -> {error, unexpected_answer_type}
     end;
 continue_transfer_answer({_, zone_transfer, {_, AnswerType, NewResources}}, {_, zone, NewSoa, PrevResources}=Tuple) ->
@@ -168,15 +193,56 @@ continue_transfer_answer({_, incremental_zone_transfer, {_, AnswerType, NewResou
         middle -> {more, setelement(4, Tuple, lists:append(PrevResources, NewResources))};
         _ -> {error, unexpected_answer_type}
     end;
+continue_transfer_answer({_, refused}, {_, nil, nil, []}) ->
+    {error, refused};
 continue_transfer_answer(_, _) ->
     {error, unexpected_transfer_type}.
+
+
+-spec get_transfer_resources(zone_transfer()) ->
+    {zone_transfer(), [dnslib:resource()]}.
+get_transfer_resources({Question, zone, NewSoa, Resources}) ->
+    {{Question, zone, NewSoa, []}, Resources};
+get_transfer_resources({Question, change_sets, NewSoa, Resources}) ->
+    {{Question, zone, NewSoa, []}, Resources}.
+
+
+-spec new_validate() -> zone_validation().
+new_validate() ->
+    {dnstrie:new(), [], [], nil}.
+
+
+-spec continue_validate(Resources :: [dnslib:resource()], State :: zone_validation())
+    -> zone_validation()
+     | {'false', Reason :: term()}.
+continue_validate(Resources, State) ->
+    try lists:foldl(fun valid_file_fold/2, State, Resources)
+    catch
+        throw:Reason -> {false, Reason}
+    end.
+
+
+-spec end_validate(State :: zone_validation()) -> 'true' | {'false', Reason :: term()}.
+end_validate(State) ->
+    is_valid_fold(State).
 
 
 is_valid_file(Path) ->
     is_valid_file(Path, []).
 
-is_valid_file(Path, Opts) ->
-    is_valid_fold(dnsfile:foldl(fun valid_file_fold/2, {dnstrie:new(), [], [], nil}, Path, Opts)).
+is_valid_file(Path, Opts0) ->
+    % Snatch our opts from the list...
+    {Opts, DnsfileOpts} = lists:partition(fun is_valid_file_opt/1, Opts0),
+    ReturnSoa = lists:member(return_soa, Opts),
+    FoldReturn = dnsfile:foldl(fun valid_file_fold/2, {dnstrie:new(), [], [], nil}, Path, DnsfileOpts),
+    case is_valid_fold(FoldReturn) of
+        true when ReturnSoa -> {true, element(4, element(2, FoldReturn))};
+        true -> true;
+        Tuple -> Tuple
+    end.
+
+is_valid_file_opt(return_soa) -> true;
+is_valid_file_opt(_) -> false.
 
 valid_file_fold(Resource, {Trie0, Ns, Cname, Soa}) ->
     Domain = lists:reverse(dnslib:normalize_domain(?RESOURCE_DOMAIN(Resource))),
@@ -198,7 +264,11 @@ valid_file_fold(Resource, {Trie0, Ns, Cname, Soa}) ->
                 _ -> {Trie1, Ns, Cname, Resource}
             end;
         ns -> {Trie1, [Resource|Ns], Cname, Soa};
-        cname -> {Trie1, Ns, [Resource|Cname], Soa};
+        cname ->
+            case lists:reverse(dnslib:normalize_domain(?RESOURCE_DATA(Resource))) of
+                Domain -> throw({cname_to_cname_loop, ?RESOURCE_DOMAIN(Resource)});
+                _ -> {Trie1, Ns, [Resource|Cname], Soa}
+            end;
         _ -> {Trie1, Ns, Cname, Soa}
     end.
 
@@ -318,6 +388,8 @@ is_valid(Rrs) ->
     % Should we warn about cases where a wildcard domain is used as NS?
 
 
+is_valid_fold({ok, {_, _, _, nil}}) ->
+    {false, missing_soa};
 is_valid_fold({ok, {Trie, Ns, Cnames, Soa}}) ->
     % Check for Cname loops
     case check_cname_loop(Cnames) of
@@ -327,7 +399,7 @@ is_valid_fold({ok, {Trie, Ns, Cnames, Soa}}) ->
                 true ->
                     case dnstrie:walk(fun valid_file_walk/3, {[], []}, Trie) of
                         {false, _}=Tuple -> Tuple;
-                        _ -> true
+                        _ -> true % Add an option to also return the Soa
                     end;
                 {false, Label} -> {false, {missing_glue, Label}}
             end;
@@ -335,6 +407,8 @@ is_valid_fold({ok, {Trie, Ns, Cnames, Soa}}) ->
     end;
 is_valid_fold({error, {foldl_error, throw, Reason, _}}) ->
     {false, Reason};
+is_valid_fold({error, _}) ->
+    {false, invalid_file};
 is_valid_fold({_, _, _, _}=Tuple) ->
     is_valid_fold({ok, Tuple}).
 
@@ -350,11 +424,21 @@ glue_present([Ns|Rest], Trie) ->
                 false -> {false, ?RESOURCE_DATA(Ns)}
             end;
         {_, Path} ->
-            % Only consider domains under soa
-            case [GenList || GenList <- Path, lists:member(soa, GenList)] of
-                [] -> {false, ?RESOURCE_DATA(Ns)};
-                _ -> glue_present(Rest, Trie)
+            % Only consider domains under soa, past an ns
+            case glue_present_under_soa_past_ns(Path) of
+                true -> {false, ?RESOURCE_DATA(Ns)};
+                false -> glue_present(Rest, Trie)
             end
+    end.
+
+glue_present_under_soa_past_ns([]) ->
+    false; % Reached root without hitting an soa or ns
+glue_present_under_soa_past_ns([List|Rest]) ->
+    case [soa, ns] -- List of
+        [soa] -> true; % Encountered an ns
+        [ns] -> false; % Encountered an soa
+        [] -> false;   % Encountered both
+        _ -> glue_present_under_soa_past_ns(Rest) % Encountered neither
     end.
 
 

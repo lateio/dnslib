@@ -13,8 +13,9 @@ dnszone:is_valid_file - Check if a file forms a valid zone
 ----
 is_valid_file(Filename :: string()) -> is_valid_file(Filename, []).
 
-is_valid_file(Filename :: string(), Opts :: []) ->
+is_valid_file(Filename :: string(), Opts :: [is_valid_file_opt() | read_file_opt()]) ->
       'true'
+    | {'true', Soa :: dnslib:resource()}
     | {'false',
           'missing_soa'
         | {'multiple_soas', Soas :: [dnslib:domain()]}
@@ -24,11 +25,28 @@ is_valid_file(Filename :: string(), Opts :: []) ->
         | {'not_under_soa', dnslib:domain()}
         | {'non_exclusive_cname', dnslib:domain()}
         | {'cname_to_cname_loop', dnslib:domain()}
-        | {'cname_loop', dnslib:domain()}.
+        | {'cname_loop', dnslib:domain()}
+        | 'invalid_file'
       }.
 ----
 
 Check if a file forms a valid zone.
+
+== Types
+
+=== is_valid_file_opt()
+
+[source,erlang]
+is_valid_file_opt() =
+    'return_soa'.
+
+`'return_soa'`::
+
+Instead of only returning `'true'` when a zone was successfully verified, return a tuple consisting of `'true'` and the zone Soa record.
+
+=== read_file_opt()
+
+See link:dnsfile.read_file{ext-relative}[dnsfile:read_file] for details.
 
 == Arguments
 
@@ -83,6 +101,10 @@ There was an anomalous `CNAME` record `{Domain, _, _, _, Domain}` in `Resources`
 `{'cname_loop', Domain $$::$$ dnslib:domain()}`::
 
 There was a `CNAME` loop in file `Filename`. `Domain` is the starting point of the loop.
+
+`'invalid_file'`::
+
+There was an error – syntax or other – in the file.
 
 == Changelog
 

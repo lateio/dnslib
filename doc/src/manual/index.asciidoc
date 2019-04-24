@@ -1,6 +1,6 @@
-= dnslib 0.0.1 Manual
+= dnslib 0.0.2 Manual
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.04.09
 :ext-relative: {outfilesuffix}
 
 == Introduction
@@ -11,6 +11,8 @@ dnslib can be included in an application when it is necessary to work with DNS m
 A variety of functionality for working with DNS messages and assorted data types is included.
 
 The reader should note that dnslib *does not* implement any of the networking functionality of DNS. While it will get an application up to the binary representation of a DNS message, dnslib will not send that binary anywhere.
+
+You can find the source code for link:https://github.com/lateio/dnslib[dnslib on Github].
 
 === Supported platforms
 
@@ -25,6 +27,10 @@ Given the fact that dnslib relies heavily on maps, Erlang/OTP 17 is likely the e
 dnslib is a new project and limited stability should be expected for versions before 1.0.0 -- although nobody likes breaking changes and we try to avoid them. Additionally, for the foreseeable future dnslib will go the way that the requirements of the link:https://github.com/lateio/kurremkarmerruk[Kurremkarmerruk DNS server] dictate.
 
 After 1.0.0, dnslib will adopt the standard semantic versioning.
+
+=== Upgrading
+
+New dnslib releases entail changes. You can find link:changelog_new{ext-relative}[new features] and link:changelog_old{ext-relative}[changes to old ones] for 0.0.2 listed link:changelog{ext-relative}[together here].
 
 == Quick start
 
@@ -66,7 +72,29 @@ ok = dnsfile:write_resources("/BleepBloop/treasures", [Answer]),
 * link:dnswire{ext-relative}[dnswire] - Transform messages from and to binary wire format
 * link:dnszone{ext-relative}[dnszone] - Functionality related to DNS zones
 
-== Supported resource types
+== Standards Compliance
+
+=== Documents
+
+* Original DNS spec: link:https://tools.ietf.org/html/rfc1034[RFC1034] and link:https://tools.ietf.org/html/rfc1035[RFC1035]
+* Host names may begin with a digit: link:https://tools.ietf.org/html/rfc1123[RFC1123]
+* Original spec clarification: link:https://tools.ietf.org/html/rfc2181[RFC2181]
+* DNS Cookies: link:https://tools.ietf.org/html/rfc7873[RFC7873]
+* NAPTR: link:https://tools.ietf.org/html/rfc2915[RFC2915]
+* DNS SRV Records: link:https://tools.ietf.org/html/rfc2782[RFC2782]
+* IPv6 (AAAA) Records: link:https://tools.ietf.org/html/rfc3596[RFC3596]
+* DNS case insensitivity: link:https://tools.ietf.org/html/rfc4343[RFC4343]
+* URI DNS Records: link:https://tools.ietf.org/html/rfc7553[RFC7553]
+* Extension Mechanism for DNS: link:https://tools.ietf.org/rfc/rfc6891.txt[RFC6891]
+* The Role of Wilcards in the DNS: link:https://tools.ietf.org/rfc/rfc4592.txt[RFC4592]
+* Handling of Unknown DNS Resource Record (RR) Types: link:https://tools.ietf.org/rfc/rfc3597.txt[RFC3597]
+* Binary Labels in the Domain Name System: link:https://tools.ietf.org/html/rfc2673[RFC2673]
+
+=== Supported Extended Label Types
+
+* Binary Labels
+
+=== Supported resource types
 
 * A
 * AAAA
@@ -91,4 +119,4 @@ ok = dnsfile:write_resources("/BleepBloop/treasures", [Answer]),
 * URI
 * WKS
 
-dnslib can also passthrough unrecognized resource types and their data, if need be.
+dnslib can also passthrough unrecognized classes, resource types and their data, if need be.

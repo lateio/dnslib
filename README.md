@@ -58,12 +58,13 @@ dnslib claims to be compliant with the following specifications:
 * Extension Mechanism for DNS: [RFC6891](https://tools.ietf.org/rfc/rfc6891.txt)
 * The Role of Wilcards in the DNS: [RFC4592](https://tools.ietf.org/rfc/rfc4592.txt)
 * Handling of Unknown DNS Resource Record (RR) Types: [RFC3597](https://tools.ietf.org/rfc/rfc3597.txt)
+* Binary Labels in the Domain Name System: [RFC2673](https://tools.ietf.org/html/rfc2673)
 
 
 Roadmap
 ---
-For version 0.0.2
+For version 0.0.3
 * Better eunit coverage
-* Custom classes similar to custom resource types
-* New opcodes/return codes as required by [Kurremkarmerruk](https://github.com/lateio/kurremkarmerruk)
+* Common test suites to verify implemented standards documents
+* New opcodes/return codes/functionality as required by [Kurremkarmerruk](https://github.com/lateio/kurremkarmerruk)
 * Progress towards DNSSEC (?)

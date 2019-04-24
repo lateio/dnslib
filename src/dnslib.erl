@@ -493,9 +493,9 @@ resource(Domain, Type0, Class0, Ttl, Data0) ->
 normalize_domain([]) ->
     [];
 normalize_domain(['_'|Domain]) ->
-    ['_'|[normalize_label(Label) || Label <- Domain]];
+    ['_'|normalize_domain(Domain, [])];
 normalize_domain(Domain) ->
-    [normalize_label(Label) || Label <- Domain].
+    normalize_domain(Domain, []).
 
 
 %normalized_domain(Domain) ->
@@ -822,8 +822,14 @@ subdomain_of(_, _) ->
     false.
 
 
-normalize_label({binary, _}=Label) ->
-    Label;
+normalize_domain([{binary, _}|_]=Domain, Acc) ->
+    {Rest, Label} = normalize_binary_label(Domain, []),
+    normalize_domain(Rest, Label ++ Acc);
+normalize_domain([Label|Rest], Acc) ->
+    normalize_domain(Rest, [normalize_label(Label)|Acc]);
+normalize_domain([], Acc) ->
+    lists:reverse(Acc).
+
 normalize_label(Label) ->
     normalize_label(Label, <<>>).
 
@@ -834,6 +840,21 @@ normalize_label(<<Char0, Tail/binary>>, Acc) when Char0 >= $A, Char0 =< $Z ->
     normalize_label(Tail, <<Acc/bits, Char>>);
 normalize_label(<<Char, Tail/binary>>, Acc) ->
     normalize_label(Tail, <<Acc/bits, Char>>).
+
+normalize_binary_label([{binary, _}=Label|Rest], Acc) ->
+    normalize_binary_label(Rest, [Label|Acc]);
+normalize_binary_label([_|_] = Rest, Acc) ->
+    {Rest, normalize_binary_label_combine(tl(Acc), [hd(Acc)])};
+normalize_binary_label([], Acc) ->
+    {[], normalize_binary_label_combine(tl(Acc), [hd(Acc)])}.
+
+normalize_binary_label_combine([{binary, LabelTail}|Rest], [{binary, LabelHead}|Acc]) ->
+    case <<LabelHead/bits, LabelTail/bits>> of
+        <<OldEnd:256/bits, NewStart/bits>> -> normalize_binary_label_combine(Rest, [{binary, NewStart}, {binary, OldEnd}|Acc]);
+        NewStart -> normalize_binary_label_combine(Rest, [{binary, NewStart}|Acc])
+    end;
+normalize_binary_label_combine([], Acc) ->
+    lists:reverse(Acc).
 
 
 list_to_codepoint_domain(_, _, _, TotalLength, _) when TotalLength > ?DOMAIN_MAX_OCTETS ->
@@ -915,8 +936,9 @@ list_to_binary_label(Rest) ->
 
 list_to_binary_label([], Bin, _) ->
     {ok, {binary, Bin}};
-list_to_binary_label([$/|LengthStr], Acc, _) ->
+list_to_binary_label([$/|LengthStr], Acc, Type) ->
     try list_to_integer(LengthStr) of
+        Length when Type =:= bit, Length =/= bit_size(Acc) -> false;
         Length when Length >= 1, Length =< 256 ->
             Padding = 256 - bit_size(Acc),
             TailBits = 256 - Length,

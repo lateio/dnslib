@@ -315,3 +315,31 @@ class_test() ->
     {'EXIT', {badarg, _}} = (catch dnslib:class(-1)), % Invalid value
     {'EXIT', {badarg, _}} = (catch dnslib:class("CLASSROOM")), % Invalid string
     {'EXIT', {badarg, _}} = (catch dnslib:class(unknown_atom)). % Unknown atom
+
+
+binary_label_test() ->
+    {ok, _, [{binary, <<10,0,0,0>>}]} = dnslib:list_to_domain("\\[10.0.0.0]"),
+    {ok, _, [{binary, <<0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1>>}]} = dnslib:list_to_domain("\\[::1]"),
+    {ok, _, [{binary, <<1:1, 1:1>>}]} = dnslib:list_to_domain("\\[o6/2]"),
+    {ok, _, [{binary, <<1:1, 1:1, 0:1>>}]} = dnslib:list_to_domain("\\[b110]"),
+    {ok, _, [{binary, <<1:1, 1:1, 1:1, 1:1>>}]} = dnslib:list_to_domain("\\[xf]"),
+    {ok, _, [{binary, <<1:1, 1:1, 1:1, 1:1>>}]} = dnslib:list_to_domain("\\[xf/4]"),
+
+    {ok, _, SampleDomain} = dnslib:list_to_domain("\\[b11010000011101]"),
+    {ok, _, SampleDomain} = dnslib:list_to_domain("\\[o64072/14]"),
+    {ok, _, SampleDomain} = dnslib:list_to_domain("\\[xd074/14]"),
+    {ok, _, SampleDomain} = dnslib:list_to_domain("\\[208.116.0.0/14]"),
+
+    {error, _} = dnslib:list_to_domain("\\[f]"),
+    {error, _} = dnslib:list_to_domain("\\[xf/3]"),
+    {error, _} = dnslib:list_to_domain("\\[f"),
+    {error, _} = dnslib:list_to_domain("\\[b111/2]"),
+    {error, _} = dnslib:list_to_domain("\\[b110/2]"),
+
+    "\\[xf]" = dnslib:domain_to_list([{binary, <<16#F:4>>}]),
+    "\\[xff]" = dnslib:domain_to_list([{binary, <<16#FF>>}]),
+    _ = (catch dnslib:domain_to_list([{binary, <<>>}])),
+
+    [{binary, <<208, 29:6>>}] = dnslib:normalize_domain([{binary, <<1:1, 1:1, 1:1, 0:1, 1:1>>}, {binary, <<8#640:9>>}]),
+    [{binary, <<16#F0>>}] = dnslib:normalize_domain([{binary, <<0:4>>}, {binary, <<16#F:4>>}]),
+    [{binary, <<0:255>>}, {binary, <<1:256>>}] = dnslib:normalize_domain([{binary, <<1:1, 0:255>>}, {binary, <<0:255>>}]).

@@ -27,7 +27,8 @@
     class_valid_for_type/2,
     section_valid_for_type/2,
     validate_data/2,
-    normalize_data/2
+    normalize_data/2,
+    additionally/1
 ]).
 
 -ifdef(EUNIT).
@@ -57,6 +58,8 @@
 % Add a callback like resolve() -> true | false | {'fun', atom()}. ?
 
 % Checklist for new builtin types... add entries in dnsrr_types, builtin() here, dnslib.app.src
+
+%-callback dnsrr_subtype() -> 'dnsrr'.
 
 -callback masterfile_token() -> string().
 -callback atom() -> type().
@@ -361,4 +364,15 @@ section_valid_for_type(Section, Type) ->
                     List = Module:message_section(),
                     lists:member(Section, List)
             end
+    end.
+
+
+additionally({_, Type, _, _, _}) when is_integer(Type) ->
+    [];
+additionally({_, Type, _, _, _} = Resource) ->
+    Module = from_to(Type, atom, module),
+    try Module:additionally(Resource) of
+        Additionally -> Additionally
+    catch
+        error:undef -> []
     end.

@@ -181,7 +181,6 @@ binary_to_domain(<<0:1, 0:1, Rest/bits>>, Acc, BytesUsed) ->
 binary_to_domain(<<B1:1, B2:1, _:6, _/binary>>, _, _) ->
     {error, {invalid_length, B1, B2}};
 binary_to_domain(Bin, _, _) ->
-    io:format("~p~n", [Bin]),
     {error, truncated_domain}.
 
 

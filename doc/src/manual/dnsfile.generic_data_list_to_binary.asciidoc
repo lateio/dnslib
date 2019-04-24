@@ -43,7 +43,7 @@ If there were issues in the string, a tuple consisting of an `'error'` atom and 
 
 `{'error', 'invalid_syntax'}`::
 
-There was an issue in the string syntax. String has to consist of "\#", a valid length (`0..16#FFFF`) in decimal and a sequence of byte values. Byte values are represented in hex and come in pairs or as sequences of pairs. There can be no more than the indicated amount of bytes.
+There was an issue in the string syntax. String has to consist of `"\#"`, a valid length (`0..16#FFFF`) in decimal and a sequence of byte values. Byte values are represented in hex and come in pairs or as sequences of pairs. There can be no more than the indicated amount of bytes.
 
 `{'error', 'data_too_long'}`::
 
@@ -60,7 +60,12 @@ The length was an invalid value.
 {ok, <<0,0,0,0>>} = dnsfile:generic_data_list_to_binary("\\# 4 00 0000 00"),
 {ok, <<0,0,0,0>>} = dnsfile:generic_data_list_to_binary("\\# 4 ( 00 0000 00 )"),
 {ok, <<>>} = dnsfile:generic_data_list_to_binary("\\# 0"),
-{ok, <<>>} = dnsfile:generic_data_list_to_binary("\\# 0          "),
+{ok, <<>>} = dnsfile:generic_data_list_to_binary("\\# 0          ").
+----
+
+.Errors
+[source,erlang]
+----
 {error, empty_string} = dnsfile:generic_data_list_to_binary(""),
 {error, invalid_syntax} = dnsfile:generic_data_list_to_binary("\\# 4 0 0 0 0"),
 {error, {bad_data_length, "-4"}} = dnsfile:generic_data_list_to_binary("\\# -4 00 00 00 00"),

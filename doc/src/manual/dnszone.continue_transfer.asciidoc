@@ -63,7 +63,7 @@ If the first member of the result tuple is `'change_sets'`, results are groups o
 
 == Changelog
 
-* *0.0.2* First argument is `dnslib:message()` instead of `dnsmsg:interpret_result()`. *Breaking change*
+* *0.0.2* First argument is `dnslib:message()` instead of `dnsmsg:interpret_result()`. *Backwards incompatible change*
 * *0.0.1* Function added
 
 == See also

@@ -30,7 +30,7 @@ Create a question term.
 
 DomainOrResourceLike::
 
-Resource -like syntax for a question or the domain to be used in the question. Can include only the domain or everything from domain to class.
+Master file -like syntax for a question or the domain to be used in the question. Can include only the domain or everything from domain to class.
 
 Domain::
 

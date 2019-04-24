@@ -15,43 +15,43 @@ General DNS functionality.
 
 Domains:
 
-* link:dnslib.append_domain{ext-relative}[dnslib:append_domain] - Concatenate two or more domains
-* link:dnslib.codepoint_domain_to_domain{ext-relative}[dnslib:codepoint_domain_to_domain] - Transform a code point domain into a domain
-* link:dnslib.domain{ext-relative}[dnslib:domain] - Create a domain term
-* link:dnslib.domain_in_zone{ext-relative}[dnslib:domain_in_zone] - Test if one domain is in the zone specified by another domain
-* link:dnslib.domain_to_codepoint_domain{ext-relative}[dnslib:domain_to_codepoint_domain] - Transform a domain into a code point domain
-* link:dnslib.domain_to_list{ext-relative}[dnslib:domain_to_list] - Transform a domain into a string
-* link:dnslib.is_subdomain{ext-relative}[dnslib:is_subdomain] - Test if one domain is a subdomain of another
-* link:dnslib.is_valid_domain{ext-relative}[dnslib:is_valid_domain] - Check if a domain breaks any length limits
-* link:dnslib.list_to_domain{ext-relative}[dnslib:list_to_domain] - Transform a string into a domain
-* link:dnslib.list_to_codepoint_domain{ext-relative}[dnslib:list_to_codepoint_domain] - Transform a string into a code point domain
-* link:dnslib.normalize_domain{ext-relative}[dnslib:normalize_domain] - Normalize domain for comparison
-* link:dnslib.reverse_dns_domain{ext-relative}[dnslib:reverse_dns_domain] - Get the reverse dns domain for an ip address
+* link:dnslib.append_domain{ext-relative}[`dnslib:append_domain/1,2`] - Concatenate two or more domains
+* link:dnslib.codepoint_domain_to_domain{ext-relative}[`dnslib:codepoint_domain_to_domain/1`] - Transform a code point domain into a domain
+* link:dnslib.domain{ext-relative}[`dnslib:domain/1`] - Create a domain term
+* link:dnslib.domain_in_zone{ext-relative}[`dnslib:domain_in_zone/2`] - Test if one domain is in the zone specified by another domain
+* link:dnslib.domain_to_codepoint_domain{ext-relative}[`dnslib:domain_to_codepoint_domain/1`] - Transform a domain into a code point domain
+* link:dnslib.domain_to_list{ext-relative}[`dnslib:domain_to_list/1`] - Transform a domain into a string
+* link:dnslib.is_subdomain{ext-relative}[`dnslib:is_subdomain/2`] - Test if one domain is a subdomain of another
+* link:dnslib.is_valid_domain{ext-relative}[`dnslib:is_valid_domain/1`] - Check if a domain breaks any length limits
+* link:dnslib.list_to_domain{ext-relative}[`dnslib:list_to_domain/1`] - Transform a string into a domain
+* link:dnslib.list_to_codepoint_domain{ext-relative}[`dnslib:list_to_codepoint_domain/1`] - Transform a string into a code point domain
+* link:dnslib.normalize_domain{ext-relative}[`dnslib:normalize_domain/1`] - Normalize domain for comparison
+* link:dnslib.reverse_dns_domain{ext-relative}[`dnslib:reverse_dns_domain/1`] - Get the reverse dns domain for an ip address
 
 Questions:
 
-* link:dnslib.normalize_question{ext-relative}[dnslib:normalize_question] - Normalize a question term
-* link:dnslib.question{ext-relative}[dnslib:question] - Create a question term
-* link:dnslib.reverse_dns_question{ext-relative}[dnslib:reverse_dns_question] - Get the reverse dns question for an ip address
+* link:dnslib.normalize_question{ext-relative}[`dnslib:normalize_question/1`] - Normalize a question term
+* link:dnslib.question{ext-relative}[`dnslib:question/1,2,3`] - Create a question term
+* link:dnslib.reverse_dns_question{ext-relative}[`dnslib:reverse_dns_question/1`] - Get the reverse dns question for an ip address
 
 Resources:
 
-* link:dnslib.normalize_resource{ext-relative}[dnslib:normalize_resource] - Normalize a resource term
-* link:dnslib.resource{ext-relative}[dnslib:resource] - Create a resource term
+* link:dnslib.normalize_resource{ext-relative}[`dnslib:normalize_resource/1`] - Normalize a resource term
+* link:dnslib.resource{ext-relative}[`dnslib:resource/1,5`] - Create a resource term
 
 Misc:
 
-* link:dnslib.class{ext-relative}[dnslib:class] - Create a class term
-* link:dnslib.deduplicate{ext-relative}[dnslib:deduplicate] - Deduplicate a list of questions or resources
-* link:dnslib.list_to_ttl{ext-relative}[dnslib:list_to_ttl] - Parse a string as a time-to-live (TTL) field
-* link:dnslib.type{ext-relative}[dnslib:type] - Create a type term
+* link:dnslib.class{ext-relative}[`dnslib:class/1`] - Create a class term
+* link:dnslib.deduplicate{ext-relative}[`dnslib:deduplicate/1`] - Deduplicate a list of questions or resources
+* link:dnslib.list_to_ttl{ext-relative}[`dnslib:list_to_ttl/1`] - Parse a string as a time-to-live (TTL) field
+* link:dnslib.type{ext-relative}[`dnslib:type/1`] - Create a type term
 
 == Types
 
 === binary_label()
 
 [source,erlang]
-binary_label() = <<_:1, _:_>>.
+binary_label() = <<_:1, _:_*1>>.
 
 RFC2673 describes extended label type "Binary label". `binary_label()` type represents these labels.
 
@@ -206,9 +206,10 @@ The `return_code()` in a DNS message signifies whether the operation succeeded o
 
 * *0.0.2*
 ** Functions `binary_to_domain/1`, `domain_to_binary/1` and `domain_binary_length/1` were moved to `dnswire` module
-** Add `'return_code()'` `'bad_version'`
-** New function `domain/1`
-** New functions `type/1` and `class/1`
+** Add `'bad_version'` to type `return_code()`
+** New function link:dnslib.domain{ext-relative}[`domain/1`]
+** New functions link:dnslib.type{ext-relative}[`type/1`] and link:dnslib.class{ext-relative}[`class/1`]
+** New type `binary_label()`
 * *0.0.1* `codepoint_domain()` type and other associated types added
 * *0.0.0* Module added
 

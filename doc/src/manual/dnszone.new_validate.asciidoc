@@ -18,7 +18,7 @@ Begin zone validation.
 
 == Return value
 
-An opaque state is returned. This state is to be used in `dnszone:continue_validate` calls.
+An opaque state is returned. This state is to be used in link:dnszone.continue_validate{ext-relative}[`dnszone:continue_validate/2`] calls.
 
 == Changelog
 

@@ -20,7 +20,7 @@ End master file iteration.
 
 State::
 
-State previously returned by link:dnsfile.iterate_next{ext-relative}[`dnsfile:iterate_begin`] or link:dnsfile.iterate_next{ext-relative}[`dnsfile:iterate_next`]
+State previously returned by link:dnsfile.iterate_next{ext-relative}[`dnsfile:iterate_begin/1,2`] or link:dnsfile.iterate_next{ext-relative}[`dnsfile:iterate_next/1`]
 
 == Return value
 
@@ -28,7 +28,7 @@ Return value can be discarded.
 
 == Notes
 
-This function is necessary *only* when iteration is terminated *before the end of the file is reached* using link:dnsfile.iterate_next{ext-relative}[`dnsfile:iterate_next`].
+This function is necessary *only* when iteration is terminated *before the end of the file is reached* using link:dnsfile.iterate_next{ext-relative}[`dnsfile:iterate_next/1`].
 
 == Changelog
 

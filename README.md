@@ -67,4 +67,5 @@ For version 0.0.3
 * Better eunit coverage
 * Common test suites to verify implemented standards documents
 * New opcodes/return codes/functionality as required by [Kurremkarmerruk](https://github.com/lateio/kurremkarmerruk)
+* PropEr (?)
 * Progress towards DNSSEC (?)

@@ -31,11 +31,11 @@ Resources belonging to the zone currently being validated
 
 State1::
 
-State returned by previous `dnszone:new_validate` or `dnszone:continue_validate` call
+State returned by previous link:dnszone.new_validate{ext-relative}[`dnszone:new_validate/0`] or link:dnszone.continue_validate{ext-relative}[`dnszone:continue_validate/2`] call
 
 == Return value
 
-If no errors were detected, an opaque state is returned which is to be used in later `dnszone:continue_validate` and `dnszone:end_validate` calls.
+If no errors were detected, an opaque state is returned which is to be used in later link:dnszone.continue_validate{ext-relative}[`dnszone:continue_validate/2`] and link:dnszone.end_validate{ext-relative}[`dnszone:end_validate/1`] calls.
 
 If an error was detected, a tuple consisting of `'false'` and the error reason is returned.
 

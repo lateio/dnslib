@@ -443,7 +443,7 @@ resource(Domain, Type0, Class0, Ttl, Data0) ->
         {value, Type0} when is_binary(Data0) -> {Domain, Type0, Class, Ttl, Data0}; % unknown resource type
         {value, Type0} when is_list(Data0) -> % Unknown resource type with data in generic form
             case dnsfile:generic_data_list_to_binary(Data0) of
-                {ok, Data} -> {Domain, Type0, Class, Ttl, Data};
+                {ok, Data} -> resource(Domain, Type0, Class, Ttl, Data); % We need to check that the binary is valid.
                 _ -> error(badarg)
             end;
         {_, Module} -> % Known module

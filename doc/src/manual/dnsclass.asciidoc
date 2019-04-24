@@ -15,15 +15,15 @@ Modules implementing specific DNS classes have to adhere to `dnsclass` behavior.
 
 == Exports
 
-* link:dnsclass.from_to{ext-relative}[dnsclass:from_to] - Transform an identifying term from one type to another
+* link:dnsclass.from_to{ext-relative}[`dnsclass:from_to/3`] - Transform an identifying term from one type to another
 
 == Callback functions
 
 === Exports
 
-* link:dnsclass.callback.atom{ext-relative}[Module:atom] - Returns an atom representing the class
-* link:dnsclass.callback.value{ext-relative}[Module:value] - Returns an integer representing the class
-* link:dnsclass.callback.masterfile_token{ext-relative}[Module:masterfile_token] (optional) - Returns a string representing the class
+* link:dnsclass.callback.atom{ext-relative}[`Module:atom/0`] - Returns an atom representing the class
+* link:dnsclass.callback.value{ext-relative}[`Module:value/0`] - Returns an integer representing the class
+* link:dnsclass.callback.masterfile_token{ext-relative}[`Module:masterfile_token/0`] (optional) - Returns a string representing the class
 
 == Types
 

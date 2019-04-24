@@ -40,7 +40,7 @@ If the file had correct syntax and semantics (see notes), `'true'` is returned. 
 
 == Notes
 
-In addition to checking the file syntax, `is_valid` also checks that in each resource the combination of class and resource type is allowed.
+In addition to checking the file syntax, `dnsfile:is_valid/1,2` also checks that in each resource the combination of class and resource type is allowed.
 
 == Changelog
 

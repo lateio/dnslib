@@ -16,11 +16,11 @@ You can find the source code for link:https://github.com/lateio/dnslib[dnslib on
 
 === Supported platforms
 
-dnslib is developed and tested for Erlang/OTP 20+, on macOS and Linux.
+dnslib is developed and tested for Erlang/OTP 20 and newer, on macOS and Linux.
 
-However, as dnslib does not rely on anything particularly exotic in Erlang, it may well work on older versions of Erlang and on other platforms. Extending support to older versions and other platforms is not out of the question, if the need arises.
+However, as dnslib does not rely on anything particularly exotic in Erlang, it may well work on older versions of Erlang and on other platforms. Extending support to older versions and other platforms is not out of the question, if the need arises. Given the fact that dnslib relies heavily on maps, Erlang/OTP 17 is likely the earliest version of Erlang for which the idea of compatibility should be entertained.
 
-Given the fact that dnslib relies heavily on maps, Erlang/OTP 17 is likely the earliest version of Erlang for which the idea of compatibility should be entertained.
+If and when dnslib implements punycode/internationalized domain names (IDN) functionality, the need to normalize Unicode strings may restrict supported Erlang versions to OTP 20 and newer, because OTP 20 introduced the necessary Unicode string normalization functions and re-implementing anything Unicode normalization related seems like a bad use of everyone's time. Alternatively, it is possible that dnslib carves out the IDN functionality as an exception on older OTP versions. All this remains to be determined one way or another.
 
 === Versioning
 
@@ -30,7 +30,7 @@ After 1.0.0, dnslib will adopt the standard semantic versioning.
 
 === Upgrading
 
-New dnslib releases entail changes. You can find link:changelog_new{ext-relative}[new features] and link:changelog_old{ext-relative}[changes to old ones] for 0.0.2 listed link:changelog{ext-relative}[together here].
+New dnslib releases entail changes. You can find link:changelog_new{ext-relative}[new features] and link:changelog_old{ext-relative}[changes to old ones] in 0.0.2 listed link:changelog{ext-relative}[together here].
 
 == Quick start
 

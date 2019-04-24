@@ -1,0 +1,32 @@
+= dnslib 0.0.2: Backwards incompatible changes
+Lauri Moisio <l@arv.io>
+Version 0.0.2, 2019.04.24
+:ext-relative: {outfilesuffix}
+
+== By module
+
+dnslib 0.0.2 introduces the following backwards incompatible changes:
+
+*dnsfile*
+
+* link:dnsfile.write_resources{ext-relative}[`dnsfile:write_resources/2,3`] option `{'generic', boolean()}` was simplified to just `'generic'`.
+
+*dnslib*
+
+* `dnslib:binary_to_domain/1` was moved to `dnswire` module.
+* `dnslib:domain_to_binary/1` was moved to `dnswire` module.
+* `dnslib:domain_binary_length/1` was moved to `dnswire` module.
+
+*dnswire*
+
+* link:dnswire.from_binary{ext-relative}[`dnswire:from_binary/1,2`] return format was changed to include a request message with the correct response return code set whenever the error reason was not `'too_short'`. Unlike previously, the returned message is not already a response, but a request, which has to be turned into a response with link:dnsmsg.response{ext-relative}[`dnsmsg:response/1,2`].
+
+*dnszone*
+
+* `dnszone:valid/1` was renamed to link:dnszone.is_valid{ext-relative}[`dnszone:is_valid/1`].
+* link:dnszone.new_transfer{ext-relative}[`dnszone:new_transfer/1`] requires different parameters.
+* link:dnszone.continue_transfer{ext-relative}[`dnszone:continue_transfer/2`] requires different parameters.
+
+== See also
+
+link:index{ext-relative}[Index]

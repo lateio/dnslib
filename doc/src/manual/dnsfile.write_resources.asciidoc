@@ -18,7 +18,7 @@ write_resources(Path :: string(), Resources :: [dnslib:resource()], Opts :: [wri
     -> 'ok'.
 ----
 
-Write resource records to a file. Inverse of link:dnsfile.consult{ext-relative}[`dnsfile:consult`].
+Write resource records to a file. Inverse of link:dnsfile.consult{ext-relative}[`dnsfile:consult/1,2`].
 
 == Types
 

@@ -107,7 +107,7 @@ TooLongDomain = lists:append([Label || _ <- lists:seq(1,4)]),
 == Changelog
 
 * *0.0.1*
-** Wildcard boolean was removed from success return tuple, `'ok'` was added.
+** `Wildcard` boolean was removed from success return tuple, `'ok'` was added.
 ** `{'non_ascii_codepoint', string()}` error was added
 * *0.0.0* Function added
 

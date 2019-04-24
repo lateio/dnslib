@@ -42,11 +42,11 @@ is_valid_file_opt() =
 
 `'return_soa'`::
 
-Instead of only returning `'true'` when a zone was successfully verified, return a tuple consisting of `'true'` and the zone Soa record.
+Instead of only returning `'true'` when a zone was successfully verified, return a tuple consisting of `'true'` and the zone `SOA` record.
 
 === read_file_opt()
 
-See link:dnsfile.read_file{ext-relative}[dnsfile:read_file] for details.
+See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`] for details.
 
 == Arguments
 
@@ -56,7 +56,7 @@ File to check
 
 Opts::
 
-To change how the file is handled. See link:dnsfile.foldl{ext-relative}[dnsfile:foldl] for details.
+Change how the file is handled.
 
 == Return value
 

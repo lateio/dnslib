@@ -20,7 +20,7 @@ Back when the original DNS specification was drafted, a strict byte-to-character
 
 Only space (`16#20`, `32`) and tab (`16#09`, `9`) are considered whitespace in master files.
 
-For distinguishing lines, dnslib relies on `io:get_line/2` of the standard library.
+For distinguishing lines, dnslib relies on link:http://erlang.org/doc/man/io.html#get_line-2[`io:get_line/2`] of the standard library.
 
 ==== Non-ASCII in tokens
 
@@ -77,29 +77,29 @@ $INCLUDE "other.zone" neworigin.arv.io.
 
 ==== Time-To-Live (TTL) field
 
-Ttl fields can use the syntax accepted by link:dnslib.list_to_ttl{ext-relative}[`dnslib:list_to_ttl`].
+Ttl fields can use the syntax accepted by link:dnslib.list_to_ttl{ext-relative}[`dnslib:list_to_ttl/1`].
 
 == Exports
 
 Read files:
 
-* link:dnsfile.consult{ext-relative}[dnsfile:consult] - Read resource records from a file
-* link:dnsfile.foldl{ext-relative}[dnsfile:foldl] - Call a function on successive resources retrieved from a master file
-* link:dnsfile.is_valid{ext-relative}[dnsfile:is_valid] - Verify master file syntax and contents
-* link:dnsfile.iterate_begin{ext-relative}[dnsfile:iterate_begin] - Begin master file iteration
-* link:dnsfile.iterate_end{ext-relative}[dnsfile:iterate_end] - End master file iteration
-* link:dnsfile.iterate_next{ext-relative}[dnsfile:iterate_next] - Get next resource from an iterated master file
-* link:dnsfile.read_file{ext-relative}[dnsfile:read_file] - Read resource records and other info from a file
-* link:dnsfile.read_file_includes{ext-relative}[dnsfile:read_file_includes] - Read include structure from a file
+* link:dnsfile.consult{ext-relative}[`dnsfile:consult/1,2`] - Read resource records from a file
+* link:dnsfile.foldl{ext-relative}[`dnsfile:foldl/3,4`] - Call a function on successive resources retrieved from a master file
+* link:dnsfile.is_valid{ext-relative}[`dnsfile:is_valid/1,2`] - Verify master file syntax and contents
+* link:dnsfile.iterate_begin{ext-relative}[`dnsfile:iterate_begin/1,2`] - Begin master file iteration
+* link:dnsfile.iterate_end{ext-relative}[`dnsfile:iterate_end/1`] - End master file iteration
+* link:dnsfile.iterate_next{ext-relative}[`dnsfile:iterate_next/1`] - Get next resource from an iterated master file
+* link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`] - Read resource records and other info from a file
+* link:dnsfile.read_file_includes{ext-relative}[`dnsfile:read_file_includes/1,2`] - Read include structure from a file
 
 Write files:
 
-* link:dnsfile.write_resources{ext-relative}[dnsfile:write_resources] - Write resource records to a file
+* link:dnsfile.write_resources{ext-relative}[`dnsfile:write_resources/2,3`] - Write resource records to a file
 
 Misc:
 
-* link:dnsfile.generic_data_list_to_binary{ext-relative}[dnsfile:generic_data_list_to_binary] - Parse a generic string list to binary
-* link:dnsfile.parse_resource{ext-relative}[dnsfile:parse_resource] - Parse string as a resource
+* link:dnsfile.generic_data_list_to_binary{ext-relative}[`dnsfile:generic_data_list_to_binary/1`] - Parse a generic string list to binary
+* link:dnsfile.parse_resource{ext-relative}[`dnsfile:parse_resource/1`] - Parse string as a resource
 
 == Examples
 
@@ -126,12 +126,12 @@ arv                       A  0.0.0.0  ; origin is appended to relative domains
 == Changelog
 
 * *0.0.2*
-** New function `foldl/3,4` added
-** New function `is_valid/1,2` added
-** New functions `iterate_begin/1,2`, `iterate_next/1` and `iterate_end/1` added
-** New function `generic_data_list_to_binary/1` added
-** New function `read_file/1,2` added
-** New function `read_file_includes/1,2` added
+** New function link:dnsfile.foldl{ext-relative}[`foldl/3,4`] added
+** New function link:dnsfile.is_valid{ext-relative}[`is_valid/1,2`] added
+** New functions link:dnsfile.iterate_begin{ext-relative}[`iterate_begin/1,2`], link:dnsfile.iterate_next{ext-relative}[`iterate_next/1`] and link:dnsfile.iterate_end{ext-relative}[`iterate_end/1`] added
+** New function link:dnsfile.generic_data_list_to_binary{ext-relative}[`generic_data_list_to_binary/1`] added
+** New function link:dnsfile.read_file{ext-relative}[`read_file/1,2`] added
+** New function link:dnsfile.read_file_includes{ext-relative}[`read_file_includes/1,2`] added
 * *0.0.0* Module added
 
 == See also

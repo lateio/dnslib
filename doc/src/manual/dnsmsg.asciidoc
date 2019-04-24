@@ -15,43 +15,43 @@ Create and work with DNS messages.
 
 Create messages:
 
-* link:dnsmsg.new{ext-relative}[dnsmsg:new] - Create a new DNS message
-* link:dnsmsg.response{ext-relative}[dnsmsg:response] - Create response to a DNS request
+* link:dnsmsg.new{ext-relative}[`dnsmsg:new/0,1`] - Create a new DNS message
+* link:dnsmsg.response{ext-relative}[`dnsmsg:response/1,2`] - Create response to a DNS request
 
 Access messages:
 
-* link:dnsmsg.additional{ext-relative}[dnsmsg:additional] - Get the additional section from a message
-* link:dnsmsg.answers{ext-relative}[dnsmsg:answers] - Get answers from a message
-* link:dnsmsg.authority{ext-relative}[dnsmsg:authority] - Get the authority section from a message
-* link:dnsmsg.id{ext-relative}[dnsmsg:id] - Get the message id
-* link:dnsmsg.is_response{ext-relative}[dnsmsg:is_response] - Check if a message is a response
-* link:dnsmsg.opcode{ext-relative}[dnsmsg:opcode] - Get the message opcode
-* link:dnsmsg.questions{ext-relative}[dnsmsg:questions] - Get questions from a message
-* link:dnsmsg.return_code{ext-relative}[dnsmsg:return_code] - Get the message return code
+* link:dnsmsg.additional{ext-relative}[`dnsmsg:additional/1`] - Get the additional section from a message
+* link:dnsmsg.answers{ext-relative}[`dnsmsg:answers/1`] - Get answers from a message
+* link:dnsmsg.authority{ext-relative}[`dnsmsg:authority/1`] - Get the authority section from a message
+* link:dnsmsg.id{ext-relative}[`dnsmsg:id/1`] - Get the message id
+* link:dnsmsg.is_response{ext-relative}[`dnsmsg:is_response/1`] - Check if a message is a response
+* link:dnsmsg.opcode{ext-relative}[`dnsmsg:opcode/1`] - Get the message opcode
+* link:dnsmsg.questions{ext-relative}[`dnsmsg:questions/1`] - Get questions from a message
+* link:dnsmsg.return_code{ext-relative}[`dnsmsg:return_code/1`] - Get the message return code
 
 Modify messages:
 
-* link:dnsmsg.add_additional{ext-relative}[dnsmsg:add_additional] - Add a resource to the additional section of a message
-* link:dnsmsg.add_answer{ext-relative}[dnsmsg:add_answer] - Add an answer to a message
-* link:dnsmsg.add_authority{ext-relative}[dnsmsg:add_authority] - Add a resource to the authority section of a message
-* link:dnsmsg.add_question{ext-relative}[dnsmsg:add_question] - Add a question to a message
-* link:dnsmsg.add_to_section{ext-relative}[dnsmsg:add_to_section] - Add a question or a resource to a section of a message
-* link:dnsmsg.reset_id{ext-relative}[dnsmsg:reset_id] - Reset the message id
-* link:dnsmsg.set_header{ext-relative}[dnsmsg:set_header] - Modify message fields
-* link:dnsmsg.set_section{ext-relative}[dnsmsg:set_section] - Set a section of a message to some list of questions or resources
+* link:dnsmsg.add_additional{ext-relative}[`dnsmsg:add_additional/2`] - Add a resource to the additional section of a message
+* link:dnsmsg.add_answer{ext-relative}[`dnsmsg:add_answer/2`] - Add an answer to a message
+* link:dnsmsg.add_authority{ext-relative}[`dnsmsg:add_authority/2`] - Add a resource to the authority section of a message
+* link:dnsmsg.add_question{ext-relative}[`dnsmsg:add_question/2`] - Add a question to a message
+* link:dnsmsg.add_to_section{ext-relative}[`dnsmsg:add_to_section/3`] - Add a question or a resource to a section of a message
+* link:dnsmsg.reset_id{ext-relative}[`dnsmsg:reset_id/1`] - Reset the message id
+* link:dnsmsg.set_header{ext-relative}[`dnsmsg:set_header/2,3`] - Modify message fields
+* link:dnsmsg.set_section{ext-relative}[`dnsmsg:set_section/3`] - Set a section of a message to some list of questions or resources
 
 Preparing responses:
 
-* link:dnsmsg.add_response_additional{ext-relative}[dnsmsg:add_response_additional] - Add a resource to the additional section of a future response
-* link:dnsmsg.add_response_answer{ext-relative}[dnsmsg:add_response_answer] - Add an answer to a future response
-* link:dnsmsg.add_response_authority{ext-relative}[dnsmsg:add_response_authority] - Add a resource to the authority section of a future response
-* link:dnsmsg.add_to_response_section{ext-relative}[dnsmsg:add_to_response_section] - Add a resource to a section of a future response
-* link:dnsmsg.set_response_header{ext-relative}[dnsmsg:set_response_header] - Modify fields of a future response
-* link:dnsmsg.set_response_section{ext-relative}[dnsmsg:set_response_section] - Set a section of a future response to some list of resources
+* link:dnsmsg.add_response_additional{ext-relative}[`dnsmsg:add_response_additional/2`] - Add a resource to the additional section of a future response
+* link:dnsmsg.add_response_answer{ext-relative}[`dnsmsg:add_response_answer/2`] - Add an answer to a future response
+* link:dnsmsg.add_response_authority{ext-relative}[`dnsmsg:add_response_authority/2`] - Add a resource to the authority section of a future response
+* link:dnsmsg.add_to_response_section{ext-relative}[`dnsmsg:add_to_response_section/2`] - Add a resource to a section of a future response
+* link:dnsmsg.set_response_header{ext-relative}[`dnsmsg:set_response_header/2,3`] - Modify fields of a future response
+* link:dnsmsg.set_response_section{ext-relative}[`dnsmsg:set_response_section/3`] - Set a section of a future response to some list of resources
 
 Interpreting responses:
 
-* link:dnsmsg.interpret_response{ext-relative}[dnsmsg:interpret_response] - Match response resources to questions
+* link:dnsmsg.interpret_response{ext-relative}[`dnsmsg:interpret_response/1`] - Match response resources to questions
 
 == Types
 
@@ -106,7 +106,7 @@ When a message is transformed into wire format, questions and resources will be 
 
 DNS header has a bit flag which signifies whether a message is a request (`0`) or a response (`1`).
 
-You should always work with requests, even if your goal is to construct a response. `dnsmsg` module offers functions like `dnsmsg:set_response_header`, `dnsmsg:add_response_answer` and others to allow you to prepare a response by working with the original request. These functions restrict you from changing fields which should remain same from the request to the response. Finally you can run `dnsmsg:response` to produce the response object you have been preparing and send that along.
+You should always work with requests, even if your goal is to construct a response. `dnsmsg` module offers functions like link:dnsmsg.set_response_header{ext-relative}[`dnsmsg:set_response_header/2,3`], link:dnsmsg.add_response_answer{ext-relative}[`dnsmsg:add_response_answer/2`] and others to allow you to prepare a response by working with the original request. These functions restrict you from changing fields which should remain same from the request to the response. Finally you can run link:dnsmsg.response{ext-relative}[`dnsmsg:response/1,2`] to produce the response object you have been preparing and send that along.
 
 === message_section()
 

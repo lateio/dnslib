@@ -32,11 +32,11 @@ Path of the master file
 
 Opts::
 
-Options to control certain aspects of master file handling. See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file`].
+Options to control certain aspects of master file handling. See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`].
 
 == Return value
 
-On success a tuple consisting of `'ok'` atom and a state to be used in later link:dnsfile.iterate_next{ext-relative}[`dnsfile:iterate_next`] and link:dnsfile.iterate_end{ext-relative}[`dnsfile:iterate_end`] calls is returned.
+On success a tuple consisting of `'ok'` atom and a state to be used in later link:dnsfile.iterate_next{ext-relative}[`dnsfile:iterate_next/1`] and link:dnsfile.iterate_end{ext-relative}[`dnsfile:iterate_end/1`] calls is returned.
 
 On error a tuple consisting of `'error'` atom and the error reason is returned.
 

@@ -216,7 +216,8 @@ resource_test() ->
     {'EXIT', {badarg, _}} = (catch dnslib:resource([], "TYPE", in, 60, {0,0,0,0})),
     {'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, "CLASS", 60, {0,0,0,0})),
     {'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, "CLASS1", 60, "\\# -4 00")),
-    {'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, "CLASS1", 60, "\\# 4 0")).
+    {'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, "CLASS1", 60, "\\# 4 0")),
+    {'EXIT', {badarg, _}} = (catch dnslib:resource(". CLASS1 0 A \\# 5 00 00 00 00 00")).
 
 
 resource_doc_test() ->

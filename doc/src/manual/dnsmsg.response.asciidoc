@@ -66,9 +66,9 @@ TBD. DNSSEC related.
 
 Set the return code for the new message.
 
-`'edns'` (`'false'`)::
+`'edns'` (depends)::
 
-Controls if EDNS is included in responses to requests which did not contain EDNS.
+Controls whether EDNS is included in the response. Default is to include EDNS if the request also contained EDNS.
 
 `'edns_version'` (`0`)::
 
@@ -118,7 +118,7 @@ Response = dnsmsg:response(dnsmsg:new()).
 
 == Changelog
 
-* *0.0.2* 'edns' added to `new_opts()`
+* *0.0.2* `'edns'` added to `response_opts()`
 * *0.0.0* Function added
 
 == See also

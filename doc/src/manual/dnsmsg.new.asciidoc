@@ -109,9 +109,9 @@ TBD. DNSSEC related.
 
 Set the return code for the new message.
 
-`'edns'` (`'false'`)::
+`'edns'` (`'true'`)::
 
-Controls if EDNS is included in responses to requests which did not contain EDNS.
+Controls whether EDNS is included in the message.
 
 `'edns_version'` (`0`)::
 
@@ -163,7 +163,7 @@ Msg1 = dnsmsg:new(#{}, dnslib:question("arv.io", a, in)).
 
 == Changelog
 
-* *0.0.2* 'edns' added to `new_opts()`
+* *0.0.2* `'edns'` added to `new_opts()`
 * *0.0.0* Function added
 
 == See also

@@ -28,7 +28,7 @@ Final verdict on zone validity.
 
 State::
 
-State returned by previous `dnszone:new_validate` or `dnszone:continue_validate` call
+State returned by previous link:dnszone.new_validate{ext-relative}[`dnszone:new_validate/0`] or link:dnszone.continue_validate{ext-relative}[`dnszone:continue_validate/2`] call
 
 == Return value
 

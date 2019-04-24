@@ -28,8 +28,8 @@ On success the produced domain is returned.
 
 This function can throw `error:badarg` in the following cases:
 
-* link:dnslib.list_to_domain{ext-relative}[`dnslib:list_to_domain`] error when `Domain` is a string
-* link:dnslib.is_valid_domain{ext-relative}[`dnslib:is_valid_domain`] error when `Domain` is not a string
+* link:dnslib.list_to_domain{ext-relative}[`dnslib:list_to_domain/1`] error when `Domain` is a string
+* link:dnslib.is_valid_domain{ext-relative}[`dnslib:is_valid_domain/1`] error when `Domain` is not a string
 * If `Domain` was a binary and contained a domain compression or trailing bytes
 
 == Examples

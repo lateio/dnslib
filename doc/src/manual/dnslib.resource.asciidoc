@@ -45,7 +45,7 @@ Class to be used. Can be an atom, a string or an integer.
 
 Ttl::
 
-Ttl to be used. Can be an integer or a string. If given as a string, can use the same format as when using link:dnslib.list_to_ttl{ext-relative}[`dnslib:list_to_ttl`].
+Ttl to be used. Can be an integer or a string. If given as a string, can use the same format as when using link:dnslib.list_to_ttl{ext-relative}[`dnslib:list_to_ttl/1`].
 
 Data::
 
@@ -116,7 +116,7 @@ Resource3 = {[], a, in, 3600, {0,0,0,0}} = dnslib:resource([], a, in, "60min", "
 
 == Changelog
 
-* *0.0.2* Allow `'masterfile_token'` strings as `Type` and `Class` in `resource/5`
+* *0.0.2* Allow `Type` and `Class` to be given as strings in `resource/5`
 * *0.0.1* Function added
 
 == See also

@@ -38,7 +38,7 @@ Read resource records from a file. Analogous to `file:consult/1`.
 
 === read_file_opt()
 
-See link:dnsfile.read_file{ext-relative}[dnsfile:read_file] for details
+See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`] for details
 
 == Arguments
 

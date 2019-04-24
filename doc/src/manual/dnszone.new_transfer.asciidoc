@@ -28,7 +28,7 @@ An opaque state is returned. This state is to be used in `dnszone:continue_trans
 
 == Changelog
 
-* *0.0.2* Function is now only used to create a transfer. Argument is no longer a `dnsmsg:interpret_result()`, but `dnslib:question()`. *Breaking change*
+* *0.0.2* Function is now only used to create a transfer. Argument is no longer a `dnsmsg:interpret_result()`, but `dnslib:question()`. *Backwards incompatible change*
 * *0.0.1* Function added
 
 == See also

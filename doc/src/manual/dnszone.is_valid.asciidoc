@@ -22,7 +22,7 @@ is_valid(Resources :: [dnslib:resource()]) ->
         | {'not_under_soa', dnslib:domain()}
         | {'non_exclusive_cname', dnslib:domain()}
         | {'cname_to_cname_loop', dnslib:domain()}
-        | {'cname_loop', dnslib:domain()}.
+        | {'cname_loop', dnslib:domain()}
       }.
 ----
 

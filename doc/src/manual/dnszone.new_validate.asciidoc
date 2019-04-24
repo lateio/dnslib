@@ -1,0 +1,30 @@
+= dnszone:new_validate
+Lauri Moisio <l@arv.io>
+Version 0.0.2, 2019.04.11
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnszone:new_validate - Begin zone validation
+
+== Description
+
+[source,erlang]
+----
+new_transfer() -> State :: opaque().
+----
+
+Begin zone validation.
+
+== Return value
+
+An opaque state is returned. This state is to be used in `dnszone:continue_validate` calls.
+
+== Changelog
+
+* *0.0.2* Function added
+
+== See also
+
+link:dnszone.continue_validate{ext-relative}[dnszone:continue_validate],
+link:dnszone{ext-relative}[dnszone]

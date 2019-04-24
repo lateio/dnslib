@@ -21,7 +21,9 @@
     refresh/1,
     retry/1,
     expire/1,
-    minimum/1
+    minimum/1,
+
+    serial_compare/2
 ]).
 
 -ifdef(EUNIT).
@@ -179,5 +181,17 @@ convenience_fn_test() ->
         {3,       fun expire/1},
         {4,       fun minimum/1}
     ],
-    true = lists:all(fun ({Expect, Fn}) -> Expect = Fn(Rr), Expect = Fn(Soa), true end, Tests).
+    true = lists:all(fun ({Expect, Fn}) -> Expect = Fn(Rr), Expect =:= Fn(Soa) end, Tests).
 -endif.
+
+
+% Compare SOA serials as per RFC1982
+serial_compare(Soa1, Soa2) when ?IS_RESOURCE(Soa1) ->
+    serial_compare(serial(Soa1), Soa2);
+serial_compare(Serial1, Soa2) when ?IS_RESOURCE(Soa2) ->
+    serial_compare(Serial1, serial(Soa2));
+serial_compare(Serial, Serial) ->
+    false;
+serial_compare(Serial1, Serial2) ->
+    (Serial1 < Serial2 andalso Serial2 - Serial1 < 16#80000000) orelse
+    (Serial1 > Serial2 andalso Serial1 - Serial2 > 16#80000000).

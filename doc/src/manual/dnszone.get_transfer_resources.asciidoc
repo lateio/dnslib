@@ -24,7 +24,7 @@ Get the resources accrued so far during a transfer.
 
 State1::
 
-State returned by previous `dnszone:new_transfer` or `dnszone:continue_transfer` call
+State returned by previous link:dnszone.new_transfer{ext-relative}[`dnszone:new_transfer/1`] or link:dnszone.continue_transfer{ext-relative}[`dnszone:continue_transfer/2`] call
 
 == Return value
 

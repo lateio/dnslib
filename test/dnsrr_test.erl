@@ -15,5 +15,6 @@ basic_test() ->
     100 = dnsrr:from_to(100, value, atom),
     100 = dnsrr:from_to(100, value, atom),
     "type100" = dnsrr:from_to(100, value, masterfile_token),
+    100 = dnsrr:from_to("TYPE100", masterfile_token, value),
     100 = dnsrr:from_to("type100", masterfile_token, value),
     "type100" = dnsrr:from_to("type100", masterfile_token, module).

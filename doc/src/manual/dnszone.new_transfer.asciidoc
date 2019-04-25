@@ -24,7 +24,7 @@ Zone transfer question, ie. `{[], axfr, in}`.
 
 == Return value
 
-An opaque state is returned. This state is to be used in `dnszone:continue_transfer` calls.
+An opaque state is returned. This state is to be used in link:dnszone.continue_transfer{ext-relative}[`dnszone:continue_transfer/2`] calls.
 
 == Changelog
 

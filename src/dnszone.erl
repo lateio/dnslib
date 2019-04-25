@@ -61,6 +61,7 @@
         dnstrie:trie(),
         Ns     :: [dnslib:resource()],
         Cnames :: [dnslib:resource()],
+        Class  :: dnsclass:class() | 'nil',
         Soa    :: dnslib:resource() | 'nil'
     }.
 
@@ -209,7 +210,7 @@ get_transfer_resources({Question, change_sets, NewSoa, Resources}) ->
 
 -spec new_validate() -> zone_validation().
 new_validate() ->
-    {dnstrie:new(), [], [], nil}.
+    {dnstrie:new(), [], [], nil, nil}.
 
 
 -spec continue_validate(Resources :: [dnslib:resource()], State :: zone_validation())
@@ -234,10 +235,10 @@ is_valid_file(Path, Opts0) ->
     % Snatch our opts from the list...
     {Opts, DnsfileOpts} = lists:partition(fun is_valid_file_opt/1, Opts0),
     ReturnSoa = lists:member(return_soa, Opts),
-    FoldReturn = dnsfile:foldl(fun valid_file_fold/2, {dnstrie:new(), [], [], nil}, Path, DnsfileOpts),
+    FoldReturn = dnsfile:foldl(fun valid_file_fold/2, {dnstrie:new(), [], [], nil, nil}, Path, DnsfileOpts),
     case is_valid_fold(FoldReturn) of
         true when ReturnSoa ->
-            {ok, {_, _, _, Soa}} = FoldReturn,
+            {ok, {_, _, _, _, Soa}} = FoldReturn,
             {true, Soa};
         true -> true;
         Tuple -> Tuple
@@ -246,7 +247,7 @@ is_valid_file(Path, Opts0) ->
 is_valid_file_opt(return_soa) -> true;
 is_valid_file_opt(_) -> false.
 
-valid_file_fold(Resource, {Trie0, Ns, Cname, Soa}) ->
+valid_file_fold(Resource, {Trie0, Ns, Cname, Class, Soa}) when Class =:= nil; ?RESOURCE_CLASS(Resource) =:= Class ->
     Domain = lists:reverse(dnslib:normalize_domain(?RESOURCE_DOMAIN(Resource))),
     Trie1 = case dnstrie:get(Domain, Trie0) of
         {ok, [_|_]} when ?RESOURCE_TYPE(Resource) =:= cname -> throw({non_exclusive_cname, ?RESOURCE_DOMAIN(Resource)});
@@ -263,16 +264,18 @@ valid_file_fold(Resource, {Trie0, Ns, Cname, Soa}) ->
         soa ->
             case ?RESOURCE_DOMAIN(Resource) of
                 ['_'|_] -> throw(wildcard_soa);
-                _ -> {Trie1, Ns, Cname, Resource}
+                _ -> {Trie1, Ns, Cname, ?RESOURCE_CLASS(Resource), Resource}
             end;
-        ns -> {Trie1, [Resource|Ns], Cname, Soa};
+        ns -> {Trie1, [Resource|Ns], Cname, ?RESOURCE_CLASS(Resource), Soa};
         cname ->
             case lists:reverse(dnslib:normalize_domain(?RESOURCE_DATA(Resource))) of
                 Domain -> throw({cname_to_cname_loop, ?RESOURCE_DOMAIN(Resource)});
-                _ -> {Trie1, Ns, [Resource|Cname], Soa}
+                _ -> {Trie1, Ns, [Resource|Cname], ?RESOURCE_CLASS(Resource), Soa}
             end;
-        _ -> {Trie1, Ns, Cname, Soa}
-    end.
+        _ -> {Trie1, Ns, Cname, ?RESOURCE_CLASS(Resource), Soa}
+    end;
+valid_file_fold(Resource, {_, _, _, Class, _}) when ?RESOURCE_CLASS(Resource) =/= Class ->
+    throw({class_mismatch, [Class, ?RESOURCE_CLASS(Resource)]}).
 
 valid_file_walk(Path, Data, {PrevPath0, Stack0}) ->
     NewLen = length(Path),
@@ -376,7 +379,7 @@ valid_file_walk_stack(Data, Stack0, Direction) ->
 is_valid([]) ->
     {false, missing_soa};
 is_valid(Rrs) ->
-    try is_valid_fold(lists:foldl(fun valid_file_fold/2, {dnstrie:new(), [], [], nil}, Rrs))
+    try is_valid_fold(lists:foldl(fun valid_file_fold/2, {dnstrie:new(), [], [], nil, nil}, Rrs))
     catch
         throw:Reason -> {false, Reason}
     end.
@@ -390,9 +393,9 @@ is_valid(Rrs) ->
     % Should we warn about cases where a wildcard domain is used as NS?
 
 
-is_valid_fold({ok, {_, _, _, nil}}) ->
+is_valid_fold({ok, {_, _, _, _, nil}}) ->
     {false, missing_soa};
-is_valid_fold({ok, {Trie, Ns, Cnames, _}}) ->
+is_valid_fold({ok, {Trie, Ns, Cnames, _, _}}) ->
     % Check for Cname loops
     case check_cname_loop(Cnames) of
         false ->
@@ -411,7 +414,7 @@ is_valid_fold({error, {foldl_error, throw, Reason, _}}) ->
     {false, Reason};
 is_valid_fold({error, _}) ->
     {false, invalid_file};
-is_valid_fold({_, _, _, _}=Tuple) ->
+is_valid_fold({_, _, _, _, _}=Tuple) ->
     is_valid_fold({ok, Tuple}).
 
 

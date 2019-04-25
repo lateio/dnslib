@@ -14,6 +14,7 @@ basic_test() ->
 
     % An unknown value
     100 = dnsclass:from_to(100, value, atom),
+    100 = dnsclass:from_to("CLASS100", masterfile_token, value),
     100 = dnsclass:from_to("class100", masterfile_token, value),
     "class100" = dnsclass:from_to(100, value, masterfile_token),
     "class100" = dnsclass:from_to("class100", masterfile_token, module).

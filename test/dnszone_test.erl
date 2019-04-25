@@ -22,7 +22,11 @@ is_valid_test() ->
         dnslib:resource("alias1 in 60 cname alias2"),
         dnslib:resource("alias1 in 60 cname alias3")
     ],
-    {false, {non_exclusive_cname, _}} = dnszone:is_valid(Resources3).
+    {false, {non_exclusive_cname, _}} = dnszone:is_valid(Resources3),
+    {false, {class_mismatch, [in, hs]}} = dnszone:is_valid([
+        dnslib:resource(". IN 60 txt foo"),
+        dnslib:resource(". HS 60 txt bar")
+    ]).
 
 o() -> #{is_response => true}.
 

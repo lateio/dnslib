@@ -1,6 +1,6 @@
 = dnszone:is_valid_file
 Lauri Moisio <l@arv.io>
-Version 0.0.2, 2019.04.10
+Version 0.0.2, 2019.04.25
 :ext-relative: {outfilesuffix}
 
 == Name
@@ -20,12 +20,13 @@ is_valid_file(Filename :: string(), Opts :: [is_valid_file_opt() | read_file_opt
           'missing_soa'
         | {'multiple_soas', Soas :: [dnslib:domain()]}
         | 'wildcard_soa'
-        | {'missing_glue', dnslib:domain()}
-        | {'other_than_glue_past_edges', dnslib:domain()}
-        | {'not_under_soa', dnslib:domain()}
-        | {'non_exclusive_cname', dnslib:domain()}
-        | {'cname_to_cname_loop', dnslib:domain()}
-        | {'cname_loop', dnslib:domain()}
+        | {'class_mismatch', List :: [dnsclass:class()]}
+        | {'missing_glue', Domain :: dnslib:domain()}
+        | {'other_than_glue_past_edges', Domain :: dnslib:domain()}
+        | {'not_under_soa', Domain :: dnslib:domain()}
+        | {'non_exclusive_cname', Domain :: dnslib:domain()}
+        | {'cname_to_cname_loop', Domain :: dnslib:domain()}
+        | {'cname_loop', Domain :: dnslib:domain()}
         | 'invalid_file'
       }.
 ----
@@ -78,6 +79,10 @@ There were multiple `SOA` records in file `Filename`. `Soas` contains the domain
 
 The `SOA` record has a wildcard domain.
 
+`{'class_mismatch', List $$::$$ [dnsclass:class()]}`::
+
+All resources did not share the same class. `List` contains detected mismatching classes (not necessarily all mismatching classes present in the file).
+
 `{missing_glue, Domain $$::$$ dnslib:domain()}`::
 
 File `Filename` did not contain glue address record(s) for records past `NS` records. `Domain` is the domain for the record missing glue records.
@@ -96,7 +101,7 @@ For some domain, there were both a `CNAME` record and additionally a record of s
 
 `{'cname_to_cname_loop', Domain $$::$$ dnslib:domain()}`::
 
-There was an anomalous `CNAME` record `{Domain, _, _, _, Domain}` in `Resources`.
+There was an anomalous `CNAME` record `{Domain, 'cname', _, _, Domain}` in the file.
 
 `{'cname_loop', Domain $$::$$ dnslib:domain()}`::
 

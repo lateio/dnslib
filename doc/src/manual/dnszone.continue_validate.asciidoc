@@ -1,6 +1,6 @@
 = dnszone:continue_validate
 Lauri Moisio <l@arv.io>
-Version 0.0.2, 2019.04.11
+Version 0.0.2, 2019.04.25
 :ext-relative: {outfilesuffix}
 
 == Name
@@ -16,6 +16,7 @@ continue_validate(Resources :: [dnslib:resource()], State1 :: opaque())
      | {'false',
            {'multiple_soas', Soas :: [dnslib:domain()]}
          | 'wildcard_soa'
+         | {'class_mismatch', List :: [dnsclass:class()]}
          | {'non_exclusive_cname', Domain :: dnslib:domain()}
          | {'cname_to_cname_loop', Domain :: dnslib:domain()}
        }.
@@ -48,6 +49,10 @@ There were multiple `SOA` records among `Resources` and/or previously validated 
 `'wildcard_soa'`::
 
 An `SOA` record has a wildcard domain.
+
+`{'class_mismatch', List $$::$$ [dnsclass:class()]}`::
+
+All resources did not have the same class and/or the class differs from previously validated resources. `List` contains detected mismatching classes (not necessarily all mismatching classes present among the resources).
 
 `{'non_exclusive_cname', Domain $$::$$ dnslib:domain()}`::
 

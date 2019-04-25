@@ -1024,18 +1024,31 @@ domain_to_list([{binary, Label}|Rest], Acc) ->
 domain_to_list([Label|Rest], Acc) ->
     domain_to_list(Rest, label_to_list(Label, Acc)).
 
-label_to_list([], Acc) ->
-    [$.|Acc];
-label_to_list([Char|Tail], []) when Char =:= $"; Char =:= $( ->
-    label_to_list(Tail, [Char, $\\]);
+% Escape characters that have special meaning in DNS master file syntax
+label_to_list([$"|Tail], Acc) ->
+    label_to_list(Tail, [$", $\\|Acc]);
+label_to_list([$(|Tail], Acc) ->
+    label_to_list(Tail, [$(, $\\|Acc]);
+label_to_list([$)|Tail], Acc) ->
+    label_to_list(Tail, [$), $\\|Acc]);
 label_to_list([$.|Tail], Acc) ->
     label_to_list(Tail, [$., $\\|Acc]);
+label_to_list([$\\|Tail], Acc) ->
+    label_to_list(Tail, [$\\, $\\|Acc]);
+label_to_list([$$|Tail], Acc) ->
+    label_to_list(Tail, [$$, $\\|Acc]);
+label_to_list([$;|Tail], Acc) ->
+    label_to_list(Tail, [$;, $\\|Acc]);
+label_to_list([$@|Tail], Acc) ->
+    label_to_list(Tail, [$@, $\\|Acc]);
 label_to_list([Char|Tail], Acc) when Char =< 16#20; Char >= 127 ->
     Str0 = integer_to_list(Char),
     Str1 = lists:append(lists:reverse(Str0), [$0 || _ <- lists:seq(1,3-length(Str0))]),
     label_to_list(Tail, lists:append(Str1, [$\\|Acc]));
 label_to_list([Char|Tail], Acc) ->
-    label_to_list(Tail, [Char|Acc]).
+    label_to_list(Tail, [Char|Acc]);
+label_to_list([], Acc) ->
+    [$.|Acc].
 
 
 binary_label_to_list(Label, Acc) ->

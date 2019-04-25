@@ -61,6 +61,13 @@ domain_to_list_test() ->
     "\\*.arv.*.io." = dnslib:domain_to_list([<<"*">>,<<"arv">>,<<"*">>,<<"io">>]),
     "\\(arv.*.io." = dnslib:domain_to_list([<<"(arv">>,<<"*">>,<<"io">>]),
     "\\\"arv.*.io." = dnslib:domain_to_list([<<"\"arv">>,<<"*">>,<<"io">>]),
+    "\\$arv.*.io." = dnslib:domain_to_list([<<"$arv">>,<<"*">>,<<"io">>]),
+    "\\@arv.*.io." = dnslib:domain_to_list([<<"@arv">>,<<"*">>,<<"io">>]),
+    "\\;arv.*.io." = dnslib:domain_to_list([<<";arv">>,<<"*">>,<<"io">>]),
+    "\\;arv.*.io\\)." = dnslib:domain_to_list([<<";arv">>,<<"*">>,<<"io)">>]),
+    "\\;arv.*.io\\;." = dnslib:domain_to_list([<<";arv">>,<<"*">>,<<"io;">>]),
+    "\\\\\\;arv.*.io\\\\\\;." = dnslib:domain_to_list([<<"\\;arv">>,<<"*">>,<<"io\\;">>]),
+
     "*.arv.io." = dnslib:domain_to_list(['_',"arv","io"]),
     "\\*.arv.io." = dnslib:domain_to_list(["*","arv","io"]),
     "\\*.arv\\.io." = dnslib:domain_to_list(["*","arv.io"]),

@@ -1,6 +1,6 @@
 = dnslib:domain_to_list
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.04.25
 :ext-relative: {outfilesuffix}
 
 == Name
@@ -27,9 +27,9 @@ Domain to transform
 
 A string representation of the domain is returned. The returned domain is absolute and thus includes the trailing dot.
 
-ASCII characters space (`16#20`) and lower and character DEL (`16#7F`) are represented as numerical escapes (`\000`).
+ASCII characters space (`16#20`) and lower and character DEL (`16#7F`) and higher are represented as numerical escapes (`\000`).
 
-`$.` is escaped in labels, as are `$*`, `$"` and `$(` in certain conditions.
+`$.`, `$"`, `$(`, `$)`, `$\\`, `$$`, `$;` and `$@` are escaped in labels, `$*` is escaped if it appears alone in the first label.
 
 == Examples
 
@@ -43,6 +43,12 @@ ASCII characters space (`16#20`) and lower and character DEL (`16#7F`) are repre
 "\\*.arv.\\*.io." = dnslib:domain_to_list([<<"*">>,<<"arv">>,<<"*">>,<<"io">>]),
 "\\(arv.*.io." = dnslib:domain_to_list([<<"(arv">>,<<"*">>,<<"io">>]),
 "\\\"arv.*.io." = dnslib:domain_to_list([<<"\"arv">>,<<"*">>,<<"io">>]),
+"\\$arv.*.io." = dnslib:domain_to_list([<<"$arv">>,<<"*">>,<<"io">>]),
+"\\@arv.*.io." = dnslib:domain_to_list([<<"@arv">>,<<"*">>,<<"io">>]),
+"\\;arv.*.io." = dnslib:domain_to_list([<<";arv">>,<<"*">>,<<"io">>]),
+"\\;arv.*.io\\)." = dnslib:domain_to_list([<<";arv">>,<<"*">>,<<"io)">>]),
+"\\;arv.*.io\\;." = dnslib:domain_to_list([<<";arv">>,<<"*">>,<<"io;">>]),
+"\\\\\\;arv.*.io\\\\\\;." = dnslib:domain_to_list([<<"\\;arv">>,<<"*">>,<<"io\\;">>]),
 
 "*.arv.io."       = dnslib:domain_to_list(['_',"arv","io"]),
 "\\*.arv.io."     = dnslib:domain_to_list(["*","arv","io"]),
@@ -55,6 +61,7 @@ ASCII characters space (`16#20`) and lower and character DEL (`16#7F`) are repre
 
 == Changelog
 
+* *0.0.2* Also escape `$$`, `$;`, `$@`, `$\\` and `$)` characters
 * *0.0.1* Added more rules about character escapes
 * *0.0.0* Function added
 

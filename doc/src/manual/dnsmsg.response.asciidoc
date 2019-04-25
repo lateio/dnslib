@@ -107,7 +107,7 @@ If a return code requiring edns is specified with the option disabling edns, an 
 
 == Creating responses
 
-Although one might be tempted to use `dnsmsg:response` to create a response and then use `dnsmsg:add_answer` and other related functions to add resources to it, there is a better way. It is possible to only work with the original request, store response resources in it with `dnsmsg:add_response_answer` and other functions and then only lastly run `dnsmsg:response` to produce the response.
+Although one might be tempted to use `dnsmsg:response` to create a response and then use `dnsmsg:add_answer` and other related functions to add resources to it, there is a better way. It is possible to only work with the original request, store response resources in it with link:dnsmsg.add_response_answer{ext-relative}[`dnsmsg:add_response_answer/2`] and other functions and then only lastly run link:dnsmsg.response{ext-relative}[`dnsmsg:response/1,2`] to produce the response.
 
 == Examples
 

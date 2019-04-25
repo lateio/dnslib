@@ -26,7 +26,7 @@ Message whose answers we want to know
 
 Answers from the message will be returned. Answers will be in the order they were added in.
 
-In case you are trying to make sense of the answers in a response, link:dnsmsg.interpret_response{ext-relative}[`dnsmsg:interpret_response`] might work better.
+In case you are trying to make sense of a response, link:dnsmsg.interpret_response{ext-relative}[`dnsmsg:interpret_response/1`] will work better for your needs.
 
 == Example
 

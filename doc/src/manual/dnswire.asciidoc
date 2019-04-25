@@ -27,8 +27,8 @@ From wire format:
 Support functions:
 
 * link:dnswire.domain_binary_length{ext-relative}[`dnswire:domain_binary_length/1`] - Get the `byte_size()` for wire encoding of a domain
-* link:dnswire.from_binary_domain{ext-relative}[`dnswire:from_binary_domain/2`] - Indicate domain in link:dnsrr.callback.from_binary{ext-relative}[`Resource:from_binary`] callback
-* link:dnswire.to_binary_domain{ext-relative}[`dnswire:to_binary_domain/2`] - Indicate domain in link:dnsrr.callback.to_binary{ext-relative}[`Resource:to_binary`] callback
+* link:dnswire.from_binary_domain{ext-relative}[`dnswire:from_binary_domain/2`] - Indicate domain in link:dnsrr.callback.from_binary{ext-relative}[`Resource:from_binary/1`] callback
+* link:dnswire.to_binary_domain{ext-relative}[`dnswire:to_binary_domain/2`] - Indicate domain in link:dnsrr.callback.to_binary{ext-relative}[`Resource:to_binary/1`] callback
 
 == Changelog
 

@@ -456,7 +456,7 @@ generic_data_list_to_binary(["\\#", BytesLenStr|Rest]) ->
     catch
         error:badarg -> {error, {bad_data_length, BytesLenStr}}
     end;
-generic_data_list_to_binary([_|Rest]) ->
+generic_data_list_to_binary([_|_]) ->
     {error, invalid_syntax}.
 
 

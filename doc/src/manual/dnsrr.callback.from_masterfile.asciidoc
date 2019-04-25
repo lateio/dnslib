@@ -22,7 +22,7 @@ Transforms master file arguments to resource data.
 
 Args::
 
-A list of arguments parsed and verified from a master file according to the link:dnsrr.callback.masterfile_format{ext-relative}[`Module:masterfile_format`] callback
+A list of arguments parsed and verified from a master file according to the link:dnsrr.callback.masterfile_format{ext-relative}[`Module:masterfile_format/0`] callback
 
 == Return value
 
@@ -32,13 +32,13 @@ Otherwise, returns a tuple consisting of `'error'` and the error reason.
 
 == Optional callback
 
-This callback is optional. However, if the module implements link:dnsrr.callback.masterfile_token{ext-relative}[`Module:masterfile_token`], this callback is also required.
+This callback is optional. However, if the module implements link:dnsrr.callback.masterfile_token{ext-relative}[`Module:masterfile_token/0`], this callback is also required.
 
 == Notes
 
-This callback works with link:dnsrr.callback.masterfile_format{ext-relative}[`Module:masterfile_format`], freeing the module from calling `list_to_integer`, link:dnslib.list_to_ttl{ext-relative}[`dnslib:list_to_ttl`] or link:list_to_domain{ext-relative}[`dnslib:list_to_domain`] on all the arguments it is passed.
+This callback works with link:dnsrr.callback.masterfile_format{ext-relative}[`Module:masterfile_format/0`], freeing the module from calling link:http://erlang.org/doc/man/erlang.html#list_to_integer-1[`list_to_integer/1`], link:dnslib.list_to_ttl{ext-relative}[`dnslib:list_to_ttl/1`] or link:list_to_domain{ext-relative}[`dnslib:list_to_domain/1`] on all the arguments it is passed.
 
-For example, due to link:dnsrr.callback.masterfile_format{ext-relative}[`Module:masterfile_format`], the `Args` for an `MX` record would have the following contents:
+For example, due to link:dnsrr.callback.masterfile_format{ext-relative}[`Module:masterfile_format/0`], the `Args` for an `MX` record would have the following contents:
 
 [source,erlang]
 [uint16, domain] = dnsrr_mx:masterfile_format(),

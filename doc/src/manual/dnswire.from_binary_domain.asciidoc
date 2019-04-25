@@ -1,23 +1,23 @@
-= dnswire:from_indicate_domain
+= dnswire:from_binary_domain
 Lauri Moisio <l@arv.io>
 Version 0.0.1, 2019.01.18
 :ext-relative: {outfilesuffix}
 
 == Name
 
-dnswire:from_indicate_domain - Indicate domain in link:dnsrr.callback.from_binary{ext-relative}[`Resource:from_binary`] callback
+dnswire:from_binary_domain - Indicate domain in link:dnsrr.callback.from_binary{ext-relative}[`Resource:from_binary/1`] callback
 
 == Description
 
 [source,erlang]
 ----
-from_indicate_domain(
+from_binary_domain(
   Domain :: dnslib:compressed_domain() | dnslib:domain(),
   Offset :: non_neg_integer())
     -> opaque().
 ----
 
-Indicate domain in link:dnsrr.callback.from_binary{ext-relative}[`Resource:from_binary`] callback.
+Indicate domain in link:dnsrr.callback.from_binary{ext-relative}[`Resource:from_binary/1`] callback.
 
 == Arguments
 
@@ -31,7 +31,7 @@ Offset -- in bytes -- from the start of the data section of the resource. This i
 
 == Return value
 
-Return value should be passed in the `DataList` of the `{'domains', DataList}` return tuple from link:dnsrr.callback.from_binary{ext-relative}[`Resource:from_binary`] callback.
+Return value should be passed in the `DataList` of the `{'domains', DataList}` return tuple from link:dnsrr.callback.from_binary{ext-relative}[`Resource:from_binary/1`] callback.
 
 == Changelog
 

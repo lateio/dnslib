@@ -11,7 +11,7 @@ dnsmsg:opcode - Get the message opcode
 
 [source,erlang]
 ----
-opcode(Message :: dnsmsg:message()) -> dnslib:opcode() | 0..16#F.
+opcode(Message :: dnsmsg:message()) -> dnslib:opcode().
 ----
 
 Get the message opcode.

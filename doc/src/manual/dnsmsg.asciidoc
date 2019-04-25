@@ -15,7 +15,7 @@ Create and work with DNS messages.
 
 Create messages:
 
-* link:dnsmsg.new{ext-relative}[`dnsmsg:new/0,1`] - Create a new DNS message
+* link:dnsmsg.new{ext-relative}[`dnsmsg:new/0,1,2,3,4,5`] - Create a new DNS message
 * link:dnsmsg.response{ext-relative}[`dnsmsg:response/1,2`] - Create response to a DNS request
 
 Access messages:

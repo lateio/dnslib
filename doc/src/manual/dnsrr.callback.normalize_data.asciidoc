@@ -24,7 +24,7 @@ Data to normalize
 
 == Return value
 
-Normalized resource data is returned.
+Normalized resource data is returned. Normalization for resource data means that all semantically equivalent data terms compare exactly equal (`=:=`) after they have been normalized.
 
 == Optional callback
 

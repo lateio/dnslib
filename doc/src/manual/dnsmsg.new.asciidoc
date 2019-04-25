@@ -75,7 +75,7 @@ Set the id for the new message.
 
 `'is_response'` (`'false'`)::
 
-Set whether the message is considered a request (`'false'`) or response (`'true'`). When creating responses to requests, one should normally stick to using link:dnsmsg.response{ext-relative}[`dnsmsg:response`].
+Set whether the message is considered a request (`'false'`) or response (`'true'`). When creating responses to requests, one should normally stick to using link:dnsmsg.response{ext-relative}[`dnsmsg:response/1,2`].
 
 `'opcode'` (`'query'`)::
 

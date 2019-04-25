@@ -104,7 +104,7 @@ link:https://tools.ietf.org/rfc/rfc3597.txt[RFC3597] specifies a special syntax 
 
 ::
 
-Do note however, that this option does not enable or disable the generic form when it comes to known resources. Ie, regardless of this option, a valid `A` record is accepted whether it is presented in the file as `"A"` or `"TYPE1"`.
+Do note however, that this option does not enable or disable the generic form when it comes to known resources. Ie, regardless of this option, a valid `A` record is accepted whether it is represented in the file as `"A"` or `"TYPE1"`.
 
 `{'allow_unknown_classes', boolean()}` (`'false'`)::
 
@@ -112,7 +112,7 @@ link:https://tools.ietf.org/rfc/rfc3597.txt[RFC3597] specifies a special syntax 
 
 ::
 
-Do note however, that this option does not enable or disable the generic form when it comes to known classes. Ie, regardless of this option, a valid `IN` record is accepted whether it is presented in the file as `"IN"` or `"CLASS1"`.
+Do note however, that this option does not enable or disable the generic form when it comes to known classes. Ie, regardless of this option, a valid `IN` record is accepted whether it is represented in the file as `"IN"` or `"CLASS1"`.
 
 `{'encoding', unicode:encoding()}` (`'unicode'`)::
 

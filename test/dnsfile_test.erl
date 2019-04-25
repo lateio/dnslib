@@ -172,3 +172,16 @@ read_file_includes_test() ->
         #dnsfile{path=Path2, included_from=undefined, resources=[]},
         #dnsfile{path=Path3, included_from=Path2, resources=[]}
     ]).
+
+
+read_file_opts_test() ->
+    {error, {syntax_error, _, 1, {unknown_class, 10000}}} = dnsfile:read_file(file("unknown_class"), [{allow_unknown_classes, false}]),
+    {ok, [#dnsfile{resources=[{[], txt, 10000, 3600, [<<"Hello">>]}]}]} =
+        dnsfile:read_file(file("unknown_class"), [{allow_unknown_classes, true}]),
+
+    {error, {syntax_error, _, 1, {unknown_resource_type, 10000}}} = dnsfile:read_file(file("unknown_resource1"), [{allow_unknown_resources, false}]),
+    {ok, [#dnsfile{resources=[{[], 10000, in, 3600, <<0,0,0>>}]}]} =
+        dnsfile:read_file(file("unknown_resource1"), [{allow_unknown_resources, true}]),
+
+    {error, {syntax_error, _, 1, {invalid_unknown_resource_data, _}}} = dnsfile:read_file(file("unknown_resource2"), [{allow_unknown_resources, true}]),
+    {error, {syntax_error, _, 1, {invalid_unknown_resource_data, _}}} = dnsfile:read_file(file("unknown_resource3"), [{allow_unknown_resources, true}]).

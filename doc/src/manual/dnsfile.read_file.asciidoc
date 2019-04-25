@@ -32,7 +32,7 @@ read_file(Path :: string(), Opts :: [read_file_opt()])
        }.
 ----
 
-Read resource records and other info from a file. Somewhat like `file:read_file_info/1`.
+Read resource records and other info from a file. Somewhat like link:http://erlang.org/doc/man/file.html#read_file_info-1[`file:read_file_info/1`] of the standard library.
 
 == Types
 
@@ -102,9 +102,17 @@ This option allows the maximum number of character per line to be adjusted. A li
 
 link:https://tools.ietf.org/rfc/rfc3597.txt[RFC3597] specifies a special syntax for unknown resource types. It allows, for example, an unknown resource type identified by integer value `10000` to be encoded in the master file as `"TYPE10000"` and allows the resource data to be stored as an opaque binary blob. This option controls whether or not these unknown resource types are allowed in a master file. If unknown resource types are not allowed and one is encountered, an error will be returned.
 
+::
+
+Do note however, that this option does not enable or disable the generic form when it comes to known resources. Ie, regardless of this option, a valid `A` record is accepted whether it is presented in the file as `"A"` or `"TYPE1"`.
+
 `{'allow_unknown_classes', boolean()}` (`'false'`)::
 
 link:https://tools.ietf.org/rfc/rfc3597.txt[RFC3597] specifies a special syntax for unknown resource classes. It allows, for example, an unknown class identified by integer value `10000` to be encoded in the master file as `"CLASS10000"`. This option controls whether or not these unknown classes are allowed in a master file. If unknown classes are not allowed and one is encountered, an error will be returned.
+
+::
+
+Do note however, that this option does not enable or disable the generic form when it comes to known classes. Ie, regardless of this option, a valid `IN` record is accepted whether it is presented in the file as `"IN"` or `"CLASS1"`.
 
 `{'encoding', unicode:encoding()}` (`'unicode'`)::
 

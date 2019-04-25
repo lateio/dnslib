@@ -53,7 +53,7 @@ Path of the master file
 
 Opts::
 
-Options to control certain aspects of master file handling. See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file`].
+Options to control certain aspects of master file handling. See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`].
 
 == Return value
 

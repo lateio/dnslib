@@ -455,7 +455,9 @@ generic_data_list_to_binary(["\\#", BytesLenStr|Rest]) ->
             end
     catch
         error:badarg -> {error, {bad_data_length, BytesLenStr}}
-    end.
+    end;
+generic_data_list_to_binary([_|Rest]) ->
+    {error, invalid_syntax}.
 
 
 transform_unknown_resource_data([], 0, Acc) ->
@@ -494,10 +496,14 @@ compile_entry(Entry = {_, undefined, _, _, _}, [Type0|Parts], State) ->
     try_type(Entry, [Type1|Parts], State).
 
 
-try_class({Domain, Type, undefined, Ttl, Data}=Entry, Parts = [Token|Rest], State) ->
-    case dnsclass:from_to(Token, masterfile_token, atom) of
+try_class({Domain, Type, undefined, Ttl, Data}=Entry, Parts = [Token|Rest], State = #state{allow_unknown_classes=UnknownAllowed, path=File, startline=LineNumber}) ->
+    case dnsclass:from_to(Token, masterfile_token, value) of
         Token -> try_ttl(Entry, Parts, State);
-        Class -> compile_entry({Domain, Type, Class, Ttl, Data}, Rest, State)
+        ClassValue ->
+            case dnsclass:from_to(ClassValue, value, atom) of
+                ClassValue when not UnknownAllowed -> error(syntax_error(File, LineNumber, {unknown_class, ClassValue}));
+                ClassAtom -> compile_entry({Domain, Type, ClassAtom, Ttl, Data}, Rest, State)
+            end
     end.
 
 
@@ -512,17 +518,25 @@ try_ttl(Entry, Parts, State) ->
     try_type(Entry, Parts, State).
 
 
-try_type({Domain, undefined, Class, Ttl, undefined}, [Type0|Rest], State = #state{startline=LineNumber,path=File}) ->
-    case dnsrr:from_to(Type0, masterfile_token, module) of
+try_type({Domain, undefined, Class, Ttl, undefined}, [Type0|Rest], State = #state{startline=LineNumber,path=File,allow_unknown_resources=UnknownAllowed}) ->
+    case dnsrr:from_to(Type0, masterfile_token, value) of
         Type0 -> error(resource_record_error(File, LineNumber, {invalid_token, Type0}));
-        Module ->
-            Atom = dnsrr:from_to(Module, module, atom),
-            case Rest of
-                ["\\#"|_] ->
+        TypeValue ->
+            % Recognized type token
+            case dnsrr:from_to(TypeValue, value, module) of
+                TypeValue when not UnknownAllowed -> error(syntax_error(File, LineNumber, {unknown_resource_type, TypeValue}));
+                TypeValue ->
+                    % Unknown type
                     case generic_data_list_to_binary(Rest) of
-                        {ok, Data} ->
-                            try Module:from_binary(Data) of
-                                {ok, Rdata} -> {ok, {Domain, Atom, Class, Ttl, Rdata}};
+                        {ok, BinData} -> {ok, {Domain, TypeValue, Class, Ttl, BinData}};
+                        {error, Reason} -> error(syntax_error(File, LineNumber, {invalid_unknown_resource_data, Reason}))
+                    end;
+                Module ->
+                    % Known type
+                    case generic_data_list_to_binary(Rest) of
+                        {ok, BinData} ->
+                            try Module:from_binary(BinData) of
+                                {ok, Rdata} -> {ok, {Domain, Module:atom(), Class, Ttl, Rdata}};
                                 {error, Reason} -> error(resource_record_error(File, LineNumber, {invalid_data, Type0, Reason}));
                                 {domains, DataList} ->
                                     case [GenTuple || GenTuple <- DataList, is_tuple(GenTuple), element(1, GenTuple) =:= compressed] of
@@ -532,26 +546,25 @@ try_type({Domain, undefined, Class, Ttl, undefined}, [Type0|Rest], State = #stat
                                                 (FunMember) -> FunMember
                                             end,
                                             Rdata = dnswire:finalize_resource_data([Fn(GenMember) || GenMember <- DataList], Module),
-                                            {ok, {Domain, Atom, Class, Ttl, Rdata}};
+                                            {ok, {Domain, Module:atom(), Class, Ttl, Rdata}};
                                         _ -> error(resource_record_error(File, LineNumber, resource_contains_domain_compressions))
                                     end
                             catch
                                 error:function_clause -> error(resource_record_error(File, LineNumber, invalid_data))
                             end;
-                        {error, Reason} -> error(syntax_error(File, LineNumber, {invalid_unknown_resource, Reason}))
-                    end;
-                _ ->
-                    case prepare_data(Rest, Module:masterfile_format(), State) of
-                        {ok, Data} ->
-                            case Module:from_masterfile(Data) of
-                                {ok, ResourceData} -> {ok, {Domain, Atom, Class, Ttl, ResourceData}};
-                                {error, Reason}    -> error(resource_record_error(File, LineNumber, {invalid_data, Type0, Reason}))
-                            end;
-                        {error, Reason = {unexpected_quoted, _}} -> error(syntax_error(File, LineNumber, Reason));
-                        {error, Reason = {invalid_integer, _}} -> error(syntax_error(File, LineNumber, Reason));
-                        {error, Reason = {invalid_ttl, _}} -> error(syntax_error(File, LineNumber, Reason));
-                        {error, Reason = {invalid_domain, _, _}} -> error(syntax_error(File, LineNumber, Reason));
-                        {error, Reason} -> error(resource_record_error(File, LineNumber, {invalid_data, Type0, Reason}))
+                        {error, _} ->
+                            case prepare_data(Rest, Module:masterfile_format(), State) of
+                                {ok, Data} ->
+                                    case Module:from_masterfile(Data) of
+                                        {ok, ResourceData} -> {ok, {Domain, Module:atom(), Class, Ttl, ResourceData}};
+                                        {error, Reason}    -> error(resource_record_error(File, LineNumber, {invalid_data, Type0, Reason}))
+                                    end;
+                                {error, Reason = {unexpected_quoted, _}} -> error(syntax_error(File, LineNumber, Reason));
+                                {error, Reason = {invalid_integer, _}} -> error(syntax_error(File, LineNumber, Reason));
+                                {error, Reason = {invalid_ttl, _}} -> error(syntax_error(File, LineNumber, Reason));
+                                {error, Reason = {invalid_domain, _, _}} -> error(syntax_error(File, LineNumber, Reason));
+                                {error, Reason} -> error(resource_record_error(File, LineNumber, {invalid_data, Type0, Reason}))
+                            end
                     end
             end
     end.

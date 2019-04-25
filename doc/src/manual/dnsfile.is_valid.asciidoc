@@ -14,7 +14,7 @@ dnsfile:is_valid - Verify master file syntax and contents
 is_valid(Path :: string())
     -> is_valid(Path, [{allow_unknown_resources, true}, {allow_unknown_classes, true}]).
 
-is_valid(Path :: string(), Opts :: [consult_opt()])
+is_valid(Path :: string(), Opts :: [read_file_opt()])
     -> boolean().
 ----
 
@@ -22,7 +22,7 @@ Verify master file syntax and contents.
 
 == Types
 
-See link:dnsfile.consult{ext-relative}[`dnsfile:consult`] for `consult_opt()`.
+See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`] for `read_file_opt()`.
 
 == Arguments
 
@@ -32,7 +32,7 @@ Path of the master file
 
 Opts::
 
-Options to control certain aspects of master file handling. See link:dnsfile.consult{ext-relative}[`dnsfile:consult`].
+Options to control certain aspects of master file handling. See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`].
 
 == Return value
 

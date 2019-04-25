@@ -80,7 +80,7 @@ Currently `consult` will not allow multiple classes to be present in a single ma
 
 == Changelog
 
-* *0.0.2* `consult/1,2` is now based on `dnsfile:read_file/1,2`
+* *0.0.2* `consult/1,2` is now based on link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`]
 * *0.0.1*
 ** A better sense of how to handle text encodings
 ** Can now handle unknown types and classes as per link:https://tools.ietf.org/rfc/rfc3597.txt[RFC3597]

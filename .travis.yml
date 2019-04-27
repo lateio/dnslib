@@ -2,6 +2,6 @@ language: erlang
 notifications:
   email: l@arv.io
 otp_release:
-  - 19.0
+  - 19.3
   - 20.0
   - 21.0

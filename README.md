@@ -1,7 +1,7 @@
 dnslib
 =====
 
-[![Build Status](https://travis-ci.org/lateio/dnslib.svg?branch=dev)](https://travis-ci.org/lateio/dnslib)
+[![Build Status](https://travis-ci.org/lateio/dnslib.svg?branch=master)](https://travis-ci.org/lateio/dnslib)
 
 dnslib will be a standards compliant, reliable and extensible library for working with Domain Name System (DNS) data. At the time of writing, however, it lacks the testing to verify it as any of the aforementioned.
 

@@ -5,7 +5,7 @@ Version 0.0.1, 2019.01.18
 
 == Name
 
-dnswire:to_binary_domain - Indicate domain in link:dnsrr.callback.to_binary{ext-relative}[`Resource:to_binary`] callback
+dnswire:to_binary_domain - Indicate domain in link:dnsrr.callback.to_binary{ext-relative}[`Resource:to_binary/1`] callback
 
 == Description
 
@@ -15,7 +15,7 @@ to_binary_domain(Domain :: dnslib:domain(), AllowCompression :: boolean())
     -> opaque().
 ----
 
-Indicate domain in link:dnsrr.callback.to_binary{ext-relative}[`Resource:to_binary`] callback.
+Indicate domain in link:dnsrr.callback.to_binary{ext-relative}[`Resource:to_binary/1`] callback.
 
 == Arguments
 
@@ -29,7 +29,7 @@ Specifies if dnslib is allowed to compress the domain
 
 == Return value
 
-Return value should be passed in the `DataList` of the `{'domains', DataList}` return tuple from link:dnsrr.callback.to_binary{ext-relative}[`Resource:to_binary`] callback.
+Return value should be passed in the `DataList` of the `{'domains', DataList}` return tuple from link:dnsrr.callback.to_binary{ext-relative}[`Resource:to_binary/1`] callback.
 
 == Changelog
 

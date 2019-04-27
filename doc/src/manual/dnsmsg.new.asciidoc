@@ -60,6 +60,7 @@ new_opts() = #{
     'checking_disabled'     => boolean(),
     'return_code'           => dnslib:return_code() | 0..16#FFF,
 
+    'edns'                  => boolean(),
     'edns_version'          => 0..16#FF,
     'edns_udp_payload_size' => 512..16#FFFF,
     'edns_dnssec_ok'        => boolean()
@@ -74,7 +75,7 @@ Set the id for the new message.
 
 `'is_response'` (`'false'`)::
 
-Set whether the message is considered a request (`'false'`) or response (`'true'`). When creating responses to requests, one should normally stick to using link:dnsmsg.response{ext-relative}[`dnsmsg:response`].
+Set whether the message is considered a request (`'false'`) or response (`'true'`). When creating responses to requests, one should normally stick to using link:dnsmsg.response{ext-relative}[`dnsmsg:response/1,2`].
 
 `'opcode'` (`'query'`)::
 
@@ -107,6 +108,10 @@ TBD. DNSSEC related.
 `'return_code'` (`'ok'`)::
 
 Set the return code for the new message.
+
+`'edns'` (`'true'`)::
+
+Controls whether EDNS is included in the message.
 
 `'edns_version'` (`0`)::
 
@@ -146,6 +151,8 @@ Resource(s) to include in the `additional` section of the new message
 
 The new message is returned.
 
+If a return code requiring edns is specified with the option disabling edns, an `'edns_required'` error is thrown.
+
 == Examples
 
 [source,erlang]
@@ -156,6 +163,7 @@ Msg1 = dnsmsg:new(#{}, dnslib:question("arv.io", a, in)).
 
 == Changelog
 
+* *0.0.2* `'edns'` added to `new_opts()`
 * *0.0.0* Function added
 
 == See also

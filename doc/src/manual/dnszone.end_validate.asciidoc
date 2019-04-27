@@ -1,0 +1,69 @@
+= dnszone:end_validate
+Lauri Moisio <l@arv.io>
+Version 0.0.2, 2019.04.11
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnszone:end_validate - Final verdict on zone validity
+
+== Description
+
+[source,erlang]
+----
+end_validate(State :: opaque())
+    -> 'true'
+     | {'false',
+           'missing_soa'
+         | {'missing_glue',               Domain :: dnslib:domain()}
+         | {'other_than_glue_past_edges', Domain :: dnslib:domain()}
+         | {'not_under_soa',              Domain :: dnslib:domain()}
+         | {'cname_loop',                 Domain :: dnslib:domain()}
+       }.
+----
+
+Final verdict on zone validity.
+
+== Arguments
+
+State::
+
+State returned by previous link:dnszone.new_validate{ext-relative}[`dnszone:new_validate/0`] or link:dnszone.continue_validate{ext-relative}[`dnszone:continue_validate/2`] call
+
+== Return value
+
+If no errors were detected, `'true'` is returned.
+
+If an error was detected, a tuple consisting of `'false'` and the error reason is returned.
+
+== Errors
+
+`'missing_soa'`::
+
+There was no `SOA` record among validated resources.
+
+`{missing_glue, Domain $$::$$ dnslib:domain()}`::
+
+Validated resources did not contain glue address record(s) for records past `NS` records. `Domain` is the domain for the record missing glue records.
+
+`{'other_than_glue_past_edges', Domain $$::$$ dnslib:domain()}`::
+
+There were resources other than address records past `NS` records. `Domain` is the domain from the problem record.
+
+`{not_under_soa, Domain $$::$$ dnslib:domain()}`::
+
+A record was not under the `SOA`. `Domain` is the domain of the problem record.
+
+`{'cname_loop', Domain $$::$$ dnslib:domain()}`::
+
+There was a `CNAME` loop in validated resources. `Domain` is the starting point of the loop.
+
+== Changelog
+
+* *0.0.2* Function added
+
+== See also
+
+link:dnszone.new_validate{ext-relative}[dnszone:new_validate],
+link:dnszone.continue_validate{ext-relative}[dnszone:continue_validate],
+link:dnszone{ext-relative}[dnszone]

@@ -6,6 +6,11 @@
     masterfile_token/0
 ]).
 
+-ifdef(EUNIT).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
+
 value() ->
     #{
         1   => dnsclass_in,   %% RFC1035
@@ -35,3 +40,16 @@ masterfile_token() ->
         "ch"  => dnsclass_ch,   %% RFC1035
         "hs"  => dnsclass_hs    %% RFC1035
     }.
+
+
+-ifdef(EUNIT).
+builtin_modules_sanity_test() ->
+    Builtin = dnsclass:builtin(),
+    CheckFn = fun ({_, FunMod}) -> not lists:member(FunMod, Builtin) end,
+    [] = lists:filter(CheckFn, maps:to_list(atom())),
+    [] = lists:filter(CheckFn, maps:to_list(value())),
+    [] = lists:filter(CheckFn, maps:to_list(masterfile_token())),
+    TakeFn = fun ({_, FunMod}, FunAcc) -> lists:delete(FunMod, FunAcc) end,
+    [] = lists:foldl(TakeFn, Builtin, maps:to_list(atom())),
+    [] = lists:foldl(TakeFn, Builtin, maps:to_list(value())).
+-endif.

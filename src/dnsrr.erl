@@ -27,19 +27,22 @@
     class_valid_for_type/2,
     section_valid_for_type/2,
     validate_data/2,
-    normalize_data/2
+    normalize_data/2,
+    additionally/1
 ]).
 
 -ifdef(EUNIT).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
+-include("include/pre_otp20_string_macro.hrl").
+
 -type type() :: atom() | 0..16#FFFF.
 -type masterfile_format_type() ::
     'token'           | % String escaped, no further processing is done. Quoted strings are rejected
-    'text'            | % String is escaped, and verified to be under 255 bytes. Quoted strings are accepted
+    'text'            | % String is escaped, and verified to be at most 255 bytes long. Quoted strings are accepted
     'text_unlimited'  | % String is escaped. No limit on length. Quoted strings are accepted
-    'qtext'           | % String is escaped, and verified to be under 255 bytes. Only quoted strings are accepted
+    'qtext'           | % String is escaped, and verified to be at most 255 bytes long. Only quoted strings are accepted
     'qtext_unlimited' | % String is escaped. No limit on length. Only quoted strings are accepted
     'uint16'          | % String is escaped and transformed to integer. Verified to fall into range 0..16#FFFF
     'uint32'          | % String is escaped and transformed to integer. Verified to fall into range 0..16#FFFFFFFF
@@ -55,6 +58,8 @@
 % Add a callback like resolve() -> true | false | {'fun', atom()}. ?
 
 % Checklist for new builtin types... add entries in dnsrr_types, builtin() here, dnslib.app.src
+
+%-callback dnsrr_subtype() -> 'dnsrr'.
 
 -callback masterfile_token() -> string().
 -callback atom() -> type().
@@ -151,7 +156,14 @@ builtin() ->
 -ifdef(EUNIT).
 builtin_modules_sanity_test() ->
     Builtin = builtin(),
-    CheckFn = fun (FunMod) -> FunAtom = FunMod:atom(), FunValue = FunMod:value(), not (from_to(FunAtom, atom, value) =:= FunValue andalso from_to(FunValue, value, atom) =:= FunAtom) end,
+    CheckFn = fun (FunMod) ->
+        FunAtom = FunMod:atom(),
+        FunValue = FunMod:value(),
+        not (
+            from_to(FunAtom, atom, value) =:= FunValue andalso
+            from_to(FunValue, value, atom) =:= FunAtom
+        )
+    end,
     [] = lists:filter(CheckFn, Builtin).
 -endif.
 
@@ -203,7 +215,7 @@ check_module_collisions([CustomMod|Rest], AtomMap, ValueMap, MasterfileTokenMap)
         maps:get(Value, ValueMap, false),
         maps:get(MasterfileToken, MasterfileTokenMap, false),
         if
-            is_list(MasterfileToken) -> string:prefix(string:to_lower(MasterfileToken), "type");
+            is_list(MasterfileToken) -> string:prefix(string:(?LOWER)(MasterfileToken), "type");
             true -> nomatch
         end
     } of
@@ -246,20 +258,51 @@ build_map_form([{Key, Module}|Rest], Acc) ->
     build_map_form(Rest, [{map_field_assoc, 0, {Type, 0, Key}, {atom, 0, Module}}|Acc]).
 
 
+-spec from_to(
+    Value :: atom() | 0..16#FFFF | string(),
+    From :: 'value' | 'module' | 'atom' | 'masterfile_token',
+    To   :: 'value' | 'module' | 'atom' | 'masterfile_token' | 'masterfile_token_generic'
+) -> atom() | 0..16#FFFF | string().
 from_to(Value, value, module) ->
     maps:get(Value, dnsrr_types:value(), Value);
+from_to(Value, value, masterfile_token) when Value >= 0, Value =< 16#FFFF ->
+    case maps:get(Value, dnsrr_types:value(), Value) of
+        Value -> from_to(Value, value, masterfile_token_generic);
+        Module -> Module:masterfile_token()
+    end;
+from_to(Value, value, masterfile_token_generic) when Value >= 0, Value =< 16#FFFF ->
+    "type" ++ integer_to_list(Value);
 from_to(Value, atom, module) ->
     maps:get(Value, dnsrr_types:atom(), Value);
-from_to(Value, masterfile_token, module) ->
-    maps:get(Value, dnsrr_types:masterfile_token(), Value);
+from_to(Value0, masterfile_token, To) ->
+    case string:(?LOWER)(Value0) of
+        [$t, $y, $p, $e|Int] ->
+            try list_to_integer(Int) of
+                Value when To =:= value, Value >= 0, Value =< 16#FFFF -> Value;
+                Value when Value >= 0, Value =< 16#FFFF ->
+                    case from_to(Value, value, To) of
+                        Value -> Value0;
+                        ToValue -> ToValue
+                    end;
+                _ -> Value0
+            catch
+                error:badarg -> Value0
+            end;
+        Value ->
+            case maps:get(Value, dnsrr_types:masterfile_token(), Value0) of
+                Value0 -> Value0;
+                Module when To =:= module -> Module;
+                Module -> from_to(Module, module, To)
+            end
+    end;
 from_to(Module, module, value) ->
     Module:value();
 from_to(Module, module, atom) ->
     Module:atom();
 from_to(Module, module, masterfile_token) ->
     Module:masterfile_token();
-    % However, with TYPE100 -syntax, every type has a masterfile token, even
-    % if it doesn't export one...
+from_to(Module, module, masterfile_token_generic) ->
+    from_to(Module:value(), value, masterfile_token_generic);
 from_to(Value, From, To) when From =/= To ->
     % If either From or To are not allowed, function_clause exception will result
     case from_to(Value, From, module) of
@@ -321,4 +364,15 @@ section_valid_for_type(Section, Type) ->
                     List = Module:message_section(),
                     lists:member(Section, List)
             end
+    end.
+
+
+additionally({_, Type, _, _, _}) when is_integer(Type) ->
+    [];
+additionally({_, Type, _, _, _} = Resource) ->
+    Module = from_to(Type, atom, module),
+    try Module:additionally(Resource) of
+        Additionally -> Additionally
+    catch
+        error:undef -> []
     end.

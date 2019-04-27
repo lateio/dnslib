@@ -27,7 +27,7 @@ Question to normalize
 
 Returns a question in which:
 
-* Domain has been normalized. See link:dnslib.normalize_domain{ext-relative}[`dnslib:normalize_domain`].
+* Domain has been normalized. See link:dnslib.normalize_domain{ext-relative}[`dnslib:normalize_domain/1`].
 * Known integer values for `Question` type and class have been replaced with their respective atoms
 
 This function throws `error:badarg` if `Question` type or class are unknown atoms.

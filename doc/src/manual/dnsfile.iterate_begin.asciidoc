@@ -1,0 +1,57 @@
+= dnsfile:iterate_begin
+Lauri Moisio <l@arv.io>
+Version 0.0.2, 2019.04.13
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsfile:iterate_begin - Begin master file iteration
+
+== Description
+
+[source,erlang]
+----
+iterate_begin(Path :: string()) -> iterate_begin(Path, []).
+
+iterate_begin(Path :: string(), Opts :: [read_file_opt()])
+    -> {'ok', State :: term()}
+     | {'error' {'file_error', 'eacces' | 'enoent' | 'eisdir', Filename :: string()}}.
+----
+
+Begin master file iteration.
+
+== Types
+
+See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`] for `read_file_opt()`.
+
+== Arguments
+
+Path::
+
+Path of the master file
+
+Opts::
+
+Options to control certain aspects of master file handling. See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`].
+
+== Return value
+
+On success a tuple consisting of `'ok'` atom and a state to be used in later link:dnsfile.iterate_next{ext-relative}[`dnsfile:iterate_next/1`] and link:dnsfile.iterate_end{ext-relative}[`dnsfile:iterate_end/1`] calls is returned.
+
+On error a tuple consisting of `'error'` atom and the error reason is returned.
+
+== Errors
+
+`{'file_error', Reason, Filename $$::$$ string()}`::
+
+`'file_error'` indicates problems with accessing the file -- insufficient permissions, file not actually existing, etc.
+
+== Changelog
+
+* *0.0.2* Function added
+
+== See also
+
+link:dnsfile.iterate_next{ext-relative}[dnsfile:iterate_next],
+link:dnsfile.iterate_end{ext-relative}[dnsfile:iterate_end],
+link:dnsfile{ext-relative}[dnsfile]

@@ -24,7 +24,7 @@ Returned string is used to represent the resource type in master files. It must 
 
 This callback is optional.
 
-If this callback is not implemented, link:dnsrr.callback.from_masterfile{ext-relative}[`Module:from_masterfile`] and link:dnsrr.callback.masterfile_format{ext-relative}[`Module:masterfile_format`] should also be left unimplemented.
+If this callback is not implemented, link:dnsrr.callback.from_masterfile{ext-relative}[`Module:from_masterfile/1`] and link:dnsrr.callback.masterfile_format{ext-relative}[`Module:masterfile_format/0`] should also be left unimplemented.
 
 == Examples
 

@@ -1,28 +1,29 @@
-= dnszone:valid
+= dnszone:is_valid
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.04.25
 :ext-relative: {outfilesuffix}
 
 == Name
 
-dnszone:valid - Check if resource records form a valid zone
+dnszone:is_valid - Check if resource records form a valid zone
 
 == Description
 
 [source,erlang]
 ----
-valid(Resources :: [dnslib:resource()]) ->
+is_valid(Resources :: [dnslib:resource()]) ->
       'true'
     | {'false',
           'missing_soa'
         | {'multiple_soas', Soas :: [dnslib:domain()]}
         | 'wildcard_soa'
-        | {'missing_glue', dnslib:domain()}
-        | {'other_than_glue_past_edges', dnslib:domain()}
-        | {'not_under_soa', dnslib:domain()}
-        | {'non_exclusive_cname', dnslib:domain()}
-        | {'cname_to_cname_loop', dnslib:domain()}
-        | {'cname_loop', dnslib:domain()}.
+        | {'class_mismatch', List :: [dnsclass:class()]}
+        | {'missing_glue', Domain :: dnslib:domain()}
+        | {'other_than_glue_past_edges', Domain :: dnslib:domain()}
+        | {'not_under_soa', Domain :: dnslib:domain()}
+        | {'non_exclusive_cname', Domain :: dnslib:domain()}
+        | {'cname_to_cname_loop', Domain :: dnslib:domain()}
+        | {'cname_loop', Domain :: dnslib:domain()}
       }.
 ----
 
@@ -54,6 +55,10 @@ There were multiple `SOA` records among `Resources`. `Soas` contains the domain 
 
 The `SOA` record has a wildcard domain.
 
+`{'class_mismatch', List $$::$$ [dnsclass:class()]}`::
+
+All resources did not have the same class. `List` contains detected mismatching classes (not necessarily all mismatching classes present among the resources).
+
 `{missing_glue, Domain $$::$$ dnslib:domain()}`::
 
 `Resources` did not contain glue address record(s) for records past `NS` records. `Domain` is the domain for the record missing glue records.
@@ -80,9 +85,11 @@ There was a `CNAME` loop in `Resources`. `Domain` is the starting point of the l
 
 == Changelog
 
+* *0.0.2* Renamed from `valid/1` to `is_valid/1`
 * *0.0.1* `cname_loop` error added
 * *0.0.0* Function added
 
 == See also
 
+link:dnszone.is_valid_file{ext-relative}[dnszone:is_valid_file],
 link:dnszone{ext-relative}[dnszone]

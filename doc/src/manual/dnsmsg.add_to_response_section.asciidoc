@@ -38,7 +38,7 @@ Term(s) to add
 
 A request message containing the added terms is returned.
 
-When `dnmsg:response` is executed on the returned request message, the added resources will be present in the created response.
+When link:dnsmsg.response{ext-relative}[`dnsmsg:response/1,2`] is executed on the returned request message, the added resources will be present in the created response.
 
 Resources will appear in the response in the order they were included in.
 

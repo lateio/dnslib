@@ -1,0 +1,41 @@
+= dnszone:get_transfer_resources
+Lauri Moisio <l@arv.io>
+Version 0.0.2, 2019.04.24
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnszone:get_transfer_resources - Get the resources accrued so far during a transfer
+
+== Description
+
+[source,erlang]
+----
+get_transfer_resources(State1 :: opaque())
+    -> {
+          State2 :: opaque(),
+          Resources :: [dnslib:resource() | dnsmsg:incremental_transfer_change_set()]
+       }.
+----
+
+Get the resources accrued so far during a transfer.
+
+== Arguments
+
+State1::
+
+State returned by previous link:dnszone.new_transfer{ext-relative}[`dnszone:new_transfer/1`] or link:dnszone.continue_transfer{ext-relative}[`dnszone:continue_transfer/2`] call
+
+== Return value
+
+A tuple consisting of the new state and the resources extracted from it is returned.
+
+== Changelog
+
+* *0.0.2* Function added
+
+== See also
+
+link:dnszone.new_transfer{ext-relative}[dnszone:new_transfer],
+link:dnszone.continue_transfer{ext-relative}[dnszone:continue_transfer],
+link:dnszone{ext-relative}[dnszone]

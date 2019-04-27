@@ -30,7 +30,7 @@ to_binary({Domain, Bitmap}) ->
     ]}.
 
 from_binary(Bin) ->
-    case dnslib:binary_to_domain(Bin) of
+    case dnswire:binary_to_domain(Bin) of
         {ok, Domain, Bitmap} -> {ok, {Domain, Bitmap}};
         _ -> {error, invalid_data}
     end.

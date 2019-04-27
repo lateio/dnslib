@@ -18,12 +18,24 @@
 %
 % ------------------------------------------------------------------------------
 %
-% This this file implements reading and parsing of DNS files.
+% This this file implements the reading, parsing and writing of DNS master files.
 -module(dnsfile).
 
 -export([
     consult/1,
     consult/2,
+    read_file/1,
+    read_file/2,
+    read_file_includes/1,
+    read_file_includes/2,
+    foldl/3,
+    foldl/4,
+    is_valid/1,
+    is_valid/2,
+    iterate_begin/1,
+    iterate_begin/2,
+    iterate_next/1,
+    iterate_end/1,
     parse_resource/1,
     write_resources/2,
     write_resources/3,
@@ -33,14 +45,18 @@
     directive_reverse_dns_pointer/2,
     directive_ttl/2,
     to_masterfile_escape_text/1,
-    indicate_domain/1
+    indicate_domain/1,
+    generic_data_list_to_binary/1
 ]).
 
 -include_lib("dnslib/include/dnslib.hrl").
+-include_lib("dnslib/include/dnsfile.hrl").
 
 -ifdef(EUNIT).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
+
+-include("include/pre_otp20_string_macro.hrl").
 
 -type proto_resource() ::
     {
@@ -53,6 +69,7 @@
 
 -type line_part() :: string() | {string(), 'quoted'}.
 
+% Split static configuration fields from state?
 -record(state, {
     encoding=unicode :: unicode:encoding(),
     text_encoding=unicode :: unicode:encoding(),
@@ -69,14 +86,15 @@
     prevclass={assume, in} :: dnsclass:class() | {'assume', 'in'} | 'undefined',
     prevttl                :: dnslib:ttl()     | 'undefined',
     defttl                 :: dnslib:ttl()     | 'undefined',
-    records=[]             :: [dnslib:resource()],
     include_depth=3        :: non_neg_integer(),
-    included_from=[]       :: [string()],
+    included_from=[undefined] :: [string() | 'undefined'],
     punyencode=false       :: boolean(),
     allow_unknown_resources=false :: boolean(),
     allow_unknown_classes=false   :: boolean(),
     reverse_dns_pointer=false :: boolean() | 'inet' | 'inet6',
     'allow_@'=true :: boolean(),
+    mode=read_file :: 'read_file' | 'read_file_includes' | 'foldl' | 'foreach',
+    mode_state={[], []}  :: term(), % Keep foldl acc&fun and/or consult resources here...
     directives=#{
         "origin"              => directive_origin,
         "ttl"                 => directive_ttl,
@@ -110,6 +128,9 @@ directive_error(File, LineNumber, Details) ->
 
 resource_record_error(File, LineNumber, Details) ->
     {resource_record_error, File, LineNumber, Details}.
+
+foldl_error(Class, Reason, Stacktrace) ->
+    {foldl_error, Class, Reason, Stacktrace}.
 
 
 -type prepare_data_error() ::
@@ -309,28 +330,57 @@ directive_include([], _) ->
     error(no_arguments).
 
 
-directive_include(Path0, Origin, OriginStr, State = #state{path=PrevPath,include_depth=Depth,records=Records,included_from=IncludedFrom}) ->
-    Path = resolve(Path0),
-    File = case filename:pathtype(Path) of
-        absolute -> Path;
-        _ -> filename:join(filename:dirname(PrevPath), Path)
+directive_include(Path0, Origin, OriginStr, State = #state{path=PrevPath,include_depth=Depth,included_from=IncludedFrom,mode=Mode}) ->
+    Path1 = resolve(Path0),
+    File = case filename:pathtype(Path1) of
+        absolute -> error({include_error, {absolute_include_path, Path1}});
+        _ ->
+            case filename:safe_relative_path(Path1) of
+                unsafe -> error({include_error, {unsafe_relative_include, Path1}});
+                Path2 -> filename:join(filename:dirname(PrevPath), Path2)
+            end
     end,
-    TmpState = State#state{
-        origin=Origin,
-        origin_str=OriginStr,
-        line=1,
-        startline=1,
-        fn=fun line_start/2,
-        parentheses=false,
-        entry_parts=[[]],
-        path=File,
-        include_depth=Depth-1,
-        records=[],
-        included_from=[PrevPath|IncludedFrom]
-    },
-    case consult_file(File, TmpState) of
-        {ok, NewRecords} -> {ok, State#state{records=lists:append(lists:reverse(NewRecords), Records)}};
-        {error, Reason} -> error({include_error, Reason})
+    % We need to check that we're not escaping beoynd the initial directory
+
+    Loop = File =:= PrevPath orelse lists:member(File, IncludedFrom), % lists:member is not evaluated if the first expression matches.
+    if
+        Loop -> {error, include_loop};
+        not Loop ->
+            TmpState0 = State#state{
+                origin=Origin,
+                origin_str=OriginStr,
+                line=1,
+                startline=1,
+                fn=fun line_start/2,
+                parentheses=false,
+                entry_parts=[[]],
+                path=File,
+                include_depth=Depth-1,
+                included_from=[PrevPath|IncludedFrom]
+            },
+            TmpState = case Mode of
+                read_file -> TmpState0#state{mode_state={[], []}};
+                read_file_includes -> TmpState0#state{mode_state={[], []}};
+                _ -> TmpState0
+            end,
+            case handle_file(File, TmpState) of
+                {ok, NewFiles} when Mode =:= read_file ->
+                    PrevFiles = case State of
+                        #state{mode_state={[], Files}} -> lists:reverse(Files);
+                        _ -> parse_file_done(State)
+                    end,
+                    {ok, State#state{mode_state={[], lists:append(lists:reverse(NewFiles), lists:reverse(PrevFiles))}}};
+                {ok, NewFiles} when Mode =:= read_file_includes ->
+                    PrevFiles = case State of
+                        #state{mode_state={[], Files}} -> lists:reverse(Files);
+                        _ -> parse_file_done(State)
+                    end,
+                    {ok, State#state{mode_state={[], lists:append(lists:reverse(NewFiles), lists:reverse(PrevFiles))}}};
+                {ok, NewAcc} when Mode =:= foldl ->
+                    #state{mode_state={Fun, _}} = State,
+                    {ok, State#state{mode_state={Fun, NewAcc}}};
+                {error, Reason} -> error({include_error, Reason})
+            end
     end.
 
 
@@ -352,7 +402,7 @@ list_to_boolean(List) ->
 
 
 directive_punyencode([Arg], State) ->
-    case list_to_boolean(string:to_lower(Arg)) of
+    case list_to_boolean(string:(?LOWER)(Arg)) of
         error -> error({punyencode, {invalid_argument, Arg}});
         Boolean -> {ok, State#state{punyencode=Boolean}}
     end;
@@ -369,7 +419,7 @@ punyencode(Domain, _) ->
 
 
 directive_reverse_dns_pointer([Arg0], State) ->
-    Arg = string:to_lower(Arg0),
+    Arg = string:(?LOWER)(Arg0),
     case list_to_boolean(Arg) of
         error when Arg =:= "inet" -> {ok, State#state{reverse_dns_pointer=inet}};
         error when Arg =:= "inet6" -> {ok, State#state{reverse_dns_pointer=inet6}};
@@ -380,28 +430,34 @@ directive_reverse_dns_pointer(_, _) ->
     error({reverse_dns_pointer, invalid_number_of_arguments}).
 
 
-
-handle_unknown_resource_data([]) ->
-    {error, no_data};
-handle_unknown_resource_data([[$\\, $#], BytesList|HexValues]) ->
-    try list_to_integer(BytesList) of
-        Bytes when Bytes >= 0, Bytes =< 16#FFFF ->
-            case lists:all(fun (FunStr) -> length(FunStr) rem 2 =:= 0 end, HexValues) of
-                false -> {error, invalid_resource_data};
+generic_data_list_to_binary([]) ->
+    {error, empty_string};
+generic_data_list_to_binary(String) when is_integer(hd(String)) ->
+    % Need to split the string into components.
+    case parse_entry(String, #state{}) of
+        {complete, ["\\#"|_]=Parts, _} -> generic_data_list_to_binary(Parts);
+        _ -> {error, invalid_syntax}
+    end;
+generic_data_list_to_binary(["\\#", BytesLenStr|Rest]) ->
+    try list_to_integer(BytesLenStr) of
+        BytesLen when BytesLen > 16#FFFF -> {error, data_too_long};
+        BytesLen when BytesLen < 0 -> {error, {bad_data_length, BytesLenStr}};
+        BytesLen ->
+            case lists:all(fun (FunStr) -> length(FunStr) rem 2 =:= 0 end, Rest) of
+                false -> {error, invalid_syntax};
                 true ->
-                    try transform_unknown_resource_data(lists:append(HexValues), Bytes, <<>>) of
+                    try transform_unknown_resource_data(lists:append(Rest), BytesLen, <<>>) of
                         {ok, _}=Tuple -> Tuple;
                         {error, _}=Tuple -> Tuple
                     catch
-                        error:function_clause -> {error, invalid_resource_data}
+                        error:function_clause -> {error, invalid_syntax} % Catch cases where the hex might be invalid
                     end
-            end;
-        Bytes -> {error, {data_too_long, Bytes}}
+            end
     catch
-        error:badarg -> {error, {bad_data_length, BytesList}}
+        error:badarg -> {error, {bad_data_length, BytesLenStr}}
     end;
-handle_unknown_resource_data([Token|_]) ->
-    {error, {invalid_unknown_resource_start_token, Token}}.
+generic_data_list_to_binary([_|_]) ->
+    {error, invalid_syntax}.
 
 
 transform_unknown_resource_data([], 0, Acc) ->
@@ -430,32 +486,24 @@ compile_entry(Entry, [], _) ->
 compile_entry(_, [{Value, quoted}|_], #state{startline=LineNumber,path=File}) ->
     error(syntax_error(File, LineNumber, {unexpected_quoted, Value}));
 compile_entry(Entry = {_, _, undefined, _, _}, [Class0|Parts], State) ->
-    Class1 = string:to_lower(Class0),
+    Class1 = string:(?LOWER)(Class0),
     try_class(Entry, [Class1|Parts], State);
 compile_entry(Entry = {_, _, _, undefined, _}, [Ttl0|Parts], State) ->
-    Ttl1 = string:to_lower(Ttl0),
+    Ttl1 = string:(?LOWER)(Ttl0),
     try_ttl(Entry, [Ttl1|Parts], State);
 compile_entry(Entry = {_, undefined, _, _, _}, [Type0|Parts], State) ->
-    Type1 = string:to_lower(Type0),
+    Type1 = string:(?LOWER)(Type0),
     try_type(Entry, [Type1|Parts], State).
 
 
-try_class({Domain, Type, undefined, Ttl, Data}=Entry, Parts = [[$c,$l,$a,$s,$s|ClassNumber]|Rest], State = #state{startline=LineNumber,path=File,allow_unknown_classes=AllowUnknown}) ->
-    try list_to_integer(ClassNumber) of
-        Value when Value >= 0, Value < 16#FFFF ->
-            case dnsclass:from_to(Value, value, atom) of
-                Value when AllowUnknown -> compile_entry({Domain, Type, Value, Ttl, Data}, Rest, State);
-                Value -> error(syntax_error(File, LineNumber, {unknown_class, Value}));
-                Atom -> compile_entry({Domain, Type, Atom, Ttl, Data}, Rest, State)
-            end;
-        Value -> error(syntax_error(File, LineNumber, {class_out_of_range, Value}))
-    catch
-        error:badarg -> try_ttl(Entry, Parts, State)
-    end;
-try_class({Domain, Type, undefined, Ttl, Data}=Entry, Parts = [Token|Rest], State) ->
-    case dnsclass:from_to(Token, masterfile_token, atom) of
+try_class({Domain, Type, undefined, Ttl, Data}=Entry, Parts = [Token|Rest], State = #state{allow_unknown_classes=UnknownAllowed, path=File, startline=LineNumber}) ->
+    case dnsclass:from_to(Token, masterfile_token, value) of
         Token -> try_ttl(Entry, Parts, State);
-        Class -> compile_entry({Domain, Type, Class, Ttl, Data}, Rest, State)
+        ClassValue ->
+            case dnsclass:from_to(ClassValue, value, atom) of
+                ClassValue when not UnknownAllowed -> error(syntax_error(File, LineNumber, {unknown_class, ClassValue}));
+                ClassAtom -> compile_entry({Domain, Type, ClassAtom, Ttl, Data}, Rest, State)
+            end
     end.
 
 
@@ -470,62 +518,25 @@ try_ttl(Entry, Parts, State) ->
     try_type(Entry, Parts, State).
 
 
-% Why is try_type here twice?
-try_type({Domain, undefined, Class, Ttl, undefined}=Tuple, [[$t,$y,$p,$e|TypeValue]|Rest], State = #state{startline=LineNumber,path=File,allow_unknown_resources=AllowUnknown}) ->
-    try list_to_integer(TypeValue) of
-        Type when Type >= 0, Type < 16#FFFF ->
-            case dnsrr:from_to(Type, value, module) of
-                Type when AllowUnknown ->
-                    case handle_unknown_resource_data(Rest) of
-                        {ok, Data} -> {ok, {Domain, Type, Class, Ttl, Data}};
-                        {error, Reason} -> error(syntax_error(File, LineNumber, {invalid_unknown_resource, Reason}))
-                    end;
-                Type -> error(syntax_error(File, LineNumber, {unknown_resource_type, Type}));
-                Module when is_atom(Module) ->
-                    % If we know that resource, use Module:from_binary to produce internal resource representation
-                    % If the data contains domain compressions, produce error
-                    Atom = dnsrr:from_to(Module, module, atom),
-                    case Rest of
-                        [[$\\, $#]|_] ->
-                            case handle_unknown_resource_data(Rest) of
-                                {ok, Data} ->
-                                    try Module:from_binary(Data) of
-                                        {ok, Rdata} -> {ok, {Domain, Atom, Class, Ttl, Rdata}};
-                                        {error, Reason} -> error(resource_record_error(File, LineNumber, Reason));
-                                        {domains, DataList} ->
-                                            case [GenTuple || GenTuple <- DataList, is_tuple(GenTuple), element(1, GenTuple) =:= compressed] of
-                                                [] ->
-                                                    Fn = fun
-                                                        ({domain, FunDomain, _}) -> FunDomain;
-                                                        (FunMember) -> FunMember
-                                                    end,
-                                                    Rdata = dnswire:finalize_resource_data([Fn(GenMember) || GenMember <- DataList], Module),
-                                                    {ok, {Domain, Atom, Class, Ttl, Rdata}};
-                                                _ -> error(resource_record_error(File, LineNumber, resource_contains_domain_compressions))
-                                            end
-                                    catch
-                                        error:function_clause -> error(resource_record_error(File, LineNumber, invalid_data))
-                                    end;
-                                {error, Reason} -> error(syntax_error(File, LineNumber, {invalid_unknown_resource, Reason}))
-                            end;
-                        _ -> try_type(Tuple, [Module:masterfile_token()|Rest], State)
-                    end
-            end;
-        Type -> error(syntax_error(File, LineNumber, {type_value_out_of_range, Type}))
-    catch
-        error:badarg -> error(syntax_error(File, LineNumber, {invalid_type_value, TypeValue}))
-    end;
-try_type({Domain, undefined, Class, Ttl, undefined}, [Type0|Rest], State = #state{startline=LineNumber,path=File}) ->
-    case dnsrr:from_to(Type0, masterfile_token, module) of
+try_type({Domain, undefined, Class, Ttl, undefined}, [Type0|Rest], State = #state{startline=LineNumber,path=File,allow_unknown_resources=UnknownAllowed}) ->
+    case dnsrr:from_to(Type0, masterfile_token, value) of
         Type0 -> error(resource_record_error(File, LineNumber, {invalid_token, Type0}));
-        Module ->
-            Atom = dnsrr:from_to(Module, module, atom),
-            case Rest of
-                [[$\\, $#]|_] ->
-                    case handle_unknown_resource_data(Rest) of
-                        {ok, Data} ->
-                            try Module:from_binary(Data) of
-                                {ok, Rdata} -> {ok, {Domain, Atom, Class, Ttl, Rdata}};
+        TypeValue ->
+            % Recognized type token
+            case dnsrr:from_to(TypeValue, value, module) of
+                TypeValue when not UnknownAllowed -> error(syntax_error(File, LineNumber, {unknown_resource_type, TypeValue}));
+                TypeValue ->
+                    % Unknown type
+                    case generic_data_list_to_binary(Rest) of
+                        {ok, BinData} -> {ok, {Domain, TypeValue, Class, Ttl, BinData}};
+                        {error, Reason} -> error(syntax_error(File, LineNumber, {invalid_unknown_resource_data, Reason}))
+                    end;
+                Module ->
+                    % Known type
+                    case generic_data_list_to_binary(Rest) of
+                        {ok, BinData} ->
+                            try Module:from_binary(BinData) of
+                                {ok, Rdata} -> {ok, {Domain, Module:atom(), Class, Ttl, Rdata}};
                                 {error, Reason} -> error(resource_record_error(File, LineNumber, {invalid_data, Type0, Reason}));
                                 {domains, DataList} ->
                                     case [GenTuple || GenTuple <- DataList, is_tuple(GenTuple), element(1, GenTuple) =:= compressed] of
@@ -535,26 +546,25 @@ try_type({Domain, undefined, Class, Ttl, undefined}, [Type0|Rest], State = #stat
                                                 (FunMember) -> FunMember
                                             end,
                                             Rdata = dnswire:finalize_resource_data([Fn(GenMember) || GenMember <- DataList], Module),
-                                            {ok, {Domain, Atom, Class, Ttl, Rdata}};
+                                            {ok, {Domain, Module:atom(), Class, Ttl, Rdata}};
                                         _ -> error(resource_record_error(File, LineNumber, resource_contains_domain_compressions))
                                     end
                             catch
                                 error:function_clause -> error(resource_record_error(File, LineNumber, invalid_data))
                             end;
-                        {error, Reason} -> error(syntax_error(File, LineNumber, {invalid_unknown_resource, Reason}))
-                    end;
-                _ ->
-                    case prepare_data(Rest, Module:masterfile_format(), State) of
-                        {ok, Data} ->
-                            case Module:from_masterfile(Data) of
-                                {ok, ResourceData} -> {ok, {Domain, Atom, Class, Ttl, ResourceData}};
-                                {error, Reason}    -> error(resource_record_error(File, LineNumber, {invalid_data, Type0, Reason}))
-                            end;
-                        {error, Reason = {unexpected_quoted, _}} -> error(syntax_error(File, LineNumber, Reason));
-                        {error, Reason = {invalid_integer, _}} -> error(syntax_error(File, LineNumber, Reason));
-                        {error, Reason = {invalid_ttl, _}} -> error(syntax_error(File, LineNumber, Reason));
-                        {error, Reason = {invalid_domain, _, _}} -> error(syntax_error(File, LineNumber, Reason));
-                        {error, Reason} -> error(resource_record_error(File, LineNumber, {invalid_data, Type0, Reason}))
+                        {error, _} ->
+                            case prepare_data(Rest, Module:masterfile_format(), State) of
+                                {ok, Data} ->
+                                    case Module:from_masterfile(Data) of
+                                        {ok, ResourceData} -> {ok, {Domain, Module:atom(), Class, Ttl, ResourceData}};
+                                        {error, Reason}    -> error(resource_record_error(File, LineNumber, {invalid_data, Type0, Reason}))
+                                    end;
+                                {error, Reason = {unexpected_quoted, _}} -> error(syntax_error(File, LineNumber, Reason));
+                                {error, Reason = {invalid_integer, _}} -> error(syntax_error(File, LineNumber, Reason));
+                                {error, Reason = {invalid_ttl, _}} -> error(syntax_error(File, LineNumber, Reason));
+                                {error, Reason = {invalid_domain, _, _}} -> error(syntax_error(File, LineNumber, Reason));
+                                {error, Reason} -> error(resource_record_error(File, LineNumber, {invalid_data, Type0, Reason}))
+                            end
                     end
             end
     end.
@@ -609,43 +619,50 @@ check_blacklist(Entry = {_, Type, _, _, _} , State = #state{startline=LineNumber
     end.
 
 
-check_type_class_compatibility(Entry = {Domain, Type, Class, Ttl, _}, State0 = #state{records=Records}) when is_integer(Type) ->
-    State1 = State0#state{records=[Entry|Records], prevdomain=Domain, prevclass=Class, prevttl=Ttl},
-    {ok, State1};
-check_type_class_compatibility(Entry = {Domain, Type, Class, Ttl, _}, State0 = #state{records=Records,startline=LineNumber,path=File}) ->
-    State1 = State0#state{records=[Entry|Records], prevdomain=Domain, prevclass=Class, prevttl=Ttl},
-    Module = dnsrr:from_to(Type, atom, module),
-    case
-        case erlang:function_exported(Module, class, 0) of
-            false -> ok;
-            true ->
-                case Module:class() of
-                    Class -> ok;
-                    List when is_list(List) ->
-                        case lists:member(Class, List) of
-                            true -> ok;
-                            false -> error
-                        end;
-                    _ -> error
-                end
-        end
-    of
-        %ok -> {ok, State1};
-        ok -> create_reverse_dns_pointer(Entry, State1);
-        error -> error(resource_record_error(File, LineNumber, invalid_class))
+check_type_class_compatibility(Entry = {_, Type, _, _, _}, State) when is_integer(Type) ->
+    entry_done(Entry, State);
+check_type_class_compatibility(Entry = {_, Type, Class, _, _}, State = #state{startline=LineNumber,path=File}) ->
+    case dnsrr:class_valid_for_type(Class, Type) of
+        false -> error(resource_record_error(File, LineNumber, invalid_class));
+        true -> create_reverse_dns_pointer(Entry, State)
     end.
 
 
-create_reverse_dns_pointer(_, State = #state{reverse_dns_pointer=false}) ->
-    {ok, State};
-create_reverse_dns_pointer({Domain, a, _, Ttl, Address}, State = #state{reverse_dns_pointer=CreatePointer,records=Records})
-when CreatePointer =:= inet; CreatePointer =:= true ->
-    Pointer = {dnslib:reverse_dns_domain(Address), ptr, in, Ttl, Domain}, % A can only have class IN
-    {ok, State#state{records=[Pointer|Records]}};
-create_reverse_dns_pointer({Domain, aaaa, _, Ttl, Address}, State = #state{reverse_dns_pointer=CreatePointer,records=Records})
-when CreatePointer =:= inet6; CreatePointer =:= true ->
-    Pointer = {dnslib:reverse_dns_domain(Address), ptr, in, Ttl, Domain}, % AAAA can only have class IN
-    {ok, State#state{records=[Pointer|Records]}}.
+create_reverse_dns_pointer(Entry, State = #state{reverse_dns_pointer=false}) ->
+    entry_done(Entry, State).
+%create_reverse_dns_pointer({Domain, a, _, Ttl, Address}, State = #state{reverse_dns_pointer=CreatePointer,records=Records})
+%when CreatePointer =:= inet; CreatePointer =:= true ->
+%    Pointer = {dnslib:reverse_dns_domain(Address), ptr, in, Ttl, Domain}, % A can only have class IN
+%    {ok, State#state{records=[Pointer|Records]}};
+%create_reverse_dns_pointer({Domain, aaaa, _, Ttl, Address}, State = #state{reverse_dns_pointer=CreatePointer,records=Records})
+%when CreatePointer =:= inet6; CreatePointer =:= true ->
+%    Pointer = {dnslib:reverse_dns_domain(Address), ptr, in, Ttl, Domain}, % AAAA can only have class IN
+%    {ok, State#state{records=[Pointer|Records]}}.
+
+
+-ifdef(OTP_RELEASE).
+entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=read_file, mode_state={Records, Files}}) ->
+    {ok, State0#state{mode_state={[Entry|Records], Files}, prevdomain=Domain, prevclass=Class, prevttl=Ttl}};
+entry_done({Domain, _, Class, Ttl, _}, State0 = #state{mode=read_file_includes}) ->
+    {ok, State0#state{prevdomain=Domain, prevclass=Class, prevttl=Ttl}};
+entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=foldl, mode_state={Fun, Acc0}}) ->
+    try Fun(Entry, Acc0) of
+        Acc1 -> {ok, State0#state{mode_state={Fun, Acc1}, prevdomain=Domain, prevclass=Class, prevttl=Ttl}}
+    catch
+        CatchClass:Reason:Stacktrace -> error(foldl_error(CatchClass, Reason, Stacktrace))
+    end.
+-else.
+entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=read_file, mode_state={Records, Files}}) ->
+    {ok, State0#state{mode_state={[Entry|Records], Files}, prevdomain=Domain, prevclass=Class, prevttl=Ttl}};
+entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=read_file_includes}) ->
+    {ok, State0#state{prevdomain=Domain, prevclass=Class, prevttl=Ttl}};
+entry_done(Entry = {Domain, _, Class, Ttl, _}, State0 = #state{mode=foldl, mode_state={Fun, Acc0}}) ->
+    try Fun(Entry, Acc0) of
+        Acc1 -> {ok, State0#state{mode_state={Fun, Acc1}, prevdomain=Domain, prevclass=Class, prevttl=Ttl}}
+    catch
+        CatchClass:Reason -> error(foldl_error(CatchClass, Reason, erlang:get_stacktrace()))
+    end.
+-endif.
 
 
 -type handle_entry_error() ::
@@ -660,7 +677,7 @@ when CreatePointer =:= inet6; CreatePointer =:= true ->
     {'ok', #state{}} |
     {'error', handle_entry_error()}.
 handle_entry([Cur = [$$|Directive0]|Rest], State = #state{directives=Directives,startline=LineNumber,path=File}) ->
-    Directive1 = string:to_lower(Directive0),
+    Directive1 = string:(?LOWER)(Directive0),
     case maps:get(Directive1, Directives, undefined) of
         undefined -> error(directive_error(File, LineNumber, {unknown_directive, Cur}));
         Handler ->
@@ -671,12 +688,12 @@ handle_entry([Cur = [$$|Directive0]|Rest], State = #state{directives=Directives,
                     Tmp = lists:reverse(A),
                     {M, F, lists:reverse([State, Rest|Tmp])}
             end,
-            Result = try
-                apply(Module, Func, Args)
+            try apply(Module, Func, Args) of
+                {ok, _}=Result -> Result;
+                {error, DirectiveError} -> error(directive_error(File, LineNumber, DirectiveError))
             catch
                 error:DirectiveError -> error(directive_error(File, LineNumber, DirectiveError))
-            end,
-            {ok, _} = Result
+            end
     end;
 handle_entry([""|_], #state{prevdomain=undefined,path=File,startline=LineNumber}) ->
     error(syntax_error(File, LineNumber, no_previous_domain));
@@ -790,7 +807,7 @@ whitespace([$"|Rest], State) ->
 whitespace([$\n|Rest], State) ->
     whitespace(Rest, State);
 whitespace([$(|Rest], State) ->
-    token(Rest, State#state{parentheses=true});
+    whitespace(Rest, State#state{parentheses=true});
 whitespace([$)|Rest], State) ->
     token(Rest, State#state{parentheses=false});
 whitespace([$;|_], State) ->
@@ -806,8 +823,6 @@ line_start([$\t|Rest], State = #state{entry_parts=Parts}) ->
 line_start(Line, State) ->
     token(Line, State).
 
-
-%parse_resource_partition($)
 
 parse_resource(Line) ->
     parse_resource(Line, []).
@@ -827,7 +842,7 @@ parse_resource(Line, _Opts) when is_list(_Opts) ->
     try parse_entry(Line, State) of
         {complete, Parts, State1} ->
             try handle_entry(Parts, State1) of
-                {ok, #state{records=[Record]}} -> {ok, Record}
+                {ok, #state{mode_state={[Record], _}}} -> {ok, Record}
             catch
                 error:Reason -> {error, Reason}
             end;
@@ -842,17 +857,20 @@ parse_entry(Line, State = #state{fn=Fn}) ->
     Fn(Line, State).
 
 
--spec parse_file(Fd :: file:io_device(), State :: #state{}) ->
-    {'ok', [dnslib:resource()]} |
-    {'error',
-        {'invalid_resource', integer(), handle_entry_error()} |
-        {'parse_error', integer(), parse_entry_error()}       |
-        {'unclosed_quote', integer()}                         |
-        {'unclosed_parentheses', integer()}
-    }.
-parse_file(Fd, State) ->
-    try get_line(Fd, State)
+-spec parse_file(Fd :: file:io_device(), State :: #state{})
+    -> {'ok', [dnslib:resource()] | term()}
+     | {'error',
+             {'invalid_resource', integer(), handle_entry_error()}
+           | {'parse_error', integer(), parse_entry_error()}
+           | {'unclosed_quote', integer()}
+           | {'unclosed_parentheses', integer()}
+       }.
+parse_file(Fd, State0) ->
+    try get_line(Fd, State0) of
+        {eof, State1} -> {ok, parse_file_done(State1)};
+        {_, State1} -> parse_file(Fd, State1)
     catch
+        error:{foldl_error, Class, Reason, Stacktrace}          -> {error, {foldl_error, Class, Reason, Stacktrace}};
         error:{syntax_error,          File, LineNumber, Reason} -> {error, {syntax_error,          File, LineNumber, Reason}};
         error:{directive_error,       File, LineNumber, Reason} -> {error, {directive_error,       File, LineNumber, Reason}};
         error:{resource_record_error, File, LineNumber, Reason} -> {error, {resource_record_error, File, LineNumber, Reason}}
@@ -861,41 +879,87 @@ parse_file(Fd, State) ->
 
 get_line(Fd, State = #state{max_line_length=MaxLen, line=LineNumber, path=File}) ->
     case io:get_line(Fd, "") of
-        eof -> parse_line(eof, Fd, State);
         {error, _} -> error(error);
-        Line when length(Line) > MaxLen -> error(syntax_error(File, LineNumber, {too_long_line, length(Line), MaxLen}));
-        Line -> parse_line(Line, Fd, State)
+        Line when is_list(Line), length(Line) > MaxLen -> error(syntax_error(File, LineNumber, {too_long_line, length(Line), MaxLen}));
+        Line -> parse_line(Line, State)
     end.
 
 
-parse_line(eof, _, State = #state{startline=LineNumber, path=File}) ->
+parse_line(eof, State = #state{startline=LineNumber, path=File}) ->
     case parse_entry([], State) of
         {complete, Parts, State1} ->
-            {ok, #state{records=Records}} = handle_entry(Parts, State1),
-            {ok, lists:reverse(Records)};
-        {empty, #state{records=Records}} ->
-            {ok, lists:reverse(Records)};
+            {ok, State2} = handle_entry(Parts, State1),
+            {eof, State2};
+        {empty, State2} ->
+            {eof, State2};
         {partial, #state{parentheses=true}} ->
             error(syntax_error(File, LineNumber, unclosed_parentheses));
         {partial, #state{}} ->
             error(syntax_error(File, LineNumber, unclosed_quotes))
     end;
-parse_line(Line, Fd, State = #state{line=LineNumber}) ->
+parse_line(Line, State = #state{line=LineNumber}) ->
     case parse_entry(Line, State) of
+        {partial, State1} -> {partial, State1#state{line=LineNumber+1}};
+        {empty, State1} -> {empty, State1#state{line=LineNumber+1, startline=LineNumber+1}};
         {complete, Parts, State1} ->
             {ok, State2} = handle_entry(Parts, State1),
-            get_line(Fd, State2#state{line=LineNumber+1, startline=LineNumber+1});
-        {partial, State1} ->
-            get_line(Fd, State1#state{line=LineNumber+1});
-        {empty, State1} ->
-            get_line(Fd, State1#state{line=LineNumber+1, startline=LineNumber+1})
+            {complete, State2#state{line=LineNumber+1, startline=LineNumber+1}}
     end.
 
 
--spec consult(Filename :: string()) -> {'ok', Resources :: [dnslib:resource()]}.
+parse_file_done(#state{mode=read_file, mode_state={Records, Files}, path=Path, included_from=IncFrom}) ->
+    lists:reverse([#dnsfile{
+        resources=lists:reverse(Records),
+        path=Path,
+        included_from=hd(IncFrom)
+    }|Files]);
+parse_file_done(#state{mode=read_file_includes, mode_state={_, Files}, path=Path, included_from=IncFrom}) ->
+    lists:usort([#dnsfile{
+        path=Path,
+        included_from=hd(IncFrom)
+    }|Files]);
+parse_file_done(#state{mode=foldl, mode_state={_, Acc}}) ->
+    Acc.
+
+
+-spec read_file(Filename :: string())
+    -> {'ok', FileInfo :: [#dnsfile{}]}
+     | {'error', Reason :: term()}
+     | {'error_list', [#dnsfile{}]}. % (IDEA) Provide an option where info about all files (even with errors) is provided
+read_file(Filename) ->
+    read_file(Filename, []).
+
+-spec read_file(Filename :: string(), Opts :: [term()])
+    -> {'ok', FileInfo :: [#dnsfile{}]}
+     | {'error', Reason :: term()}.
+read_file(Filename, Opts) ->
+    case prepare_state(#state{}, Opts) of
+        {ok, State} -> handle_file(Filename, State);
+        {error, Reason} -> {error, {invalid_opt, Reason}}
+    end.
+
+
+-spec read_file_includes(Filename :: string())
+    -> {'ok', FileInfo :: [#dnsfile{}]}
+     | {'error', Reason :: term()}.
+read_file_includes(Filename) ->
+    read_file_includes(Filename, []).
+
+-spec read_file_includes(Filename :: string(), Opts :: [term()])
+    -> {'ok', FileInfo :: [#dnsfile{}]}
+     | {'error', Reason :: term()}.
+read_file_includes(Filename, Opts) ->
+    case prepare_state(#state{}, Opts) of
+        {ok, State} -> handle_file(Filename, State#state{mode=read_file_includes});
+        {error, Reason} -> {error, {invalid_opt, Reason}}
+    end.
+
+
+-spec consult(Filename :: string())
+    -> {'ok', Resources :: [dnslib:resource()]}
+     | {'error', Reason :: term()}.
 consult(Filename) ->
     consult(Filename, []).
-
 
 -type consult_opt() ::
       {'line_break', string()}
@@ -913,24 +977,27 @@ consult(Filename) ->
     -> {'ok', Resources :: [dnslib:resource()]}
      | {'error', ErrorSpec :: term()}.
 consult(Filename, Opts) when is_list(Opts) ->
-    case prepare_state(#state{}, Opts) of
-        {ok, State} -> consult_file(Filename, State);
-        {error, Reason} -> {error, {invalid_opt, Reason}}
+    case read_file(Filename, Opts) of
+        {ok, Files} -> {ok, lists:foldl(fun consult_fold/2, [], Files)};
+        Result -> Result
     end.
 
-consult_file(Filename, State = #state{encoding=Encoding}) ->
-    case filename:pathtype(Filename) of
-        absolute ->
-            case file:open(Filename, [read, {encoding, Encoding}]) of
-                {ok, Fd} ->
-                    Result = parse_file(Fd, State#state{path=Filename}),
-                    ok = file:close(Fd),
-                    Result;
-                {error, eacces} -> {error, {file_error, eacces, Filename}};
-                {error, enoent} -> {error, {file_error, enoent, Filename}};
-                {error, eisdir} -> {error, {file_error, eisdir, Filename}}
-            end;
-        _ -> consult_file(filename:absname(Filename), State)
+consult_fold(#dnsfile{resources=Records}, Acc) -> lists:append(Acc, Records).
+
+
+-spec handle_file(string(), #state{})
+    -> {'ok', term()}
+     | {'error', ErrorSpec :: term()}.
+handle_file(Filename0, State = #state{encoding=Encoding}) ->
+    Filename = filename:absname(Filename0),
+    case file:open(Filename, [read, {encoding, Encoding}]) of
+        {ok, Fd} ->
+            Result = parse_file(Fd, State#state{path=Filename}),
+            ok = file:close(Fd),
+            Result;
+        {error, eacces} -> {error, {file_error, eacces, Filename}};
+        {error, enoent} -> {error, {file_error, enoent, Filename}};
+        {error, eisdir} -> {error, {file_error, eisdir, Filename}}
     end.
 
 
@@ -954,7 +1021,7 @@ prepare_state(State = #state{}, [{class, Class0}|Rest]) ->
             end
     end;
 %prepare_state(State = #state{directives=Directives0}, [{directive, Str, false}|Rest]) when is_list(Str) ->
-%    Directives1 = maps:remove(string:to_lower(Str), Directives0),
+%    Directives1 = maps:remove(string:(?LOWER)(Str), Directives0),
 %    prepare_state(State#state{directives=Directives1}, Rest);
 prepare_state(State = #state{type_blacklist=BL}, [{type_blacklist, List}|Rest]) when is_list(List) ->
     prepare_state(State#state{type_blacklist=lists:append(BL, [dnsrr:from_to(GenType, value, atom) || GenType <- List])}, Rest);
@@ -978,6 +1045,84 @@ prepare_state(State = #state{}, [{text_encoding, Encoding}|Rest]) ->
     prepare_state(State#state{text_encoding=Encoding}, Rest);
 prepare_state(_, [{Key, _}|_]) ->
     {error, {unknown_opt, Key}}.
+
+
+-spec foldl(fun((dnslib:resource(), term()) -> term()), term(), string())
+    -> {'ok', term()}
+     | {'error', ErrorSpec :: term()}.
+foldl(Fun, Acc0, Path) -> foldl(Fun, Acc0, Path, []).
+
+-spec foldl(fun((dnslib:resource(), term()) -> term()), term(), string(), [consult_opt()])
+    -> {'ok', term()}
+     | {'error', ErrorSpec :: term()}.
+foldl(Fun, Acc0, Path, Opts) ->
+    case prepare_state(#state{}, Opts) of
+        {ok, State} -> handle_file(Path, State#state{mode=foldl, mode_state={Fun, Acc0}});
+        {error, Reason} -> {error, {invalid_opt, Reason}}
+    end.
+
+
+is_valid(Path) -> is_valid(Path, []).
+
+is_valid(Path, Opts) ->
+    Fun = fun (_, _) -> nil end,
+    case foldl(Fun, nil, Path, Opts) of
+        {ok, nil} -> true;
+        _ -> false
+    end.
+
+
+iterate_begin(Path) -> iterate_begin(Path, []).
+
+iterate_begin(Path0, Opts) ->
+    case prepare_state(#state{}, Opts) of
+        {error, Reason} -> {error, {invalid_opt, Reason}};
+        {ok, State = #state{encoding=Encoding}} ->
+            Path = case filename:pathtype(Path0) of
+                absolute -> Path0;
+                _ -> filename:absname(Path0)
+            end,
+            case file:open(Path, [read, {encoding, Encoding}]) of
+                {ok, Fd} -> {ok, {State, Fd}};
+                {error, eacces} -> {error, {file_error, eacces, Path}};
+                {error, enoent} -> {error, {file_error, enoent, Path}};
+                {error, eisdir} -> {error, {file_error, eisdir, Path}}
+            end
+    end.
+
+
+iterate_next({_, eof}) -> eof;
+iterate_next({State, Fd}) -> iterate_next(State, Fd).
+
+iterate_next(State0, Fd) ->
+    try get_line(Fd, State0) of
+        {eof, State1 = #state{mode_state={[Resource], _}}} ->
+            ok = file:close(Fd),
+            {ok, Resource, {State1#state{mode_state={[], []}}, eof}};
+        {eof, #state{mode_state={[], _}}} ->
+            ok = file:close(Fd),
+            eof;
+        {complete, State1 = #state{mode_state={[Resource], _}}} ->
+            {ok, Resource, {State1#state{mode_state={[], []}}, Fd}};
+        {_, State1} -> iterate_next(State1, Fd)
+    catch
+        error:{foldl_error, Class, Reason, Stacktrace}          ->
+            ok = file:close(Fd),
+            {error, {foldl_error, Class, Reason, Stacktrace}};
+        error:{syntax_error, File, LineNumber, Reason} ->
+            ok = file:close(Fd),
+            {error, {syntax_error, File, LineNumber, Reason}};
+        error:{directive_error, File, LineNumber, Reason} ->
+            ok = file:close(Fd),
+            {error, {directive_error, File, LineNumber, Reason}};
+        error:{resource_record_error, File, LineNumber, Reason} ->
+            ok = file:close(Fd),
+            {error, {resource_record_error, File, LineNumber, Reason}}
+    end.
+
+
+iterate_end({_, eof}) -> ok;
+iterate_end({_, Fd}) -> ok = file:close(Fd).
 
 
 %%
@@ -1036,7 +1181,11 @@ write_resources(Filename, Rrs, Opts) ->
     % If optimizations haven't been disabled, run through the resource records,
     % introducing directives and mangling Resource record data as necessary
     % to produce a shorter file
-    {ok, Fd} = file:open(Filename, [write, binary]),
+    Mode = case lists:member(append, Opts) of
+        true -> append;
+        false -> write
+    end,
+    {ok, Fd} = file:open(Filename, [write, Mode]),
     ok = write_resource(Rrs, Fd, handle_write_resources_opts(Opts)),
     ok = file:close(Fd).
 
@@ -1050,8 +1199,10 @@ handle_write_resources_opts(Opts) ->
 
 handle_write_resources_opts([], Opts) ->
     Opts;
-handle_write_resources_opts([{generic, Boolean}|Rest], Opts) when Boolean =:= true; Boolean =:= false ->
-    handle_write_resources_opts(Rest, Opts#{generic => Boolean}).
+handle_write_resources_opts([generic|Rest], Opts) ->
+    handle_write_resources_opts(Rest, Opts#{generic => true});
+handle_write_resources_opts([append|Rest], Opts) ->
+    handle_write_resources_opts(Rest, Opts).
 
 
 write_resource([], _, _) ->
@@ -1061,11 +1212,15 @@ write_resource([{iodata, Line}|Rest], Fd, Opts = #{linebreak := Linebreak}) ->
     write_resource(Rest, Fd, Opts);
 write_resource([{Domain, Type, Class0, Ttl, Data}|Rest], Fd, Opts = #{linebreak := Linebreak, whitespace := Whitespace, generic := Generic}) ->
     % This allows us to write files with multiple classes
-    Class = case dnsclass:from_to(Class0, atom, masterfile_token) of
-        _ when Generic, is_atom(Class0) -> lists:append("class", integer_to_list(dnsclass:from_to(Class0, atom, value)));
-        Class0 when is_integer(Class0) -> lists:append("class", integer_to_list(Class0));
-        CaseClass when is_list(CaseClass) -> CaseClass
+    From = if
+        is_integer(Class0) -> value;
+        true -> atom
     end,
+    To = if
+        Generic -> masterfile_token_generic;
+        true -> masterfile_token
+    end,
+    Class = dnsclass:from_to(Class0, From, To),
     Iodata = [
         dnslib:domain_to_list(Domain),
         Whitespace,
@@ -1075,10 +1230,7 @@ write_resource([{Domain, Type, Class0, Ttl, Data}|Rest], Fd, Opts = #{linebreak 
         Whitespace,
         resource_specific(Type, Data, Opts)
     ],
-    case Rest of
-        [] -> ok = file:write(Fd, Iodata);
-        _  -> ok = file:write(Fd, [Iodata, Linebreak])
-    end,
+    ok = file:write(Fd, [Iodata, Linebreak]),
     write_resource(Rest, Fd, Opts).
 
 
@@ -1086,7 +1238,7 @@ resource_specific(Type, Data, Opts = #{whitespace := Whitespace, generic := Gene
     case dnsrr:from_to(Type, atom, module) of
         Type when is_integer(Type), is_binary(Data) ->
             [
-                string:to_upper(lists:append("type", integer_to_list(Type))),
+                string:to_upper(dnsrr:from_to(Type, value, masterfile_token_generic)),
                 Whitespace,
                 resource_data_to_io(Type, Data, Opts)
             ];
@@ -1108,7 +1260,7 @@ resource_data_to_binary(Module, Data) ->
         {ok, BinData} -> iolist_to_binary(BinData);
         {domains, List} ->
             Fn = fun
-                ({domain, _, Domain}) -> {ok, Bin} = dnslib:domain_to_binary(Domain), Bin;
+                ({domain, _, Domain}) -> {ok, Bin} = dnswire:domain_to_binary(Domain), Bin;
                 (FunData) -> FunData
             end,
             iolist_to_binary([Fn(GenTuple) || GenTuple <- List])

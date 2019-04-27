@@ -1,0 +1,72 @@
+= dnslib 0.0.2: New features
+Lauri Moisio <l@arv.io>
+Version 0.0.2, 2019.04.24
+:ext-relative: {outfilesuffix}
+
+== By module
+
+dnslib 0.0.2 introduces the following new features:
+
+*dnsclass*
+
+* link:dnsclass.from_to{ext-relative}[`dnsclass:from_to/3`] now works with general form in masterfile tokens (`"CLASS1"`)
+
+*dnsfile*
+
+* New function link:dnsfile.foldl{ext-relative}[`dnsfile:foldl/3,4`]
+* New function link:dnsfile.generic_data_list_to_binary{ext-relative}[`dnsfile:generic_data_list_to_binary/1`]
+* New function link:dnsfile.is_valid{ext-relative}[`dnsfile:is_valid/1,2`]
+* New functions link:dnsfile.iterate_begin{ext-relative}[`dnsfile:iterate_begin/1,2`], link:dnsfile.iterate_next{ext-relative}[`dnsfile:iterate_next/1`], link:dnsfile.iterate_end{ext-relative}[`dnsfile:iterate_end/1`]
+* New function link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`]
+* New function link:dnsfile.read_file_includes{ext-relative}[`dnsfile:read_file_includes/1,2`]
+* New option `'append'` for link:dnsfile.write_resources{ext-relative}[`dnsfile:write_resources/2,3`]
+* `$INCLUDE` directive now disallows absolute paths and relative paths trying to climb outside the directory where the file containing the directive is located.
+* Explicitly catch `$INCLUDE` directive loops
+
+*dnslib*
+
+* New function link:dnslib.domain{ext-relative}[`dnslib:domain/1`]
+* New function link:dnslib.question{ext-relative}[`dnslib:question/1`]
+* New function link:dnslib.type{ext-relative}[`dnslib:type/1`]
+* New function link:dnslib.class{ext-relative}[`dnslib:class/1`]
+* Support binary labels (link:https://tools.ietf.org/html/rfc2673[RFC2673]): from list, to list, normalize
+* Support generic type and class forms in link:dnslib.question{ext-relative}[`dnslib:question/1,2,3`] and link:dnslib.resource{ext-relative}[`dnslib:resource/1,5`]
+* link:dnslib.resource{ext-relative}[`dnslib:resource/5`] accepts resource data in generic form
+
+*dnsmsg*
+
+* New option to disallow EDNS in link:dnsmsg.new{ext-relative}[`dnsmsg:new/1,2`] and link:dnsmsg.response{ext-relative}[`dnsmsg:response/1,2`]
+
+*dnsrr*
+
+* link:dnsrr.from_to{ext-relative}[`dnsrr:from_to/3`] now works with general form in masterfile tokens (`"TYPE1"`)
+
+*dnsrr_soa*
+
+* New function `dnsrr_soa:serial_compare/2`
+* New function `dnsrr_soa:nameserver/1`
+* New function `dnsrr_soa:contact/1`
+* New function `dnsrr_soa:refresh/1`
+* New function `dnsrr_soa:retry/1`
+* New function `dnsrr_soa:expire/1`
+* New function `dnsrr_soa:minimum/1`
+
+*dnstrie*
+
+* New function `dnstrie:walk/3`
+* New function `dnstrie:get/3`
+* New option to disable wildcard matches in `dnstrie:get/3`
+
+*dnswire*
+
+* Support encoding and decoding binary labels (link:https://tools.ietf.org/html/rfc2673[RFC2673])
+
+*dnszone*
+
+* New function link:dnszone.is_valid_file{ext-relative}[`dnszone:is_valid_file/1`]
+* New function link:dnszone.get_transfer_resources{ext-relative}[`dnszone:get_transfer_resources/1`]
+* New functions link:dnszone.new_validate{ext-relative}[`dnszone:new_validate/0`], link:dnszone.continue_validate{ext-relative}[`dnszone:continue_validate/2`] and link:dnszone.end_validate{ext-relative}[`dnszone:end_validate/1`]
+
+== See also
+
+link:index{ext-relative}[Index]

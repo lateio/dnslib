@@ -1,0 +1,41 @@
+= dnsfile:iterate_end
+Lauri Moisio <l@arv.io>
+Version 0.0.2, 2019.02.02
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsfile:iterate_end - End master file iteration
+
+== Description
+
+[source,erlang]
+----
+iterate_end(State :: term()) -> ok.
+----
+
+End master file iteration.
+
+== Arguments
+
+State::
+
+State previously returned by link:dnsfile.iterate_next{ext-relative}[`dnsfile:iterate_begin/1,2`] or link:dnsfile.iterate_next{ext-relative}[`dnsfile:iterate_next/1`]
+
+== Return value
+
+Return value can be discarded.
+
+== Notes
+
+This function is necessary *only* when iteration is terminated *before the end of the file is reached* using link:dnsfile.iterate_next{ext-relative}[`dnsfile:iterate_next/1`].
+
+== Changelog
+
+* *0.0.2* Function added
+
+== See also
+
+link:dnsfile.iterate_begin{ext-relative}[dnsfile:iterate_begin],
+link:dnsfile.iterate_next{ext-relative}[dnsfile:iterate_next],
+link:dnsfile{ext-relative}[dnsfile]

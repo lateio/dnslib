@@ -1,6 +1,6 @@
 = dnsclass:from_to
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.04.08
 :ext-relative: {outfilesuffix}
 
 == Function
@@ -13,8 +13,8 @@ dnsclass:from_to - Transform an identifying term from one type to another
 ----
 from_to(
   Value :: atom() | 0..16#FFFF | string(),
-  From :: 'value' | 'module' | 'atom',
-  To   :: 'value' | 'module' | 'atom')
+  From :: 'value' | 'module' | 'atom' | 'masterfile_token',
+  To   :: 'value' | 'module' | 'atom' | 'masterfile_token' | 'masterfile_token_generic')
     -> atom() | 0..16#FFFF | string().
 ----
 
@@ -26,7 +26,7 @@ Mnemonic: `from_to(hs, atom, value)` -- "Transform hs *from_* atom *to* value".
 
 Value::
 
-Term to transform
+Term to transform. If it is a `'masterfile_token'` string, character case does not matter. Generic form is accepted in the `'masterfile_token'` case.
 
 From::
 
@@ -50,18 +50,29 @@ Summarizing: On success a different value is returned, on error the original val
 ----
 1 = dnsclass:from_to(in, atom, value),
 "in" = dnsclass:from_to(in, atom, masterfile_token),
+"class1" = dnsclass:from_to(in, atom, masterfile_token_generic),
 dnsclass_in = dnsclass:from_to(in, atom, module),
 
 in = dnsclass:from_to(1, value, atom),
 dnsclass_in = dnsclass:from_to(1, value, module),
 "in" = dnsclass:from_to(1, value, masterfile_token),
+"class1" = dnsclass:from_to(1, value, masterfile_token_generic),
 
 % An unknown value
-100 = dnsclass:from_to(100, value, atom).
+100 = dnsclass:from_to(100, value, atom),
+100 = dnsclass:from_to("CLASS100", masterfile_token, value),
+100 = dnsclass:from_to("class100", masterfile_token, value),
+"class100" = dnsclass:from_to(100, value, masterfile_token),
+"class100" = dnsclass:from_to("class100", masterfile_token, module).
 ----
 
 == Changelog
 
+* *0.0.2*
+** String case is ignored when transforming from `'masterfile_token'` values
+** `'masterfile_token'` values can also be in the generic format (`"CLASS1"`)
+** Added `'masterfile_token_generic'` as a possible value for `To`
+** Add missing documentation/spec for `'masterfile_token'` as a value of `From` and `To`
 * *0.0.0* Function added
 
 == See also

@@ -1,6 +1,6 @@
 = dnslib:resource
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.04.08
 :ext-relative: {outfilesuffix}
 
 == Name
@@ -37,19 +37,19 @@ Domain to be used in the question. Can be given as a string.
 
 Type::
 
-Type to be used. Can be an atom or a an integer.
+Type to be used. Can be an atom, a string or an integer.
 
 Class::
 
-Class to be used. Can be an atom or an integer.
+Class to be used. Can be an atom, a string or an integer.
 
 Ttl::
 
-Ttl to be used. Can be an integer or a string. If given as a string, can use the same format as when using link:dnslib.list_to_ttl{ext-relative}[`dnslib:list_to_ttl`].
+Ttl to be used. Can be an integer or a string. If given as a string, can use the same format as when using link:dnslib.list_to_ttl{ext-relative}[`dnslib:list_to_ttl/1`].
 
 Data::
 
-Data for the the resource. Can be a string in master file format, raw binary or the in-memory data structure for the resource type.
+Data for the the resource. Can be a string in master file format – generic form is allowed –, raw binary or the in-memory data structure for the resource type.
 
 == Return value
 
@@ -61,23 +61,29 @@ This function can throw `error:badarg` in the following cases:
 * `dnslib:is_valid_domain` error when `Domain` is not a string
 * An unknown atom is passed as `Type` or `Class`
 * An integer outside the range `0..16#FFFF` is passed as `Type` or `Class`
+* An unknown or invalid string is passed as `Type` or `Class`
 * `dnslib:list_to_ttl` error when `Ttl` is a string
 * An invalid string or an integer outside range `0..16#7FFFFFFF` is passed as `Ttl`
 * Data is invalid for the resource type
+* Data as a generic form string contained syntax/other errors
 
 == Examples
 
 [source,erlang]
 ----
-RRLine = ".    IN    0    A  0.0.0.0",
-{[], a, in, 0, {0,0,0,0}} = Resource1 = dnslib:resource(RRLine),
-Resource1 = dnslib:resource(". IN 0 A \\# 4 00 00 00 00"),
-Resource1 = dnslib:resource(". CLASS1 0 TYPE1 \\# 4 00 00 00 00"),
-Resource1 = dnslib:resource(". CLASS1 0 A \\# 4 00 00 00 00"),
-Resource1 = dnslib:resource(".", a, in, 0, {0,0,0,0}),
-Resource1 = dnslib:resource([], 1, 1, 0, <<0:32>>),
-Resource1 = dnslib:resource(".", a, in, 0, "0.0.0.0"),
-Resource1 = dnslib:resource(".", a, in, 0, "\\# 4 00 00 00 00"),
+RRLine = ".    IN    30min    A  0.0.0.0",
+{[], a, in, 1800, {0,0,0,0}} = Resource1 = dnslib:resource(RRLine),
+Resource1 = dnslib:resource(". IN 30min A \\# 4 00 00 00 00"),
+Resource1 = dnslib:resource(". CLASS1 30min TYPE1 \\# 4 00 00 00 00"),
+Resource1 = dnslib:resource(". CLASS1 30min A \\# 4 00 00 00 00"),
+Resource1 = dnslib:resource(".", a, in, "30min", {0,0,0,0}),
+Resource1 = dnslib:resource(".", "A", "IN", "30min", {0,0,0,0}),
+Resource1 = dnslib:resource(".", "TYPE1", "CLASS1", "30min", {0,0,0,0}),
+Resource1 = dnslib:resource(".", "TYPE1", "CLASS1", "30min", <<0:32>>),
+Resource1 = dnslib:resource(".", "TYPE1", "CLASS1", "30min", "\\# 4 00000000"),
+Resource1 = dnslib:resource([], 1, 1, 1800, <<0:32>>),
+Resource1 = dnslib:resource(".", a, in, 1800, "0.0.0.0"),
+Resource1 = dnslib:resource(".", a, in, 1800, "\\# 4 00 00 00 00"),
 
 {[<<"arv">>,<<"io">>], a, in, 0, {0,0,0,0}} = dnslib:resource("arv.io IN 0 A 0.0.0.0"),
 
@@ -101,15 +107,21 @@ Resource3 = {[], a, in, 3600, {0,0,0,0}} = dnslib:resource([], a, in, "60min", "
 {'EXIT', {badarg, _}} = (catch dnslib:resource([], 1, 1, 16#7FFFFFFF+1, nil)),
 {'EXIT', {badarg, _}} = (catch dnslib:resource([], 1, 1, not_a_ttl, nil)),
 {'EXIT', {badarg, _}} = (catch dnslib:resource([], 1, 1, "foobar", nil)),
-{'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, in, 60, {0,0,0,0})).
+{'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, in, 60, {0,0,0,0})),
+{'EXIT', {badarg, _}} = (catch dnslib:resource([], "TYPE", in, 60, {0,0,0,0})),
+{'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, "CLASS", 60, {0,0,0,0})),
+{'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, "CLASS1", 60, "\\# -4 00")),
+{'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, "CLASS1", 60, "\\# 4 0")).
 ----
 
 == Changelog
 
+* *0.0.2* Allow `Type` and `Class` to be given as strings in `resource/5`
 * *0.0.1* Function added
 
 == See also
 
 link:dnslib.list_to_ttl{ext-relative}[dnslib:list_to_ttl],
+link:dnslib.domain{ext-relative}[dnslib:domain],
 link:dnslib.question{ext-relative}[dnslib:question],
 link:dnslib{ext-relative}[dnslib]

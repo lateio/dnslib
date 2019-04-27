@@ -69,7 +69,7 @@ Escape form `\000` is limited to values in range `0..255`
 Erlang strings are lists of arbitrarily large integers. Thus it is possible to try to parse a string containing code points outside of ASCII as a domain. While a number of extended ASCII encodings can be represented using single octets, dnslib takes the stance that any domains containing non-ASCII code points have to be explicitly handled and okayed by the programmer, so as to prevent encodings -- and related ambiguity -- from accidentally bleeding into domains. Thus `list_to_domain` will produce an error if the string contains non-ASCII code points.
 
 [NOTE]
-If your use case potentially involves non-ASCII code points, use link:dnslib.list_to_codepoint_domain{ext-relative}[dnslib:list_to_codepoint_domain] instead, as it allows you to deal with previously mentioned code points before they are transformed to binaries.
+If your use case potentially involves non-ASCII code points, use link:dnslib.list_to_codepoint_domain{ext-relative}[`dnslib:list_to_codepoint_domain/1`] instead, as it allows you to deal with previously mentioned code points before they are transformed to binaries.
 
 == Examples
 
@@ -107,7 +107,7 @@ TooLongDomain = lists:append([Label || _ <- lists:seq(1,4)]),
 == Changelog
 
 * *0.0.1*
-** Wildcard boolean was removed from success return tuple, `'ok'` was added.
+** `Wildcard` boolean was removed from success return tuple, `'ok'` was added.
 ** `{'non_ascii_codepoint', string()}` error was added
 * *0.0.0* Function added
 

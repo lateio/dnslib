@@ -27,7 +27,7 @@ Resource to normalize
 
 Returns a resource in which:
 
-* Domain has been normalized. See link:dnslib.normalize_domain{ext-relative}[`dnslib:normalize_domain`].
+* Domain has been normalized. See link:dnslib.normalize_domain{ext-relative}[`dnslib:normalize_domain/1`].
 * Known integer values for `Resource` type and class have been replaced with their respective atoms
 * If the data member of a known resource type is a `binary()` term, it will be transformed to the appropriate data structure.
 * Resource data is normalized

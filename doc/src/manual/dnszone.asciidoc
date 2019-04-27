@@ -1,6 +1,6 @@
 = dnszone
 Lauri Moisio <l@arv.io>
-Version 0.0.1, 2019.01.18
+Version 0.0.2, 2019.04.10
 :ext-relative: {outfilesuffix}
 
 == Module
@@ -15,15 +15,25 @@ Functionality related to DNS zones.
 
 Zone validity:
 
-* link:dnszone.valid{ext-relative}[dnszone:valid] - Check if resource records form a valid zone
+* link:dnszone.continue_validate{ext-relative}[`dnszone:continue_validate/2`] - Continue an ongoing zone validation
+* link:dnszone.end_validate{ext-relative}[`dnszone:end_validate/1`] - Final verdict on zone validity
+* link:dnszone.is_valid{ext-relative}[`dnszone:is_valid/1`] - Check if resource records form a valid zone
+* link:dnszone.is_valid_file{ext-relative}[`dnszone:is_valid_file/1,2`] - Check if a file forms a valid zone
+* link:dnszone.new_validate{ext-relative}[`dnszone:new_validate/0`] - Begin zone validation
 
 Zone transfers:
 
-* link:dnszone.continue_transfer{ext-relative}[dnszone:continue_transfer] - Continue an ongoing zone transfer
-* link:dnszone.new_transfer{ext-relative}[dnszone:new_transfer] - Keep track of an ongoing zone transfer
+* link:dnszone.continue_transfer{ext-relative}[`dnszone:continue_transfer/2`] - Continue an ongoing zone transfer
+* link:dnszone.get_transfer_resources{ext-relative}[`dnszone:get_transfer_resources/1`] - Get the resources accrued so far during a transfer
+* link:dnszone.new_transfer{ext-relative}[`dnszone:new_transfer/1`] - Keep track of an ongoing zone transfer
 
 == Changelog
 
+* *0.0.2*
+** `valid/1` renamed to link:dnszone.is_valid{ext-relative}[`is_valid/1`]
+** New function link:dnszone.is_valid_file{ext-relative}[`is_valid_file/1,2`]
+** New function link:dnszone.get_transfer_resources{ext-relative}[`get_transfer_resources/1`]
+** New functions link:dnszone.continue_validate{ext-relative}[`continue_validate/2`], link:dnszone.new_validate{ext-relative}[`new_validate/0`], link:dnszone.end_validate{ext-relative}[`end_validate/1`]
 * *0.0.0* Module added
 
 == See also

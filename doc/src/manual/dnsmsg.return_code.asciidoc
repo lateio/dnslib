@@ -11,7 +11,7 @@ dnsmsg:return_code - Get the message return code
 
 [source,erlang]
 ----
-return_code(Message :: dnsmsg:message()) -> dnslib:return_code() | 0..16#FFF.
+return_code(Message :: dnsmsg:message()) -> dnslib:return_code().
 ----
 
 Get the message return code.

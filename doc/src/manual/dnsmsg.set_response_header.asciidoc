@@ -82,7 +82,7 @@ Value to which the field will be set to
 
 A request message containing the added resource(s) is returned.
 
-When `dnmsg:response` is executed on the returned request message, the modified fields will be present in the created response.
+When link:dnsmsg.response{ext-relative}[`dnsmsg:response/1,2`] is executed on the returned request message, the modified fields will be present in the created response.
 
 Supplying the wrong type of value for a field will crash the application.
 

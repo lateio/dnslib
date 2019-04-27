@@ -1,0 +1,121 @@
+= dnszone:is_valid_file
+Lauri Moisio <l@arv.io>
+Version 0.0.2, 2019.04.25
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnszone:is_valid_file - Check if a file forms a valid zone
+
+== Description
+
+[source,erlang]
+----
+is_valid_file(Filename :: string()) -> is_valid_file(Filename, []).
+
+is_valid_file(Filename :: string(), Opts :: [is_valid_file_opt() | read_file_opt()]) ->
+      'true'
+    | {'true', Soa :: dnslib:resource()}
+    | {'false',
+          'missing_soa'
+        | {'multiple_soas', Soas :: [dnslib:domain()]}
+        | 'wildcard_soa'
+        | {'class_mismatch', List :: [dnsclass:class()]}
+        | {'missing_glue', Domain :: dnslib:domain()}
+        | {'other_than_glue_past_edges', Domain :: dnslib:domain()}
+        | {'not_under_soa', Domain :: dnslib:domain()}
+        | {'non_exclusive_cname', Domain :: dnslib:domain()}
+        | {'cname_to_cname_loop', Domain :: dnslib:domain()}
+        | {'cname_loop', Domain :: dnslib:domain()}
+        | 'invalid_file'
+      }.
+----
+
+Check if a file forms a valid zone.
+
+== Types
+
+=== is_valid_file_opt()
+
+[source,erlang]
+is_valid_file_opt() =
+    'return_soa'.
+
+`'return_soa'`::
+
+Instead of only returning `'true'` when a zone was successfully verified, return a tuple consisting of `'true'` and the zone `SOA` record.
+
+=== read_file_opt()
+
+See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`] for details.
+
+== Arguments
+
+Filename::
+
+File to check
+
+Opts::
+
+Change how the file is handled.
+
+== Return value
+
+If file `Filename` contained a valid zone, `'true'` is returned.
+
+On error a tuple consisting of `'false'` and the error reason is returned.
+
+== Errors
+
+`'missing_soa'`::
+
+There was no `SOA` record in file `Filename`.
+
+`{'multiple_soas', Soas $$::$$ [dnslib:domain()]}`::
+
+There were multiple `SOA` records in file `Filename`. `Soas` contains the domain names for additional `SOA` records.
+
+`'wildcard_soa'`::
+
+The `SOA` record has a wildcard domain.
+
+`{'class_mismatch', List $$::$$ [dnsclass:class()]}`::
+
+All resources did not share the same class. `List` contains detected mismatching classes (not necessarily all mismatching classes present in the file).
+
+`{missing_glue, Domain $$::$$ dnslib:domain()}`::
+
+File `Filename` did not contain glue address record(s) for records past `NS` records. `Domain` is the domain for the record missing glue records.
+
+`{'other_than_glue_past_edges', Domain $$::$$ dnslib:domain()}`::
+
+There were resources other than address records past `NS` records. `Domain` is the domain from the problem record.
+
+`{not_under_soa, Domain $$::$$ dnslib:domain()}`::
+
+A record was not under the `SOA`. `Domain` is the domain of the problem record.
+
+`{'non_exclusive_cname', Domain $$::$$ dnslib:domain()}`::
+
+For some domain, there were both a `CNAME` record and additionally a record of some other type. `Domain` is the domain of the problem record.
+
+`{'cname_to_cname_loop', Domain $$::$$ dnslib:domain()}`::
+
+There was an anomalous `CNAME` record `{Domain, 'cname', _, _, Domain}` in the file.
+
+`{'cname_loop', Domain $$::$$ dnslib:domain()}`::
+
+There was a `CNAME` loop in file `Filename`. `Domain` is the starting point of the loop.
+
+`'invalid_file'`::
+
+There was an error – syntax or other – in the file.
+
+== Changelog
+
+* *0.0.2* Function added
+
+== See also
+
+link:dnszone.is_valid{ext-relative}[dnszone:is_valid],
+link:dnszone{ext-relative}[dnszone]

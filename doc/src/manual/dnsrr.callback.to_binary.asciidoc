@@ -28,7 +28,7 @@ Data to transform
 
 If the resource data *does not contain domains*, returns a tuple with `'ok'` and an `iodata()` term.
 
-If the resource data *does contain domains*, returns a tuple with `'domains'` and a list in which data other than domains has `iodata()` representation and domains are indicated with link:dnswire.to_binary_domain{ext-relative}[`dnswire:to_binary_domain`].
+If the resource data *does contain domains*, returns a tuple with `'domains'` and a list in which data other than domains has `iodata()` representation and domains are indicated with link:dnswire.to_binary_domain{ext-relative}[`dnswire:to_binary_domain/1`].
 
 == Examples
 

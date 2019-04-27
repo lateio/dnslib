@@ -1,0 +1,84 @@
+= dnsfile:foldl
+Lauri Moisio <l@arv.io>
+Version 0.0.2, 2019.04.13
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsfile:foldl - Call a function on successive resources retrieved from a master file
+
+== Description
+
+[source,erlang]
+----
+foldl(Fun :: fun(), Acc0 :: term(), Path :: string())
+    -> foldl(Fun, Acc0, Path, []).
+
+foldl(Fun :: fun(), Acc0 :: term(), Path :: string(), Opts :: [read_file_opt()])
+    -> {'ok', AccFinal :: term()}
+     | {'error'
+           {'file_error', 'eacces' | 'enoent' | 'eisdir', Filename :: string()}
+         | {
+             read_file_error_type(),
+             Filename :: string(),
+             Line :: pos_integer(),
+             Reason :: term()
+           }
+         | {'foldl_error', Class :: atom(), Reason :: term(), Stacktrace :: term()}
+       }.
+----
+
+Call a function on successive resources retrieved from a master file. Analogous to `lists:foldl`.
+
+== Types
+
+[source,erlang]
+Fun = fun((Resource :: dnslib:resource(), AccIn :: term()) -> AccOut)
+
+See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`] for `read_file_opt()`.
+
+== Arguments
+
+Fun::
+
+Function to call on resources
+
+Acc0::
+
+Initial state of the accumulator
+
+Path::
+
+Path of the master file
+
+Opts::
+
+Options to control certain aspects of master file handling. See link:dnsfile.read_file{ext-relative}[`dnsfile:read_file/1,2`].
+
+== Return value
+
+On success a tuple consisting of `'ok'` atom and the final accumulator is returned.
+
+On error a tuple consisting of `'error'` atom and the error reason is returned.
+
+== Errors
+
+`{'file_error', Reason, Filename $$::$$ string()}`::
+
+`'file_error'` indicates problems with accessing the file -- insufficient permissions, file not actually existing, etc.
+
+`{read_file_error_type(), File $$::$$ string(), Line $$::$$ pos_integer(), Reason $$::$$ term()}`::
+
+This case covers a wide variety problems regarding file contents. In effort to be helpful, `File` and `Line`  are included to help guide debugging. `Reason` terms try to be informative.
+
+`{'foldl_error', Class $$::$$ atom(), Reason $$::$$ term(), Stacktrace $$::$$ term()}`::
+
+`Fun` produced an exception of some kind. Tuple contains available details.
+
+== Changelog
+
+* *0.0.2* Function added
+
+== See also
+
+link:dnsfile{ext-relative}[dnsfile]

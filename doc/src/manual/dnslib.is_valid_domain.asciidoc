@@ -57,7 +57,7 @@ Label = << <<$a>> || _ <- lists:seq(1,63)>>,
 
 == Changelog
 
-* *0.0.1* IsWildcard boolean() and the wrapping tuple removed from `'true'` return
+* *0.0.1* `IsWildcard` boolean and the wrapping tuple removed from `'true'` return form
 * *0.0.0* Function added
 
 == See also

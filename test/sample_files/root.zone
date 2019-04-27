@@ -1,0 +1,23 @@
+$ORIGIN root.
+$TTL 10min
+
+@       IN     30d     SOA     (
+                                  ns1
+                                  hostmaster
+                                  100
+                                  1h
+                                  1h
+                                  1h
+                                  1h
+                                )
+
+ns1           10h     A         10.140.96.1
+www           10h     A         10.140.85.1
+
+$INCLUDE "include.zone" included
+
+$INCLUDE "include.zone"
+
+              1h      AAAA      ::1
+Tail          2h      TXT       (""
+                                 "")

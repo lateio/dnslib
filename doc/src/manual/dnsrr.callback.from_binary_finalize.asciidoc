@@ -20,7 +20,7 @@ Finalizes parsing from wire format.
 
 Terms::
 
-The list returned by `Module:from_binary`, in which compressed domains have been resolved
+The list returned by link:dnsrr.callback.from_binary{ext-relative}[`Module:from_binary/1`], in which compressed domains have been resolved
 
 == Return value
 
@@ -28,10 +28,10 @@ Returns a tuple consisting of `'ok'` and the internal resource data.
 
 == Optional callback
 
-If the module can return `{'domains', List}` from link:dnsrr.callback.from_binary{ext-relative}[`Module:from_binary`], and the resource data is structured in *some other way than*:
+If the module can return `{'domains', List}` from link:dnsrr.callback.from_binary{ext-relative}[`Module:from_binary/1`], and the resource data is structured in *some other way than*:
 
 * If the list has only one member, the first member is used as the resource data
-* If there are multiple members in the list, `list_to_tuple` is run on the list and the tuple is used as resource data
+* If there are multiple members in the list, the list is made into a tuple with link:http://erlang.org/doc/man/erlang.html#list_to_tuple-1[`list_to_tuple/1`] and the tuple is used as resource data
 
 then the module must implement this callback. Otherwise it is optional.
 

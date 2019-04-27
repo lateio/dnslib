@@ -29,7 +29,7 @@ Binary which should contain the resource record data
 
 If the binary was a valid representation of resource data and the data *did not contain domains*, returns a tuple consisting of `'ok'` and the internal resource data.
 
-If the binary was a valid representation of resource data and *did contain domains*, returns a tuple consisting of `'domains'` and a list of terms, in which domains have been marked with link:dnswire:from_binary{ext-relative}[`dnswire:from_binary_domain`]. The module might also have to implement link:dnsrr.callback.from_binary_finalize[`Module:from_binary_finalize`].
+If the binary was a valid representation of resource data and *did contain domains*, returns a tuple consisting of `'domains'` and a list of terms, in which domains have been marked with link:dnswire.from_binary_domain{ext-relative}[`dnswire:from_binary_domain/2`]. The module might also have to implement link:dnsrr.callback.from_binary_finalize{ext-relative}[`Module:from_binary_finalize/1`].
 
 If the binary was invalid, returns a tuple consisting of `'error'` and the error reason.
 

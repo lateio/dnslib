@@ -112,19 +112,19 @@
     'additional'.
 
 -type terminal_interpret_result() ::
-    {dnslib:question(), 'ok',         [dnslib:resource()]}                                            |
-    {dnslib:question(), 'nodata',     {Soa :: dnslib:resource(), CnameTrail :: [dnslib:resource()]}}  |
-    {dnslib:question(), 'name_error', {Soa :: dnslib:resource(), CnameTrail :: [dnslib:resource()]}}.
+      {dnslib:question(), 'ok',         [dnslib:resource()]}
+    | {dnslib:question(), 'nodata',     {Soa :: dnslib:resource(), CnameTrail :: [dnslib:resource()]}}
+    | {dnslib:question(), 'name_error', {Soa :: dnslib:resource(), CnameTrail :: [dnslib:resource()]}}.
 
 -type referral_interpret_result() ::
-    {dnslib:question(), 'addressless_referral', [dnslib:resource()]}            |
-    {dnslib:question(), 'missing_glue_referral', [dnslib:resource()]}           |
-    {dnslib:question(), 'referral', [{dnslib:resource(), [dnslib:resource()]}]}.
+      {dnslib:question(), 'addressless_referral', [dnslib:resource()]}
+    | {dnslib:question(), 'missing_glue_referral', [dnslib:resource()]}
+    | {dnslib:question(), 'referral', [{dnslib:resource(), [dnslib:resource()]}]}.
 
 -type cname_interpret_result() ::
-    {dnslib:question(), 'cname_loop', Cnames :: [dnslib:resource()]} |
-    {dnslib:question(), 'cname', {Cname :: dnslib:resource(cname), PreceedingCnames :: [dnslib:resource()]}} |
-    {dnslib:question(), 'cname_referral', {Cname :: dnslib:resource(), Referral :: referral_interpret_result(), PreceedingCnames :: [dnslib:resource()]}}.
+      {dnslib:question(), 'cname_loop', Cnames :: [dnslib:resource()]}
+    | {dnslib:question(), 'cname', {Cname :: dnslib:resource(cname), PreceedingCnames :: [dnslib:resource()]}}
+    | {dnslib:question(), 'cname_referral', {Cname :: dnslib:resource(), Referral :: referral_interpret_result(), PreceedingCnames :: [dnslib:resource()]}}.
 
 -type transfer_result_type() ::
       'complete'
@@ -172,9 +172,9 @@ new(Opts) ->
         CaseOp when is_atom(CaseOp) -> CaseOp;
         CaseOp when is_integer(CaseOp) -> dnswire:opcode(CaseOp)
     end,
-    ReturnCode = case maps:get(return_code, Opts, ok) of
-        CaseReturn when is_atom(CaseReturn) -> CaseReturn;
-        CaseReturn when is_integer(CaseReturn) -> dnswire:return_code(CaseReturn)
+    {ReturnCode, EDNSRequired} = case maps:get(return_code, Opts, ok) of
+        CaseReturn when is_atom(CaseReturn) -> {CaseReturn, dnswire:return_code(CaseReturn) > 16#0F};
+        CaseReturn when is_integer(CaseReturn) -> {dnswire:return_code(CaseReturn), CaseReturn > 16#0F}
     end,
     Req = #{
         % Basic header
@@ -185,7 +185,7 @@ new(Opts) ->
         'Truncated'           => maps:get(truncated, Opts, false),
         'Recursion_desired'   => maps:get(recursion_desired, Opts, false),
         'Recursion_available' => maps:get(recursion_available, Opts, false),
-        'Reserved'            => 0, % Better not to return a bitstring (<<0:3>>), More complicated, no upside
+        'Reserved'            => <<0:1>>, % Better not to return a bitstring (<<0:3>>), More complicated, no upside
         'Authenticated_data'  => maps:get(authenticated_data, Opts, false),
         'Checking_disabled'   => maps:get(checking_disabled, Opts, false),
         'Return_code'         => ReturnCode,
@@ -202,6 +202,7 @@ new(Opts) ->
         }
     },
     case Opts of
+        #{edns := false} when EDNSRequired -> error(edns_required);
         #{edns := false} -> Req;
         #{} ->
             % edns
@@ -252,12 +253,12 @@ response(Req = #{'Is_response' := false}) ->
 -spec response(Req :: dnsmsg:message(), map()) -> dnsmsg:message().
 response(Request = #{'Is_response' := false, 'Response' := ProtoResponse}, Opts) ->
     MaxSize = application:get_env(dnslib, udp_payload_max_size, 512),
-    ReturnCode = case maps:get(return_code, Opts, maps:get('Return_code', ProtoResponse, ok)) of
-        CaseCode when is_atom(CaseCode) -> CaseCode;
+    {ReturnCode, EDNSRequired} = case maps:get(return_code, Opts, maps:get('Return_code', ProtoResponse, ok)) of
+        CaseCode when is_atom(CaseCode) -> {CaseCode, dnswire:return_code(CaseCode) > 16#0F};
         Value when is_integer(Value) ->
             case dnswire:return_code(Value) of
-                Value -> Value;
-                CaseCode -> CaseCode
+                Value -> {Value, Value > 16#0F};
+                CaseCode -> {CaseCode, Value > 16#0F}
             end
     end,
     Response = Request#{
@@ -266,7 +267,7 @@ response(Request = #{'Is_response' := false, 'Response' := ProtoResponse}, Opts)
         'Authoritative'       => maps:get(authoritative, Opts, maps:get('Authoritative', ProtoResponse, false)),
         'Truncated'           => maps:get(truncated, Opts, maps:get('Truncated', ProtoResponse, false)),
         'Recursion_available' => maps:get(recursion_available, Opts, maps:get('Recursion_available', ProtoResponse, false)),
-        'Reserved'            => 0,
+        'Reserved'            => <<0:1>>,
         'Authenticated_data'  => maps:get(authenticated_data, Opts, maps:get('Authenticated_data', ProtoResponse, false)),
         'Checking_disabled'   => maps:get(checking_disabled, Opts, maps:get('Checking_disabled', ProtoResponse, false)),
         'Return_code'         => ReturnCode,
@@ -276,15 +277,16 @@ response(Request = #{'Is_response' := false, 'Response' := ProtoResponse}, Opts)
         'Additional'  => maps:get('Additional', ProtoResponse, [])
     },
     maps:remove('Response',
-        case Request of
-            #{'EDNS' := _} ->
+        case maps:get(edns, Opts, maps:get('EDNS', Request, false)) =/= false of
+            true ->
                 Response#{
                     'EDNS_version'              => maps:get(edns_version, Opts, 0),
                     'EDNS_udp_payload_size'     => maps:get(edns_udp_payload_size, Opts, MaxSize),
                     'EDNS_dnssec_ok'            => maps:get(edns_dnssec_ok, Opts, false),
                     'EDNS'                      => #{} % edns key-value options
                 };
-            #{} -> Response
+            false when EDNSRequired -> error(edns_required);
+            false -> Response
         end
     ).
 
@@ -436,7 +438,7 @@ add_question(Msg, Entry = {_, _, _}) ->
 add_question(Msg, []) ->
     Msg;
 add_question(Msg = #{'Questions' := List0}, Entries = [{_, _, _}|_]) ->
-    List1 = lists:foldr(
+    List1 = lists:foldl(
         fun (Entry = {_, Type, _}, FunList) ->
             true = dnsrr:section_valid_for_type(question, Type),
             add_entry(Entry, FunList)
@@ -451,7 +453,7 @@ add_answer(Msg, Entry = {_, _, _, _, _}) ->
 add_answer(Msg, []) ->
     Msg;
 add_answer(Msg = #{'Answers' := List0}, Entries = [{_, _, _, _, _}|_]) ->
-    List1 = lists:foldr(
+    List1 = lists:foldl(
         fun (Entry = {_, Type, _, _, _}, FunList) ->
             true = dnsrr:section_valid_for_type(answer, Type),
             add_entry(Entry, FunList)
@@ -466,7 +468,7 @@ add_authority(Msg, Entry = {_, _, _, _, _}) ->
 add_authority(Msg, []) ->
     Msg;
 add_authority(Msg = #{'Nameservers' := List0}, Entries = [{_, _, _, _, _}|_]) ->
-    List1 = lists:foldr(
+    List1 = lists:foldl(
         fun (Entry = {_, Type, _, _, _}, FunList) ->
             true = dnsrr:section_valid_for_type(authority, Type),
             add_entry(Entry, FunList)
@@ -481,7 +483,7 @@ add_additional(Msg, Entry = {_, _, _, _, _}) ->
 add_additional(Msg, []) ->
     Msg;
 add_additional(Msg = #{'Additional' := List0}, Entries = [{_, _, _, _, _}|_]) ->
-    List1 = lists:foldr(
+    List1 = lists:foldl(
         fun (Entry = {_, Type, _, _, _}, FunList) ->
             true = dnsrr:section_valid_for_type(additional, Type),
             add_entry(Entry, FunList)
@@ -837,7 +839,7 @@ infer_question_response_referral(Domain, {_, _, Class}=Question, Nameservers, Ad
                 [{NsDomain0, _, _, _, _}|_] = CaseList0 ->
                     NsDomain = dnslib:normalize_domain(NsDomain0),
                     {CaseList1, _} = lists:splitwith(fun ({FunDomain, _, _, _, _}) -> NsDomain =:= dnslib:normalize_domain(FunDomain) end, CaseList0),
-                    case referral_ns_address_match(CaseList1, Additional, []) of
+                    case referral_ns_address_match(CaseList1, Domain, Additional, []) of
                         {missing_glue, NsList} -> {Question, missing_glue_referral, NsList};
                         {addressless, NsList} -> {Question, addressless_referral, NsList};
                         {ok, NsAddrList} -> {Question, referral, NsAddrList}
@@ -865,19 +867,19 @@ interpret_response_split_fun(Domain, Type, Class) ->
     fun (List) -> lists:partition(Fn, List) end.
 
 
-referral_ns_address_match([], _, Acc) ->
+referral_ns_address_match([], ResolvDomain, _, Acc) ->
     % Should we make sure that addresses are sane?
     {Normal, Addressless} = lists:partition(fun ({_, AddrList}) -> AddrList =/= [] end, Acc),
-    case lists:filter(fun ({{NsDomain, _, _, _, ServerDomain}, _}) -> not dnslib:domain_in_zone(dnslib:normalize_domain(ServerDomain), dnslib:normalize_domain(NsDomain)) end, Addressless) of
+    case lists:filter(fun ({{_, _, _, _, ServerDomain}, _}) -> not dnslib:domain_in_zone(dnslib:normalize_domain(ServerDomain), ResolvDomain) end, Addressless) of
         [] when Normal =:= [] -> {missing_glue, [NsTuple || {NsTuple, _} <- Acc]};
         [] -> {ok, Normal};
         NotInZone when Normal =:= [] -> {addressless, [NsTuple || {NsTuple, _} <- NotInZone]};
         NotInZone -> {ok, lists:append(Normal, NotInZone)}
     end;
-referral_ns_address_match([{_, _, Class, _, Domain0}=Ns|Rest], Additional, Acc) ->
+referral_ns_address_match([{_, _, Class, _, Domain0}=Ns|Rest], ResolvDomain, Additional, Acc) ->
     Domain = dnslib:normalize_domain(Domain0),
     Addresses = lists:filter(fun ({FunDomain, _, FunClass, _, _}) -> dnslib:normalize_domain(FunDomain) =:= Domain andalso FunClass =:= Class end, Additional),
-    referral_ns_address_match(Rest, Additional, [{Ns, lists:filter(fun referral_ns_address_filter/1, Addresses)}|Acc]).
+    referral_ns_address_match(Rest, ResolvDomain, Additional, [{Ns, lists:filter(fun referral_ns_address_filter/1, Addresses)}|Acc]).
 
 
 referral_ns_address_filter({_, a, _, _, Address}) ->

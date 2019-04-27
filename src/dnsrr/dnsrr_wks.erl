@@ -38,6 +38,8 @@
 
 -export([bitmap_to_ports/1,ports_to_bitmap/1]).
 
+-include("../include/pre_otp20_string_macro.hrl").
+
 -define(MAX_BITMAP, 8192).
 
 masterfile_token() -> "wks".
@@ -223,7 +225,7 @@ port(Int, Bitmap) when is_integer(Int) ->
 ports([], Bitmap) ->
     {ok, Bitmap};
 ports([Port|Rest], Bitmap0) ->
-    case port(string:lowercase(Port), Bitmap0) of
+    case port(string:(?LOWER)(Port), Bitmap0) of
         {ok, Bitmap1} -> ports(Rest, Bitmap1);
         {error, _}=Tuple -> Tuple
     end.
@@ -232,7 +234,7 @@ ports([Port|Rest], Bitmap0) ->
 from_masterfile([Address0, Protocol0|Ports0]) ->
     case inet:parse_ipv4strict_address(Address0) of
         {ok, Address1} ->
-            case protocol(string:lowercase(Protocol0)) of
+            case protocol(string:(?LOWER)(Protocol0)) of
                 {error, Reason} -> {error, {invalid_protocol, Reason}};
                 {ok, Protocol1} ->
                     case ports(Ports0, <<>>) of
@@ -288,7 +290,7 @@ when is_integer(Port), Port >= 0, Port =< 16#FFFF ->
     {ok, Bitmap1} = port(Port, Bitmap0),
     ports_to_bitmap(Rest, Bitmap1);
 ports_to_bitmap([Port|Rest], Bitmap0) when is_list(Port) ->
-    {ok, Bitmap1} = port(string:lowercase(Port), Bitmap0),
+    {ok, Bitmap1} = port(string:(?LOWER)(Port), Bitmap0),
     ports_to_bitmap(Rest, Bitmap1).
 
 

@@ -52,32 +52,6 @@ domain_to_codepoint_domain_test() ->
     ["ARV","io"] = dnslib:domain_to_codepoint_domain([<<"ARV">>,<<"io">>]).
 
 
-binary_to_domain_test() ->
-    {ok, [<<"arv">>,<<"io">>], <<>>} = dnslib:binary_to_domain(<<3, "arv", 2, "io", 0>>),
-    {compressed, {compressed, 2, [<<"io">>,<<"arv">>]}, <<>>} = dnslib:binary_to_domain(<<3, "arv", 2, "io", 1:1, 1:1, 2:14>>),
-    {error, truncated_domain} = dnslib:binary_to_domain(<<0:2>>),
-    {error, truncated_domain} = dnslib:binary_to_domain(<<3, "arv", 2, "io">>),
-    {error, empty_binary} = dnslib:binary_to_domain(<<>>),
-    BinLabel = << <<$a>> || _ <- lists:seq(1,63)>>,
-    LongBinary = <<63, BinLabel/binary, 63, BinLabel/binary, 63, BinLabel/binary, 63, BinLabel/binary, 0>>,
-    {error, domain_too_long} = dnslib:binary_to_domain(LongBinary),
-    LastLabel = << <<$a>> || _ <- lists:seq(1,61)>>,
-    MaxBinary = <<63, BinLabel/binary, 63, BinLabel/binary, 63, BinLabel/binary, 61, LastLabel/binary, 0>>,
-    {ok, _, <<>>} = dnslib:binary_to_domain(MaxBinary),
-    {error, {invalid_length, 0, 1}} = dnslib:binary_to_domain(<<0:1, 1:1, 0:6>>).
-
-
-domain_to_binary_test() ->
-    {ok, <<3, "ARV", 2, "io", 0>>} = dnslib:domain_to_binary([<<"ARV">>,<<"io">>]),
-    {ok, <<3, "ARV", 2, "io", 3:2, 12:14>>} = dnslib:domain_to_binary({compressed, 12, [<<"io">>, <<"ARV">>]}),
-    BinLabel = << <<$a>> || _ <- lists:seq(1,63)>>,
-    {error, domain_too_long} = dnslib:domain_to_binary([BinLabel || _ <- lists:seq(1,4)]),
-    {error, label_too_long} = dnslib:domain_to_binary([<< <<$a>> || _ <- lists:seq(1,64)>>]),
-    {error, empty_label} = dnslib:domain_to_binary([<<>>]),
-    {error, ref_out_of_range} = dnslib:domain_to_binary({compressed, -1, [<<"io">>, <<"ARV">>]}),
-    {error, ref_out_of_range} = dnslib:domain_to_binary({compressed, 16#4000, [<<"io">>, <<"ARV">>]}).
-
-
 domain_to_list_test() ->
     "*.arv.io." = dnslib:domain_to_list(['_',<<"arv">>,<<"io">>]),
     "\\\"arv.io." = dnslib:domain_to_list([<<"\"arv">>,<<"io">>]),
@@ -87,6 +61,13 @@ domain_to_list_test() ->
     "\\*.arv.*.io." = dnslib:domain_to_list([<<"*">>,<<"arv">>,<<"*">>,<<"io">>]),
     "\\(arv.*.io." = dnslib:domain_to_list([<<"(arv">>,<<"*">>,<<"io">>]),
     "\\\"arv.*.io." = dnslib:domain_to_list([<<"\"arv">>,<<"*">>,<<"io">>]),
+    "\\$arv.*.io." = dnslib:domain_to_list([<<"$arv">>,<<"*">>,<<"io">>]),
+    "\\@arv.*.io." = dnslib:domain_to_list([<<"@arv">>,<<"*">>,<<"io">>]),
+    "\\;arv.*.io." = dnslib:domain_to_list([<<";arv">>,<<"*">>,<<"io">>]),
+    "\\;arv.*.io\\)." = dnslib:domain_to_list([<<";arv">>,<<"*">>,<<"io)">>]),
+    "\\;arv.*.io\\;." = dnslib:domain_to_list([<<";arv">>,<<"*">>,<<"io;">>]),
+    "\\\\\\;arv.*.io\\\\\\;." = dnslib:domain_to_list([<<"\\;arv">>,<<"*">>,<<"io\\;">>]),
+
     "*.arv.io." = dnslib:domain_to_list(['_',"arv","io"]),
     "\\*.arv.io." = dnslib:domain_to_list(["*","arv","io"]),
     "\\*.arv\\.io." = dnslib:domain_to_list(["*","arv.io"]),
@@ -94,12 +75,6 @@ domain_to_list_test() ->
     "\\*.arv.*.io." = dnslib:domain_to_list(["*","arv","*","io"]),
     "\\(arv.*.io." = dnslib:domain_to_list(["(arv","*","io"]),
     "\\\"arv.*.io." = dnslib:domain_to_list(["\"arv","*","io"]).
-
-
-domain_binary_length_test() ->
-    1 = dnslib:domain_binary_length([]),
-    8 = dnslib:domain_binary_length([<<"arv">>,<<"io">>]),
-    9 = dnslib:domain_binary_length({compressed, 12, [<<"io">>,<<"arv">>]}).
 
 
 reset_id_test() ->
@@ -153,6 +128,7 @@ is_valid_domain_test() ->
 
 
 normalize_domain_test() ->
+    ['_'] = dnslib:normalize_domain(['_']),
     [<<"arv">>, <<"io">>] = dnslib:normalize_domain([<<"ARV">>, <<"io">>]),
     [<<"Ä">>, <<"arv">>, <<"io">>] = dnslib:normalize_domain([<<"Ä">>,<<"ARV">>, <<"io">>]).
 
@@ -177,7 +153,15 @@ reverse_dns_question_test() ->
 
 question_test() ->
     Question1 = {[<<"arv">>,<<"io">>], a, in} = dnslib:question("arv.io", a, in),
+    Question1 = dnslib:question("arv.io."),
+    Question1 = dnslib:question("arv.io.", a),
+    Question1 = dnslib:question("arv.io.", a, in),
     Question1 = dnslib:question("arv.io", 1, 1),
+    Question1 = dnslib:question("arv.io", "A", in),
+    Question1 = dnslib:question("arv.io", "A", "IN"),
+    Question1 = dnslib:question("arv.io", "TYPE1", "CLASS1"),
+    Question1 = dnslib:question("arv.io A IN"),
+    Question1 = dnslib:question("arv.io. A IN"),
 
     {'EXIT', {badarg, _}} = (catch dnslib:question([], -1, 1)), % out of range type
     {'EXIT', {badarg, _}} = (catch dnslib:question([], 16#FFFF+1, 1)), % out of range type
@@ -185,15 +169,29 @@ question_test() ->
     {'EXIT', {badarg, _}} = (catch dnslib:question([], 1, 16#FFFF+1)), % out of range class
     {'EXIT', {badarg, _}} = (catch dnslib:question("väinämöinen", 1, 1)), % non-ASCII error
     {'EXIT', {badarg, _}} = (catch dnslib:question([], not_a_type, 1)), % unknown type atom
-    {'EXIT', {badarg, _}} = (catch dnslib:question([], 1, not_a_class)). % unknown class atom
+    {'EXIT', {badarg, _}} = (catch dnslib:question([], 1, not_a_class)), % unknown class atom
+    {'EXIT', {badarg, _}} = (catch dnslib:question([], "TYPE", 1)), % invalid type error
+    {'EXIT', {badarg, _}} = (catch dnslib:question([], 1, "CLASS")). % invalid class error
 
 
 resource_test() ->
-    Resource1 = {[<<"arv">>,<<"io">>], a, in, 0, {0,0,0,0}} = dnslib:resource("arv.io", a, in, 0, {0,0,0,0}),
-    Resource1 = dnslib:resource("arv.io", 1, 1, 0, {0,0,0,0}),
-    Resource1 = dnslib:resource("arv.io", 1, 1, 0, <<0:32>>),
-    Resource1 = dnslib:resource("arv.io", 1, 1, 0, "0.0.0.0"),
-    Resource1 = dnslib:resource("arv.io   IN  0  A 0.0.0.0"),
+    Resource1 = {[<<"arv">>,<<"io">>], a, in, 1800, {0,0,0,0}} = dnslib:resource("arv.io", a, in, 1800, {0,0,0,0}),
+    Resource1 = dnslib:resource("arv.io", 1, 1, 1800, {0,0,0,0}),
+    Resource1 = dnslib:resource("arv.io", 1, 1, 1800, <<0:32>>),
+    Resource1 = dnslib:resource("arv.io", a, 1, 1800, <<0:32>>),
+    Resource1 = dnslib:resource("arv.io", "A", 1, 1800, <<0:32>>),
+    Resource1 = dnslib:resource("arv.io", "TYPE1", 1, 1800, <<0:32>>),
+    Resource1 = dnslib:resource("arv.io", 1, 1, 1800, "\\# 4 00 00 00 00"),
+    Resource1 = dnslib:resource("arv.io", a, 1, 1800, "\\# 4 00 00 00 00"),
+    Resource1 = dnslib:resource("arv.io", "A", 1, 1800, "\\# 4 00 00 00 00"),
+    Resource1 = dnslib:resource("arv.io", 1, 1, 1800, "0.0.0.0"),
+    Resource1 = dnslib:resource("arv.io", "A", 1, 1800, "0.0.0.0"),
+    Resource1 = dnslib:resource("arv.io", "A", "IN", 1800, "0.0.0.0"),
+    Resource1 = dnslib:resource("arv.io", 1, "IN", 1800, "0.0.0.0"),
+    Resource1 = dnslib:resource("arv.io", 1, "CLASS1", 1800, "0.0.0.0"),
+    Resource1 = dnslib:resource("arv.io", "A", "IN", "30min", "0.0.0.0"),
+    Resource1 = dnslib:resource("arv.io   IN  30min  A 0.0.0.0"),
+    Resource1 = dnslib:resource("arv.io   IN  30min  A 0.0.0.0"),
 
     Resource2 = {[], a, in, 0, {0,0,0,0}} = dnslib:resource(". IN 0 A 0.0.0.0"),
     Resource2 = dnslib:resource(". IN 0 A \\# 4 00 00 00 00"),
@@ -221,7 +219,36 @@ resource_test() ->
     {'EXIT', {badarg, _}} = (catch dnslib:resource([], 1, 1, 16#7FFFFFFF+1, nil)),
     {'EXIT', {badarg, _}} = (catch dnslib:resource([], 1, 1, not_a_ttl, nil)),
     {'EXIT', {badarg, _}} = (catch dnslib:resource([], 1, 1, "foobar", nil)),
-    {'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, in, 60, {0,0,0,0})).
+    {'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, in, 60, {0,0,0,0})),
+    {'EXIT', {badarg, _}} = (catch dnslib:resource([], "TYPE", in, 60, {0,0,0,0})),
+    {'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, "CLASS", 60, {0,0,0,0})),
+    {'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, "CLASS1", 60, "\\# -4 00")),
+    {'EXIT', {badarg, _}} = (catch dnslib:resource([], cname, "CLASS1", 60, "\\# 4 0")),
+    {'EXIT', {badarg, _}} = (catch dnslib:resource(". CLASS1 0 A \\# 5 00 00 00 00 00")).
+
+
+resource_doc_test() ->
+    RRLine = ".    IN    30min    A  0.0.0.0",
+    {[], a, in, 1800, {0,0,0,0}} = Resource1 = dnslib:resource(RRLine),
+    Resource1 = dnslib:resource(". IN 30min A \\# 4 00 00 00 00"),
+    Resource1 = dnslib:resource(". CLASS1 30min TYPE1 \\# 4 00 00 00 00"),
+    Resource1 = dnslib:resource(". CLASS1 30min A \\# 4 00 00 00 00"),
+    Resource1 = dnslib:resource(".", a, in, "30min", {0,0,0,0}),
+    Resource1 = dnslib:resource(".", "A", "IN", "30min", {0,0,0,0}),
+    Resource1 = dnslib:resource(".", "TYPE1", "CLASS1", "30min", {0,0,0,0}),
+    Resource1 = dnslib:resource(".", "TYPE1", "CLASS1", "30min", <<0:32>>),
+    Resource1 = dnslib:resource(".", "TYPE1", "CLASS1", "30min", "\\# 4 00000000"),
+    Resource1 = dnslib:resource([], 1, 1, 1800, <<0:32>>),
+    Resource1 = dnslib:resource(".", a, in, 1800, "0.0.0.0"),
+    Resource1 = dnslib:resource(".", a, in, 1800, "\\# 4 00 00 00 00"),
+
+    {[<<"arv">>,<<"io">>], a, in, 0, {0,0,0,0}} = dnslib:resource("arv.io IN 0 A 0.0.0.0"),
+
+    Resource2 = {[<<"_spf">>,<<"arv">>,<<"io">>], txt, in, 0, [<<"v=spf1 mx -all">>]},
+    Resource2 = dnslib:resource("_spf.arv.io", txt, in, 0, "\"v=spf1 mx -all\""),
+
+    Resource3 = {[], a, in, 3600, {0,0,0,0}} = dnslib:resource([], a, in, "60min", "0.0.0.0"),
+    {[], a, in, 1892160000, {0,0,0,0}} = dnslib:resource([], a, in, "60 years", "0.0.0.0").
 
 
 normalize_resource_test() ->
@@ -253,3 +280,74 @@ deduplicate_test() ->
     Resource2 = dnslib:resource("ARV.IO", cname, in, 60, "ARV.IO"),
     Resource3 = dnslib:resource("ARV.IO", a, in, 60, "0.0.0.0"),
     [Resource1, Resource3] = dnslib:deduplicate([Resource1, Resource3, Resource2]).
+
+
+domain_test() ->
+    [<<"arv">>,<<"io">>] = dnslib:domain("arv.io"),
+    [<<"arv">>,<<"io">>] = dnslib:domain([<<"arv">>,<<"io">>]),
+    [<<"arv">>,<<"io">>] = dnslib:domain(<<3, "arv", 2, "io", 0>>),
+    {'EXIT', {badarg, _}} = (catch dnslib:domain("väinämöinen.com")), % Non-ASCII
+    Long = [$a || _ <- lists:seq(1,64)],
+    {'EXIT', {badarg, _}} = (catch dnslib:domain(Long)), % Too long label
+    {'EXIT', {badarg, _}} = (catch dnslib:domain("abc..com")), % Empty label
+    {'EXIT', {badarg, _}} = (catch dnslib:domain(<<3, "arv", 2, "io", 0, 0>>)). % Trailing byte(s)
+
+
+type_test() ->
+    a = dnslib:type("A"),
+    a = dnslib:type("TYPE1"),
+    a = dnslib:type(1),
+    a = dnslib:type(a),
+    a = dnslib:type(dnsrr_a), % Module responsible for the type
+
+    % An unknown type
+    2000 = dnslib:type("TYPE2000"),
+    2000 = dnslib:type(2000),
+
+    {'EXIT', {badarg, _}} = (catch dnslib:type(-1)), % Invalid value
+    {'EXIT', {badarg, _}} = (catch dnslib:type("TYPEKIT")), % Invalid string
+    {'EXIT', {badarg, _}} = (catch dnslib:type(unknown_atom)). % Unknown atom
+
+
+class_test() ->
+    in = dnslib:class("IN"),
+    in = dnslib:class("CLASS1"),
+    in = dnslib:class(1),
+    in = dnslib:class(in),
+    in = dnslib:class(dnsclass_in), % Module responsible for the class
+
+    % An unknown type
+    2000 = dnslib:class("CLASS2000"),
+    2000 = dnslib:class(2000),
+
+    {'EXIT', {badarg, _}} = (catch dnslib:class(-1)), % Invalid value
+    {'EXIT', {badarg, _}} = (catch dnslib:class("CLASSROOM")), % Invalid string
+    {'EXIT', {badarg, _}} = (catch dnslib:class(unknown_atom)). % Unknown atom
+
+
+binary_label_test() ->
+    {ok, _, [{binary, <<10,0,0,0>>}]} = dnslib:list_to_domain("\\[10.0.0.0]"),
+    {ok, _, [{binary, <<0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1>>}]} = dnslib:list_to_domain("\\[::1]"),
+    {ok, _, [{binary, <<1:1, 1:1>>}]} = dnslib:list_to_domain("\\[o6/2]"),
+    {ok, _, [{binary, <<1:1, 1:1, 0:1>>}]} = dnslib:list_to_domain("\\[b110]"),
+    {ok, _, [{binary, <<1:1, 1:1, 1:1, 1:1>>}]} = dnslib:list_to_domain("\\[xf]"),
+    {ok, _, [{binary, <<1:1, 1:1, 1:1, 1:1>>}]} = dnslib:list_to_domain("\\[xf/4]"),
+
+    {ok, _, SampleDomain} = dnslib:list_to_domain("\\[b11010000011101]"),
+    {ok, _, SampleDomain} = dnslib:list_to_domain("\\[o64072/14]"),
+    {ok, _, SampleDomain} = dnslib:list_to_domain("\\[xd074/14]"),
+    {ok, _, SampleDomain} = dnslib:list_to_domain("\\[208.116.0.0/14]"),
+
+    {error, _} = dnslib:list_to_domain("\\[f]"),
+    {error, _} = dnslib:list_to_domain("\\[xf/3]"),
+    {error, _} = dnslib:list_to_domain("\\[f"),
+    {error, _} = dnslib:list_to_domain("\\[b111/2]"),
+    {error, _} = dnslib:list_to_domain("\\[b110/2]"),
+
+    "\\[xf]" = dnslib:domain_to_list([{binary, <<16#F:4>>}]),
+    "\\[xff]" = dnslib:domain_to_list([{binary, <<16#FF>>}]),
+    _ = (catch dnslib:domain_to_list([{binary, <<>>}])),
+
+    [{binary, <<208, 29:6>>}] = dnslib:normalize_domain([{binary, <<1:1, 1:1, 1:1, 0:1, 1:1>>}, {binary, <<8#640:9>>}]),
+    [{binary, <<16#F0>>}] = dnslib:normalize_domain([{binary, <<0:4>>}, {binary, <<16#F:4>>}]),
+    [{binary, <<0:255>>}, {binary, <<1:256>>}] = dnslib:normalize_domain([{binary, <<1:1, 0:255>>}, {binary, <<0:255>>}]).

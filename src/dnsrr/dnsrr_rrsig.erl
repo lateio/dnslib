@@ -58,7 +58,7 @@ to_binary({Type, Algorithm, Labels, Ttl, Expiration, Inception, Tag, Signer, Sig
 
 
 from_binary(<<Type:16, Algorithm, Labels, Ttl:32, Expiration:32, Inception:32, Tag:16, Tail/binary>>) ->
-    case dnslib:binary_to_domain(Tail) of
+    case dnswire:binary_to_domain(Tail) of
         {ok, Signer, Signature} -> {ok, {Type, Algorithm, Labels, Ttl, Expiration, Inception, Tag, Signer, Signature}};
         _ -> {error, invalid_data}
     end.

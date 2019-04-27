@@ -39,7 +39,7 @@ Each format type is passed to the module as a certain type. This is given in par
 
 `'token'` (`string()`)::
 
-Any non-quoted string of characters. For example, `0.0.0.0`.
+Any non-quoted string of characters. For example, `0.0.0.0` or `Hello\ world`.
 
 `'text'` (`[byte()]`)::
 
@@ -67,7 +67,7 @@ Base10 integer in range `0..16#FFFFFFFF`.
 
 `'ttl'` (`dnslib:ttl()`)::
 
-Base10 integer in range `0..16#7FFFFFFF`. Accepts time units described in link:dnslib.list_to_ttl{ext-relative}[`dnslib:list_to_ttl`].
+Base10 integer in range `0..16#7FFFFFFF`. Accepts time units described in link:dnslib.list_to_ttl{ext-relative}[`dnslib:list_to_ttl/1`].
 
 `'domain'` (`dnslib:non_wildcard_domain()`)::
 
@@ -85,7 +85,7 @@ Returned list is used when verifying the number, types and values of master file
 
 This callback is optional.
 
-If this callback is not implemented, but link:dnsrr.callback.masterfile_token{ext-relative}[`Module:masterfile_token`] and link:dnsrr.callback.from_masterfile{ext-relative}[`Module:from_masterfile`] are implemented, default value `['token', '...']` is used.
+If this callback is not implemented, but link:dnsrr.callback.masterfile_token{ext-relative}[`Module:masterfile_token/0`] and link:dnsrr.callback.from_masterfile{ext-relative}[`Module:from_masterfile/1`] are implemented, default value `['token', '...']` is used.
 
 == Examples
 

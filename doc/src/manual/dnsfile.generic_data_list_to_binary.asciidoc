@@ -1,0 +1,82 @@
+= dnsfile:generic_data_list_to_binary
+Lauri Moisio <l@arv.io>
+Version 0.0.2, 2019.02.02
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnsfile:generic_data_list_to_binary - Parse a generic data string to binary
+
+== Description
+
+[source,erlang]
+----
+generic_data_list_to_binary(Generic :: string())
+    -> {ok, Data :: binary()}
+     | {error,
+             'empty_string'
+           | 'invalid_syntax'
+           | 'data_too_long'
+           | {'bad_data_length', string()}
+       }.
+----
+
+Parse a generic data string to binary.
+
+== Arguments
+
+Generic::
+
+Generic is a string in the DNS master file generic data format. String must not include line breaks, as they will result in a syntax error.
+
+== Return value
+
+If the string had correct syntax, a tuple consisting of an `'ok'` atom and the parsed binary is returned.
+
+If there were issues in the string, a tuple consisting of an `'error'` atom and the error reason is returned.
+
+== Errors
+
+`{'error', 'empty_string'}`::
+
+`Generic` was an empty string.
+
+`{'error', 'invalid_syntax'}`::
+
+There was an issue in the string syntax. String has to consist of `"\#"`, a valid length (`0..16#FFFF`) in decimal and a sequence of byte values. Byte values are represented in hex and come in pairs or as sequences of pairs. There can be no more than the indicated amount of bytes.
+
+`{'error', 'data_too_long'}`::
+
+Generic syntax cannot represent data which is longer than the maximum allowed length of resource data (`16#FFFF`).
+
+`{'error', {'bad_data_length', string()}}`::
+
+The length was an invalid value.
+
+== Examples
+
+[source,erlang]
+----
+{ok, <<0,0,0,0>>} = dnsfile:generic_data_list_to_binary("\\# 4 00 0000 00"),
+{ok, <<0,0,0,0>>} = dnsfile:generic_data_list_to_binary("\\# 4 ( 00 0000 00 )"),
+{ok, <<>>} = dnsfile:generic_data_list_to_binary("\\# 0"),
+{ok, <<>>} = dnsfile:generic_data_list_to_binary("\\# 0          ").
+----
+
+.Errors
+[source,erlang]
+----
+{error, empty_string} = dnsfile:generic_data_list_to_binary(""),
+{error, invalid_syntax} = dnsfile:generic_data_list_to_binary("\\# 4 0 0 0 0"),
+{error, {bad_data_length, "-4"}} = dnsfile:generic_data_list_to_binary("\\# -4 00 00 00 00"),
+{error, {bad_data_length, "foo"}} = dnsfile:generic_data_list_to_binary("\\# foo 00 00 00 00"),
+{error, invalid_syntax} = dnsfile:generic_data_list_to_binary("\\# 4 gh ijklm op").
+----
+
+== Changelog
+
+* *0.0.2* Function added
+
+== See also
+
+link:dnsfile{ext-relative}[dnsfile]

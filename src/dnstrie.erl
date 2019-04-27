@@ -27,10 +27,12 @@
     is_empty/1,
     set/3,
     get/2,
+    get/3,
     get_path/2,
     get_subkeys/2,
     remove/2,
-    remove/3
+    remove/3,
+    walk/3
 ]).
 
 
@@ -58,15 +60,21 @@ set([Key|Rest], Value, Map) when Key =/= '_', Key =/= '' ->
 
 
 -spec get(Key :: get_key(), Trie :: trie()) -> {'ok', term()} | 'undefined' | 'nodata'.
-get([], #{'' := Value}) ->
+get(Key, Trie) ->
+    get(Key, Trie, true).
+
+
+-spec get(Key :: get_key(), Trie :: trie(), FollowWildcards :: boolean())
+    -> {'ok', term()} | 'undefined' | 'nodata'.
+get([], #{'' := Value}, _) ->
     {ok, Value};
-get([], _) ->
+get([], _, _) ->
     nodata;
-get([Key|Rest], Map) ->
+get([Key|Rest], Map, FollowWildcards) ->
     case Map of
-        #{Key := NextMap} -> get(Rest, NextMap);
-        #{'_' := Value}   -> {ok, Value};
-        #{}               -> undefined
+        #{Key := NextMap}                    -> get(Rest, NextMap, FollowWildcards);
+        #{'_' := Value} when FollowWildcards -> {ok, Value};
+        #{}                                  -> undefined
     end.
 
 
@@ -132,3 +140,32 @@ remove([Key|Rest], Map, Mode) ->
         #{Key := Subtree} -> Map#{Key => remove(Rest, Subtree, Mode)};
         #{} -> Map
     end.
+
+
+walk(Fn, State, Trie) ->
+    element(2, walk(Fn, State, [], Trie)).
+
+walk(Fn, State0, Path, [{Key, Child}|Rest]) when Key =/= '' ->
+    case walk(Fn, State0, [Key|Path], Child) of
+        {keep_going, State1} -> walk(Fn, State1, Path, Rest);
+        {stop, _}=Tuple -> Tuple
+    end;
+walk(Fn, State0, Path, [{'', Data}|Rest]) ->
+    case Fn(Path, Data, State0) of
+        {keep_going, State1} -> walk(Fn, State1, Path, Rest);
+        keep_going -> walk(Fn, State0, Path, Rest);
+        {stop, _}=Tuple -> Tuple;
+        stop -> {stop, State0}
+    end;
+walk(_, State, _, []) ->
+    {keep_going, State};
+walk(Fn, State, Path, Trie) when is_map(Trie) ->
+    case lists:partition(fun walk_partition/1, maps:to_list(Trie)) of
+        {[], Children} -> walk(Fn, State, Path, [{'', nodata}|lists:sort(fun walk_sort/2, Children)]);
+        {Value, Children} -> walk(Fn, State, Path, Value ++ lists:sort(fun walk_sort/2, Children))
+    end.
+
+walk_partition({Val, _}) -> Val =:= '';
+walk_partition(_) -> false.
+
+walk_sort({Key1, _}, {Key2, _}) -> Key1 < Key2.

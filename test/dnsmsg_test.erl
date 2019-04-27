@@ -20,10 +20,10 @@ order_test() ->
     Msg7 = dnsmsg:add_additional(Msg6, Resource1),
     Msg8 = dnsmsg:add_additional(Msg7, Resource2),
     Msg8 = Msg0#{'Questions' => QList, 'Answers' => RList, 'Nameservers' => RList, 'Additional' => RList},
-    Msg0_1 = dnsmsg:add_question(Msg0, QList),
-    Msg0_2 = dnsmsg:add_answer(Msg0_1, RList),
-    Msg0_3 = dnsmsg:add_authority(Msg0_2, RList),
-    Msg0_4 = dnsmsg:add_additional(Msg0_3, RList),
+    Msg0_1 = dnsmsg:add_question(Msg0, lists:reverse(QList)),
+    Msg0_2 = dnsmsg:add_answer(Msg0_1, lists:reverse(RList)),
+    Msg0_3 = dnsmsg:add_authority(Msg0_2, lists:reverse(RList)),
+    Msg0_4 = dnsmsg:add_additional(Msg0_3, lists:reverse(RList)),
     Msg0_4 = Msg0#{'Questions' => QList, 'Answers' => RList, 'Nameservers' => RList, 'Additional' => RList},
     Msg8 =
         dnsmsg:set_section(
@@ -219,3 +219,8 @@ wrong_section_test() ->
     Resource = {[], opt, 512, 0, nil}, % Invalid term, doesn't matter
     Msg = dnsmsg:new(),
     {'EXIT', {{badmatch, _}, _}} = (catch dnsmsg:add_answer(Msg, Resource)).
+
+
+edns_required_test() ->
+    {'EXIT', {edns_required, _}} = (catch dnsmsg:new(#{edns => false, return_code => bad_version})),
+    {'EXIT', {edns_required, _}} = (catch dnsmsg:response(dnsmsg:new(), #{edns => false, return_code => bad_version})).

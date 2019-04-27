@@ -1,0 +1,73 @@
+= dnszone:continue_validate
+Lauri Moisio <l@arv.io>
+Version 0.0.2, 2019.04.25
+:ext-relative: {outfilesuffix}
+
+== Name
+
+dnszone:continue_validate - Continue an ongoing zone validation
+
+== Description
+
+[source,erlang]
+----
+continue_validate(Resources :: [dnslib:resource()], State1 :: opaque())
+    -> State2 :: opaque()
+     | {'false',
+           {'multiple_soas', Soas :: [dnslib:domain()]}
+         | 'wildcard_soa'
+         | {'class_mismatch', List :: [dnsclass:class()]}
+         | {'non_exclusive_cname', Domain :: dnslib:domain()}
+         | {'cname_to_cname_loop', Domain :: dnslib:domain()}
+       }.
+----
+
+Continue an ongoing zone validation.
+
+== Arguments
+
+Resources::
+
+Resources belonging to the zone currently being validated
+
+State1::
+
+State returned by previous link:dnszone.new_validate{ext-relative}[`dnszone:new_validate/0`] or link:dnszone.continue_validate{ext-relative}[`dnszone:continue_validate/2`] call
+
+== Return value
+
+If no errors were detected, an opaque state is returned which is to be used in later link:dnszone.continue_validate{ext-relative}[`dnszone:continue_validate/2`] and link:dnszone.end_validate{ext-relative}[`dnszone:end_validate/1`] calls.
+
+If an error was detected, a tuple consisting of `'false'` and the error reason is returned.
+
+== Errors
+
+`{'multiple_soas', Soas $$::$$ [dnslib:domain()]}`::
+
+There were multiple `SOA` records among `Resources` and/or previously validated resources. `Soas` contains the domain names for additional `SOA` records.
+
+`'wildcard_soa'`::
+
+An `SOA` record has a wildcard domain.
+
+`{'class_mismatch', List $$::$$ [dnsclass:class()]}`::
+
+All resources did not have the same class and/or the class differs from previously validated resources. `List` contains detected mismatching classes (not necessarily all mismatching classes present among the resources).
+
+`{'non_exclusive_cname', Domain $$::$$ dnslib:domain()}`::
+
+For some domain, there were both a `CNAME` record and additionally a record of some other type. `Domain` is the domain of the problem record.
+
+`{'cname_to_cname_loop', Domain $$::$$ dnslib:domain()}`::
+
+There was an anomalous `CNAME` record `{Domain, 'cname', _, _, Domain}` in `Resources`.
+
+== Changelog
+
+* *0.0.2* Function added
+
+== See also
+
+link:dnszone.new_validate{ext-relative}[dnszone:new_validate],
+link:dnszone.end_validate{ext-relative}[dnszone:end_validate],
+link:dnszone{ext-relative}[dnszone]

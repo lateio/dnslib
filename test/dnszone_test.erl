@@ -1,25 +1,32 @@
 -module(dnszone_test).
 -include_lib("eunit/include/eunit.hrl").
 
-valid_test() ->
+file(Filename) ->
+    filename:absname(filename:join(["test", "sample_files", Filename])).
+
+is_valid_test() ->
     Resources1 = [
         dnslib:resource(". in 60 SOA ns1 hostmaster 0 60 60 60 0"),
         dnslib:resource("alias2 in 60 cname alias1"),
         dnslib:resource("ALIAS1 in 60 cname ALIAS2")
     ],
-    {false, {cname_loop, [<<"alias2">>]}} = dnszone:valid(Resources1),
+    {false, {cname_loop, [<<"alias2">>]}} = dnszone:is_valid(Resources1),
     Resources2 = [
         dnslib:resource(". in 60 SOA ns1 hostmaster 0 60 60 60 0"),
         dnslib:resource("alias1 in 60 cname alias2"),
         dnslib:resource("alias2 in 60 cname alias1")
     ],
-    {false, {cname_loop, [<<"alias1">>]}} = dnszone:valid(Resources2),
+    {false, {cname_loop, [<<"alias1">>]}} = dnszone:is_valid(Resources2),
     Resources3 = [
         dnslib:resource(". in 60 SOA ns1 hostmaster 0 60 60 60 0"),
         dnslib:resource("alias1 in 60 cname alias2"),
         dnslib:resource("alias1 in 60 cname alias3")
     ],
-    {false, {non_exclusive_cname, _}} = dnszone:valid(Resources3).
+    {false, {non_exclusive_cname, _}} = dnszone:is_valid(Resources3),
+    {false, {class_mismatch, [in, hs]}} = dnszone:is_valid([
+        dnslib:resource(". IN 60 txt foo"),
+        dnslib:resource(". HS 60 txt bar")
+    ]).
 
 o() -> #{is_response => true}.
 
@@ -49,16 +56,17 @@ transfer_zone_test() ->
         Answer2,
         Soa
     ],
-    {ok, [AnswerFirst]} = dnsmsg:interpret_response(dnsmsg:new(o(), Question, First)),
-    {ok, [AnswerMiddle]} = dnsmsg:interpret_response(dnsmsg:new(o(), Question, Middle)),
-    {ok, [AnswerLast]} = dnsmsg:interpret_response(dnsmsg:new(o(), Question, Last)),
-    {ok, [AnswerComplete]} = dnsmsg:interpret_response(dnsmsg:new(o(), Question, Complete)),
-    {more, Transfer0} = dnszone:new_transfer(AnswerFirst),
-    {more, Transfer1} = dnszone:continue_transfer(AnswerMiddle, Transfer0),
-    {ok, {zone, Soa, [Answer1, Answer2, Answer1, Answer2, Answer1, Answer2]}} = dnszone:continue_transfer(AnswerLast, Transfer1),
-    {error, invalid_transfer_start} = dnszone:new_transfer(AnswerMiddle),
-    {error, invalid_transfer_start} = dnszone:new_transfer(AnswerLast),
-    {ok, {zone, Soa, [Answer1, Answer2]}} = dnszone:new_transfer(AnswerComplete).
+    FirstMsg = dnsmsg:new(o(), Question, First),
+    MiddleMsg = dnsmsg:new(o(), [], Middle),
+    LastMsg = dnsmsg:new(o(), [], Last),
+    CompleteMsg = dnsmsg:new(o(), Question, Complete),
+    Transfer0 = dnszone:new_transfer(Question),
+    {more, Transfer1} = dnszone:continue_transfer(FirstMsg, Transfer0),
+    {more, Transfer2} = dnszone:continue_transfer(MiddleMsg, Transfer1),
+    {ok, {zone, Soa, [Answer1, Answer2, Answer1, Answer2, Answer1, Answer2]}} = dnszone:continue_transfer(LastMsg, Transfer2),
+    {error, unexpected_answer_type} = dnszone:continue_transfer(MiddleMsg, Transfer0),
+    {error, unexpected_answer_type} = dnszone:continue_transfer(LastMsg, Transfer0),
+    {ok, {zone, Soa, [Answer1, Answer2]}} = dnszone:continue_transfer(CompleteMsg, Transfer0).
 
 transfer_incremental_test() ->
     % Copied from dnsmsg_test:interpret_response_incremental_transfer_test()
@@ -95,23 +103,66 @@ transfer_incremental_test() ->
         Answer2,
         NewSoa
     ],
-    {ok, [AnswerFirst]} = dnsmsg:interpret_response(dnsmsg:new(o(), Question, First)),
-    {ok, [AnswerMiddle]} = dnsmsg:interpret_response(dnsmsg:new(o(), Question, Middle)),
-    {ok, [AnswerLast]} = dnsmsg:interpret_response(dnsmsg:new(o(), Question, Last)),
-    {ok, [AnswerComplete]} = dnsmsg:interpret_response(dnsmsg:new(o(), Question, Complete)),
-    {more, Transfer0} = dnszone:new_transfer(AnswerFirst),
-    {more, Transfer1} = dnszone:continue_transfer(AnswerMiddle, Transfer0),
+    FirstMsg = dnsmsg:new(o(), Question, First),
+    MiddleMsg = dnsmsg:new(o(), [], Middle),
+    LastMsg = dnsmsg:new(o(), [], Last),
+    EmptyLastMsg = dnsmsg:new(o(), [], [NewSoa]),
+    CompleteMsg = dnsmsg:new(o(), Question, Complete),
+    Transfer0 = dnszone:new_transfer(Question),
+    {more, Transfer1} = dnszone:continue_transfer(FirstMsg, Transfer0),
+    {more, Transfer2} = dnszone:continue_transfer(MiddleMsg, Transfer1),
     {ok, {change_sets, NewSoa, [
         {{OldSoa, [Answer1]}, {NewSoa, [Answer2]}},
         {{OldSoa, [Answer1]}, {NewSoa, [Answer2]}},
         {{OldSoa, [Answer1]}, {NewSoa, [Answer2]}}
-    ]}} = dnszone:continue_transfer(AnswerLast, Transfer1),
-    {error, invalid_transfer_start} = dnszone:new_transfer(AnswerMiddle),
-    {error, invalid_transfer_start} = dnszone:new_transfer(AnswerLast),
+    ]}} = dnszone:continue_transfer(LastMsg, Transfer2),
+    {error, unexpected_answer_type} = dnszone:continue_transfer(MiddleMsg, Transfer0),
+    {error, unexpected_answer_type} = dnszone:continue_transfer(LastMsg, Transfer0),
     {ok, {change_sets, NewSoa, [
         {{OldSoa, [Answer1]}, {NewSoa, [Answer2]}}
-    ]}} = dnszone:new_transfer(AnswerComplete),
+    ]}} = dnszone:continue_transfer(CompleteMsg, Transfer0),
     {ok, {change_sets, NewSoa, [
         {{OldSoa, [Answer1]}, {NewSoa, [Answer2]}},
         {{OldSoa, [Answer1]}, {NewSoa, [Answer2]}}
-    ]}} = dnszone:continue_transfer({nil, zone_transfer, {NewSoa, last, []}}, Transfer1).
+    ]}} = dnszone:continue_transfer(EmptyLastMsg, Transfer2).
+
+
+is_valid_file_test() ->
+    true = dnszone:is_valid_file(file("all_rrs.zone")),
+    AllSoa = dnslib:resource(".   IN   60   SOA     ns1 hostmaster 0 60 60 60 60"),
+    {true, AllSoa} = dnszone:is_valid_file(file("all_rrs.zone"), [return_soa]).
+
+
+stream_validate_test() ->
+    State0 = dnszone:new_validate(),
+    {false, _} = dnszone:end_validate(State0),
+    Zone1 = [
+        dnslib:resource(". in 60 SOA ns1 hostmaster 0 60 60 60 0"),
+        dnslib:resource("alias2 in 60 cname alias1"),
+        dnslib:resource("ALIAS1 in 60 cname ALIAS2")
+    ],
+    State1_1 = dnszone:continue_validate(Zone1, State0),
+    {false, {cname_loop, [<<"alias2">>]}} = dnszone:end_validate(State1_1),
+    Zone2 = [
+        dnslib:resource(". in 60 SOA ns1 hostmaster 0 60 60 60 0"),
+        dnslib:resource("alias1 in 60 cname alias2"),
+        dnslib:resource("alias2 in 60 cname alias1")
+    ],
+    State2_1 = dnszone:continue_validate(Zone2, State0),
+    {false, {cname_loop, [<<"alias1">>]}} = dnszone:end_validate(State2_1),
+    Zone3 = [
+        dnslib:resource(". in 60 SOA ns1 hostmaster 0 60 60 60 0"),
+        dnslib:resource("alias1 in 60 cname alias2"),
+        dnslib:resource("alias1 in 60 cname alias3")
+    ],
+    {false, {non_exclusive_cname, _}} = dnszone:continue_validate(Zone3, State0),
+    Zone4_1 = [
+        dnslib:resource(". in 60 SOA ns1 hostmaster 0 60 60 60 0")
+    ],
+    State4_1 = dnszone:continue_validate(Zone4_1, State0),
+    true = dnszone:end_validate(State4_1),
+    Zone4_2 = [
+        dnslib:resource(". 60 TXT Hello")
+    ],
+    State4_2 = dnszone:continue_validate(Zone4_2, State4_1),
+    true = dnszone:end_validate(State4_2).
